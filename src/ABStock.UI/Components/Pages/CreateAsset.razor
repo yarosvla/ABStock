@@ -1,0 +1,863 @@
+﻿@page "/create-asset"
+@layout CreateAssetLayout
+@rendermode InteractiveServer
+
+<PageTitle>Создание актива</PageTitle>
+
+<div class="create-asset-shell">
+    <nav class="top-navigation" aria-label="Основная навигация">
+        <a class="brand" href="/create-asset" aria-label="ABStock">
+            <span class="brand-mark" aria-hidden="true">
+                <img src="images/abstock-logo.png" alt="" />
+            </span>
+            <span class="brand-name">ABStock</span>
+        </a>
+
+        <div class="nav-links" aria-label="Разделы">
+            <a href="#">Торговля</a>
+            <a href="#">Спекуляции</a>
+            <a href="#">Анализ</a>
+            <a href="#">Новости</a>
+            <a href="#">Аналитика</a>
+            <a href="#">Портфель</a>
+            <a class="active" href="/create-asset">Создание актива</a>
+        </div>
+
+        <div class="nav-actions">
+            <span class="market-status"><span aria-hidden="true"></span>Рынок: открыт</span>
+            <button class="icon-button" type="button" aria-label="Уведомления">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M17.5 9.5a5.5 5.5 0 0 0-11 0c0 6-2.5 6.8-2.5 6.8h16s-2.5-.8-2.5-6.8Z" />
+                    <path d="M9.8 20a2.4 2.4 0 0 0 4.4 0" />
+                </svg>
+            </button>
+            <button class="icon-button" type="button" aria-label="Помощь">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M9.6 9.4A2.5 2.5 0 0 1 12 7.8c1.5 0 2.7.9 2.7 2.3 0 1.7-1.6 2.1-2.3 3.1-.3.4-.4.8-.4 1.3" />
+                    <path d="M12 17.3h.01" />
+                </svg>
+            </button>
+            <button class="avatar-button" type="button" aria-label="Профиль пользователя">
+                <span>АК</span>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="m4 6 4 4 4-4" />
+                </svg>
+            </button>
+        </div>
+    </nav>
+
+    <main class="create-asset-main @(isProfileGenerated ? "generated" : "draft")">
+        <aside class="side-rail" aria-label="Контекст создания актива">
+            <section class="glass-card side-card steps-card">
+                <h2>Создание актива</h2>
+                <ol class="step-list">
+                    <li class="@(isProfileGenerated || isGenerating ? "done" : "active")">
+                        <span>@(isProfileGenerated || isGenerating ? "✓" : "1")</span>
+                        <div>
+                            <strong>Ввод данных</strong>
+                            <small>Укажите параметры актива</small>
+                        </div>
+                    </li>
+                    <li class="@(isProfileGenerated ? "done" : isGenerating ? "active" : null)">
+                        <span>@(isProfileGenerated ? "✓" : "2")</span>
+                        <div>
+                            <strong>Генерация профиля</strong>
+                            <small>@(isGenerating ? AnalysisStages[Math.Clamp(generationStep, 0, AnalysisStages.Length - 1)] : "AI анализ и формирование")</small>
+                        </div>
+                    </li>
+                    <li class="@(isProfileGenerated ? "active" : null)">
+                        <span>3</span>
+                        <div>
+                            <strong>Готово</strong>
+                            <small>Проверка результата</small>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+
+            <section class="glass-card side-card assistant-card">
+                <div class="side-title-row">
+                    <h2>AI-ассистент</h2>
+                    <span>AI</span>
+                </div>
+                <dl>
+                    <div>
+                        <dt>Модель:</dt>
+                        <dd>ABStock AI Core v2.3</dd>
+                    </div>
+                    <div>
+                        <dt>Статус:</dt>
+                        <dd><span class="status-dot"></span>@(isGenerating ? "Идёт анализ" : isProfileGenerated ? "Профиль готов" : "Готов к генерации")</dd>
+                    </div>
+                </dl>
+                <div class="ai-cube" aria-hidden="true">
+                    <div class="cube-stage">
+                        <span class="cube-shadow"></span>
+                        <span class="cube-rail rail-a"></span>
+                        <span class="cube-rail rail-b"></span>
+                        <span class="cube-rail rail-c"></span>
+                        <div class="holo-cube">
+                            <span class="cube-face cube-front"></span>
+                            <span class="cube-face cube-right"></span>
+                            <span class="cube-face cube-top"></span>
+                            <span class="cube-vein vein-a"></span>
+                            <span class="cube-vein vein-b"></span>
+                            <span class="cube-vein vein-c"></span>
+                            <span class="cube-vein vein-d"></span>
+                            <span class="cube-vein vein-e"></span>
+                            <span class="cube-vein vein-f"></span>
+                            <span class="cube-core"></span>
+                            <span class="cube-scan"></span>
+                        </div>
+                        <span class="orbit-node node-a"></span>
+                        <span class="orbit-node node-b"></span>
+                        <span class="orbit-node node-c"></span>
+                        <span class="data-spark spark-a"></span>
+                        <span class="data-spark spark-b"></span>
+                    </div>
+                </div>
+                <p>Профиль формируется из введённого описания. Внешние источники в прототипе не используются.</p>
+            </section>
+
+            <section class="glass-card side-card usage-card">
+                <h2>Куда будет использоваться актив</h2>
+                <ul>
+                    <li>
+                        <span class="usage-icon purple" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M4 17h16"/><path d="M7 17V9l4 4 3-6 3 10"/></svg>
+                        </span>
+                        <div>
+                            <strong>Симуляции и бэктесты</strong>
+                            <small>Проверяйте стратегии на исторических данных</small>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="usage-icon green" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 3 5 7v6c0 4 3 7 7 8 4-1 7-4 7-8V7l-7-4Z"/><path d="m9 12 2 2 4-5"/></svg>
+                        </span>
+                        <div>
+                            <strong>Торговые идеи и сигналы</strong>
+                            <small>Получайте сигналы и рекомендации</small>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="usage-icon blue" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M5 19V9"/><path d="M12 19V5"/><path d="M19 19v-8"/><path d="M4 19h16"/></svg>
+                        </span>
+                        <div>
+                            <strong>Портфельный анализ</strong>
+                            <small>Оценивайте вклад актива в портфель</small>
+                        </div>
+                    </li>
+                </ul>
+                <p><span aria-hidden="true">✦</span> Актив будет доступен во всех модулях ABStock</p>
+            </section>
+        </aside>
+
+        <section class="work-stage">
+            <header class="stage-header @(isProfileGenerated ? "generated-stage-header" : null)">
+                <div class="page-header">
+                    <h1>Создание актива</h1>
+                    <p>Создайте новый актив и получите AI-профиль с оценкой факторов и рисков</p>
+                </div>
+
+                @if (isProfileGenerated)
+                {
+                    <section class="generated-progress-card" aria-label="Статус создания актива">
+                        <div class="generated-step done">
+                            <span aria-hidden="true">✓</span>
+                            <strong>1</strong>
+                            <p>Ввод данных</p>
+                        </div>
+                        <i aria-hidden="true"></i>
+                        <div class="generated-step done">
+                            <span aria-hidden="true">✓</span>
+                            <strong>2</strong>
+                            <p>Генерация профиля <small>AI анализ завершён</small></p>
+                        </div>
+                        <i aria-hidden="true"></i>
+                        <div class="generated-step active">
+                            <span aria-hidden="true">3</span>
+                            <p>Готово <small>Профиль готов к использованию</small></p>
+                        </div>
+                        <div class="generated-ai-badge">
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M12 2.8 13.8 8l5.4 1.8-5.4 1.8L12 16.8l-1.8-5.2-5.4-1.8L10.2 8 12 2.8Z" />
+                                <path d="M18.5 15.5 19.4 18l2.6.9-2.6.9-.9 2.5-.9-2.5-2.6-.9 2.6-.9.9-2.5Z" />
+                            </svg>
+                            <span>AI-профиль</span>
+                            <small>Сгенерировано моделью</small>
+                        </div>
+                    </section>
+                }
+            </header>
+
+            <section class="workspace-grid @(isProfileGenerated ? "profile-visible review-mode" : isGenerating ? "generating-mode" : "profile-hidden")" aria-label="Создание актива">
+                <section class="glass-card form-card @(isProfileGenerated ? "summary-card" : null)" aria-labelledby="form-title">
+                    @if (isProfileGenerated)
+                    {
+                        <div class="profile-params-head">
+                            <h2 id="form-title">Параметры профиля</h2>
+                            <div class="summary-actions">
+                                <button class="secondary-button compact-button" type="button" @onclick="EditParameters">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 20h9" />
+                                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" />
+                                    </svg>
+                                    Редактировать
+                                </button>
+                                <button class="secondary-button compact-button" type="button" @onclick="RegenerateProfile">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M21 12a9 9 0 0 1-15.3 6.4" />
+                                        <path d="M5.7 21.5v-3.1h3.1" />
+                                        <path d="M3 12a9 9 0 0 1 15.3-6.4" />
+                                        <path d="M18.3 2.5v3.1h-3.1" />
+                                    </svg>
+                                    Перегенерировать
+                                </button>
+                            </div>
+                        </div>
+
+                        <dl class="profile-summary-spec">
+                            <div>
+                                <dt>Актив</dt>
+                                <dd>@DisplayAssetName</dd>
+                            </div>
+                            <div>
+                                <dt>Тип</dt>
+                                <dd>@selectedAssetType.Name</dd>
+                            </div>
+                            <div>
+                                <dt>Сектор</dt>
+                                <dd>@selectedIndustry</dd>
+                            </div>
+                            <div>
+                                <dt>Регион</dt>
+                                <dd>Россия / СНГ</dd>
+                            </div>
+                            <div>
+                                <dt>Валюта</dt>
+                                <dd>RUB</dd>
+                            </div>
+                            <div>
+                                <dt>Горизонт</dt>
+                                <dd>6-24 мес.</dd>
+                            </div>
+                        </dl>
+
+                        <div class="summary-description">
+                            <strong>Описание (кратко)</strong>
+                            <p>@DescriptionPreview</p>
+                        </div>
+
+                        <button class="read-description-button" type="button">
+                            Читать полное описание
+                            <svg viewBox="0 0 16 16" aria-hidden="true">
+                                <path d="m4 6 4 4 4-4" />
+                            </svg>
+                        </button>
+
+                        <p class="summary-generated-note">
+                            <span aria-hidden="true">i</span>
+                            Профиль сгенерирован на основе AI-модели ABStock v1.3
+                        </p>
+                    }
+                    else if (isGenerating)
+                    {
+                        <div class="card-title-row compact">
+                            <div>
+                                <h2 id="form-title">Формирование AI-профиля</h2>
+                                <p>Модель последовательно оценивает описание, риски и чувствительность к новостям</p>
+                            </div>
+                            <span class="state-pill">Анализ</span>
+                        </div>
+
+                        <div class="generation-panel" style="--progress:@GenerationProgress%">
+                            <div class="generation-progress" aria-hidden="true"><span></span></div>
+                            <ol class="analysis-stage-list">
+                                @for (var i = 0; i < AnalysisStages.Length; i++)
+                                {
+                                    var stageClass = i < generationStep ? "done" : i == generationStep ? "current" : "pending";
+                                    <li class="@stageClass">
+                                        <span>@(i < generationStep ? "✓" : i + 1)</span>
+                                        <div>
+                                            <strong>@AnalysisStages[i]</strong>
+                                            <small>@(i == generationStep ? "Выполняется" : i < generationStep ? "Завершено" : "В очереди")</small>
+                                        </div>
+                                    </li>
+                                }
+                            </ol>
+                            <div class="profile-skeleton" aria-hidden="true">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card-title-row">
+                            <div>
+                                <h2 id="form-title">Параметры актива</h2>
+                                <p>Укажите данные для оценки факторов роста, рисков и новостной чувствительности</p>
+                            </div>
+                            <span class="state-pill">Черновик</span>
+                        </div>
+
+                        <div class="asset-form">
+                            <div class="field-group dropdown-field">
+                                <label id="asset-type-label">Тип актива <span>*</span></label>
+                                <button class="select-control" type="button" aria-labelledby="asset-type-label" aria-expanded="@isAssetTypeOpen" @onclick="ToggleAssetType">
+                                    <span class="select-icon" aria-hidden="true">
+                                        @((MarkupString)selectedAssetType.Icon)
+                                    </span>
+                                    <span>@selectedAssetType.Name</span>
+                                    <svg class="chevron @(isAssetTypeOpen ? "open" : null)" viewBox="0 0 16 16" aria-hidden="true">
+                                        <path d="m3.8 6.2 4.2 4.2 4.2-4.2" />
+                                    </svg>
+                                </button>
+
+                                @if (isAssetTypeOpen)
+                                {
+                                    <div class="dropdown-panel" role="listbox" aria-label="Тип актива">
+                                        @foreach (var type in AssetTypes)
+                                        {
+                                            <button class="dropdown-option @(type.Name == selectedAssetType.Name ? "selected" : null)" type="button" role="option" aria-selected="@(type.Name == selectedAssetType.Name)" @onclick="() => SelectAssetType(type)">
+                                                <span>@((MarkupString)type.Icon)</span>
+                                                <strong>@type.Name</strong>
+                                                <small>@type.Description</small>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="field-group">
+                                <label for="asset-name">Название актива <span>*</span></label>
+                                <input id="asset-name" type="text" @bind="assetName" @bind:event="oninput" />
+                            </div>
+
+                            <div class="field-group">
+                                <label for="asset-description">Описание актива <span>*</span></label>
+                                <textarea id="asset-description" @bind="assetDescription" @bind:event="oninput"></textarea>
+                                <small class="field-hint">Длинное описание можно прокручивать. После генерации оно свернётся в резюме.</small>
+                            </div>
+
+                            <button class="optional-row @(isOptionalOpen ? "open" : null)" type="button" aria-expanded="@isOptionalOpen" @onclick="ToggleOptional">
+                                <span class="optional-copy">
+                                    <strong>Дополнительные параметры</strong>
+                                    <small>Сектор, валюта и настройки генерации</small>
+                                </span>
+                                <svg viewBox="0 0 16 16" aria-hidden="true">
+                                    <path d="m3.8 6.2 4.2 4.2 4.2-4.2" />
+                                </svg>
+                            </button>
+
+                            @if (isOptionalOpen)
+                            {
+                                <div class="optional-panel">
+                                    <div class="field-group compact">
+                                        <label id="industry-label">Сектор</label>
+                                        <button class="select-control small" type="button" aria-labelledby="industry-label" aria-expanded="@isIndustryOpen" @onclick="ToggleIndustry">
+                                            <span>@selectedIndustry</span>
+                                            <svg class="chevron @(isIndustryOpen ? "open" : null)" viewBox="0 0 16 16" aria-hidden="true">
+                                                <path d="m3.8 6.2 4.2 4.2 4.2-4.2" />
+                                            </svg>
+                                        </button>
+                                        @if (isIndustryOpen)
+                                        {
+                                            <div class="dropdown-panel compact-list" role="listbox" aria-label="Сектор">
+                                                @foreach (var industry in Industries)
+                                                {
+                                                    <button class="dropdown-option text-only @(industry == selectedIndustry ? "selected" : null)" type="button" role="option" @onclick="() => SelectIndustry(industry)">
+                                                        <strong>@industry</strong>
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <label class="toggle-row">
+                                        <input type="checkbox" @bind="includeGovernmentSupport" />
+                                        <span>Учитывать государственную поддержку</span>
+                                    </label>
+
+                                    <label class="range-row">
+                                        <span>Потенциал роста</span>
+                                        <strong>@growthPotential%</strong>
+                                        <input type="range" min="0" max="100" step="1" @bind="growthPotential" />
+                                    </label>
+                                </div>
+                            }
+
+                            <div class="form-actions">
+                                <button class="secondary-button" type="button" @onclick="ClearForm">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M3 12a9 9 0 0 1 15.3-6.4" />
+                                        <path d="M18.3 2.5v3.1h-3.1" />
+                                        <path d="M21 12a9 9 0 0 1-15.3 6.4" />
+                                        <path d="M5.7 21.5v-3.1h3.1" />
+                                    </svg>
+                                    Очистить
+                                </button>
+                                <button class="primary-button" type="button" @onclick="GenerateProfile" disabled="@(!CanGenerate || isGenerating)">
+                                    Сформировать AI-профиль
+                                </button>
+                            </div>
+
+                            <p class="privacy-note">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <rect x="5" y="10" width="14" height="10" rx="2" />
+                                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                                </svg>
+                                Профиль формируется только по введённым данным и выбранным параметрам.
+                            </p>
+                        </div>
+                    }
+                </section>
+
+                @if (isProfileGenerated)
+                {
+                    <aside class="glass-card profile-card profile-redesign" aria-labelledby="profile-title">
+                        <div class="card-title-row profile-title-row">
+                            <h2 id="profile-title">AI-профиль актива</h2>
+                            <span class="ai-generated-pill">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 2.8 13.8 8l5.4 1.8-5.4 1.8L12 16.8l-1.8-5.2-5.4-1.8L10.2 8 12 2.8Z" />
+                                    <path d="M18.5 15.5 19.4 18l2.6.9-2.6.9-.9 2.5-.9-2.5-2.6-.9 2.6-.9.9-2.5Z" />
+                                </svg>
+                                Сгенерировано AI
+                            </span>
+                        </div>
+
+                        <section class="profile-hero-card" id="profile-overview" aria-label="Сводка AI-профиля">
+                            <div class="asset-summary-block">
+                                <div class="asset-emblem compact" aria-hidden="true">
+                                    <svg viewBox="0 0 80 88">
+                                        <defs>
+                                            <linearGradient id="assetGradient" x1="15" y1="13" x2="63" y2="73" gradientUnits="userSpaceOnUse">
+                                                <stop stop-color="#7b55e7" />
+                                                <stop offset="1" stop-color="#3f2a91" />
+                                            </linearGradient>
+                                        </defs>
+                                        <path d="M40 4 73 23v42L40 84 7 65V23L40 4Z" />
+                                        <path d="m47 15-28 39h17l-5 22 30-42H43l4-19Z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <h3>@DisplayAssetName</h3>
+                                    <div class="profile-chip-row">
+                                        <span>@selectedAssetType.Name</span>
+                                        <span>@selectedIndustry</span>
+                                        <span>Россия / СНГ</span>
+                                        <span>RUB</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="profile-kpi-strip">
+                                <div class="kpi-card recommendation">
+                                    <span>Рекомендация</span>
+                                    <strong class="positive-text">нейтрально-позитивная</strong>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M3 17.5 8.5 12l4 4L21 7.5" />
+                                        <path d="M16 7.5h5v5" />
+                                    </svg>
+                                </div>
+                                <div class="kpi-card risk">
+                                    <span>Риск</span>
+                                    <strong class="warning-text">умеренно высокий</strong>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 3 19 6.5v5.2c0 4.1-2.8 7.5-7 8.8-4.2-1.3-7-4.7-7-8.8V6.5L12 3Z" />
+                                    </svg>
+                                </div>
+                                <div class="kpi-card horizon">
+                                    <span>Горизонт</span>
+                                    <strong>6-24 мес.</strong>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <rect x="4" y="5" width="16" height="15" rx="2" />
+                                        <path d="M8 3v4" />
+                                        <path d="M16 3v4" />
+                                        <path d="M4 10h16" />
+                                    </svg>
+                                </div>
+                                <div class="kpi-card confidence">
+                                    <span>Уверенность</span>
+                                    <strong class="positive-text">82%</strong>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <circle cx="12" cy="12" r="8" />
+                                        <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="profile-dashboard" id="profile-factors" aria-label="Ключевые выводы AI-профиля">
+                            <article class="profile-panel growth-panel">
+                                <div class="panel-title-row">
+                                    <h3>Драйверы роста</h3>
+                                    <svg class="moving-panel-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M3 18 8 13l4 3 8-10" />
+                                        <path d="M15 6h5v5" />
+                                    </svg>
+                                </div>
+                                <ul class="driver-summary-list">
+                                    @foreach (var factor in PositiveFactors.Take(3))
+                                    {
+                                        <li>
+                                            <span class="signal-dot green-dot"></span>
+                                            <strong>@factor.Title</strong>
+                                            <em>@(factor.Impact.Contains("Высок") ? "Высокое" : "Среднее")</em>
+                                        </li>
+                                    }
+                                </ul>
+                                <div class="panel-footline">
+                                    <span>Позитивное влияние</span>
+                                    <strong>78%</strong>
+                                </div>
+                            </article>
+
+                            <article class="profile-panel risk-panel">
+                                <div class="panel-title-row">
+                                    <h3>Ключевые риски</h3>
+                                    <svg class="moving-panel-icon shield-icon" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 3 19 6.5v5.2c0 4.1-2.8 7.5-7 8.8-4.2-1.3-7-4.7-7-8.8V6.5L12 3Z" />
+                                    </svg>
+                                </div>
+                                <ul class="risk-summary-list">
+                                    @foreach (var risk in RiskFactors.Take(3))
+                                    {
+                                        <li>
+                                            <span class="signal-dot red-dot"></span>
+                                            <strong>@risk.Title</strong>
+                                            <em>@risk.Impact</em>
+                                        </li>
+                                    }
+                                </ul>
+                                <div class="panel-footline risk-footline">
+                                    <span>Общий уровень риска</span>
+                                    <strong>Умеренно высокий</strong>
+                                </div>
+                            </article>
+
+                            <article class="profile-panel sensitivity-panel" id="profile-news">
+                                <div class="panel-title-row">
+                                    <h3>Чувствительность к новостям</h3>
+                                    <button class="info-button" type="button" title="Оценка повышена из-за зависимости от госполитики, субсидий, контрактов и технологических релизов.">i</button>
+                                </div>
+                                <div class="news-score-layout">
+                                    <div class="news-gauge" aria-label="86 из 100, высокая чувствительность">
+                                        <svg viewBox="0 0 180 170" aria-hidden="true">
+                                            <defs>
+                                                <linearGradient id="newsGaugeGradient"
+                                                                x1="35" y1="130"
+                                                                x2="145" y2="45"
+                                                                gradientUnits="userSpaceOnUse">
+                                                    <stop stop-color="#4f6dff" />
+                                                    <stop offset=".46" stop-color="#8b57ff" />
+                                                    <stop offset="1" stop-color="#28c874" />
+                                                </linearGradient>
+                                            </defs>
+
+                                            <path class="news-gauge-track"
+                                                  d="M36 126 A62 62 0 1 1 144 126"
+                                                  pathLength="100" />
+
+                                            <path class="news-gauge-value"
+                                                  d="M36 126 A62 62 0 1 1 144 126"
+                                                  pathLength="100" />
+
+                                            <path class="news-gauge-needle"
+                                                  d="M138 126 L166 126" />
+                                        </svg>
+
+                                        <div class="news-gauge-score">
+                                            <strong>86</strong>
+                                            <span>/100</span>
+                                        </div>
+
+                                        <small class="news-gauge-label">Высокая</small>
+                                    </div>
+                                    <ul class="news-sensitivity-list">
+                                        @foreach (var driver in SensitivityDrivers)
+                                        {
+                                            <li class="@(driver.Level == "Высокая" ? "high" : "medium")">
+                                                <span>@driver.Name</span>
+                                                <em>@driver.Level</em>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                                <a class="sensitivity-link" href="#profile-news">
+                                    Подробнее о чувствительности
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M5 12h14" />
+                                        <path d="m13 6 6 6-6 6" />
+                                    </svg>
+                                </a>
+                            </article>
+                        </section>
+
+                        <section class="profile-bottom-row" id="profile-actions">
+                            <div class="profile-panel tags-panel">
+                                <h3>Ключевые теги</h3>
+                                <div class="tag-cloud sector-tags">
+                                    <span>Энергетика</span>
+                                    <span>Умные сети</span>
+                                    <span class="risk-tag">Регуляторный риск</span>
+                                    <span class="green-tag">Господдержка</span>
+                                    <span class="warning-tag">Высокая чувствительность</span>
+                                </div>
+                            </div>
+                            <div class="profile-panel conclusion-panel">
+                                <h3>Ключевые выводы</h3>
+                                <ul>
+                                    <li>
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16" /><path d="M7 16v-5" /><path d="M12 16V8" /><path d="M17 16V5" /><path d="m14 8 3-3 3 3" /></svg>
+                                        Основной драйвер: господдержка и спрос на энергоэффективность
+                                    </li>
+                                    <li>
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 22 20H2L12 3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></svg>
+                                        Главный риск: регуляторные изменения и капиталоёмкость проектов
+                                    </li>
+                                    <li>
+                                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><circle cx="12" cy="12" r="3" /><path d="M16.5 7.5 20 4" /></svg>
+                                        Профиль: умеренно высокий риск при нейтрально-позитивной рекомендации
+                                    </li>
+                                </ul>
+                            </div>
+                        </section>
+
+                        <div class="profile-action-footer">
+                            <div class="action-buttons">
+                                <button class="primary-action" type="button">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M4 19h16" />
+                                        <path d="M7 16v-5" />
+                                        <path d="M12 16V7" />
+                                        <path d="M17 16v-3" />
+                                    </svg>
+                                    Открыть в анализе
+                                </button>
+                                <button type="button">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M3 12h5l2.2-5 3.2 10 2-5H21" />
+                                    </svg>
+                                    Запустить симуляцию
+                                </button>
+                                <button type="button">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M12 3 15 9l6.5.9-4.7 4.6 1.1 6.5L12 18l-5.9 3 1.1-6.5L2.5 9.9 9 9l3-6Z" />
+                                    </svg>
+                                    Добавить в watchlist
+                                </button>
+                            </div>
+                            <p>Данные актуальны на 23 мая 2025 <span aria-hidden="true">i</span></p>
+                        </div>
+
+                        @if (showMethodology)
+                        {
+                            <div class="methodology-panel compact-methodology">
+                                <strong>Методология прототипа</strong>
+                                <p>Модель выделяет ключевые темы из описания, классифицирует факторы роста и риски, затем оценивает чувствительность к новостным событиям. Метрика не является прогнозом доходности.</p>
+                            </div>
+                        }
+                    </aside>
+                }
+            </section>
+        </section>
+    </main>
+</div>
+
+@code {
+    private readonly AssetTypeOption[] AssetTypes =
+    [
+        new("Акция", "Публичная компания", "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"#fff\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 17.5 9.6 12l4 3.8L20 8.8\"/><path d=\"M16.2 8.8H20v3.8\"/></svg>"),
+        new("Облигация", "Долговой инструмент", "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"#fff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6.5 5.5h11a1.5 1.5 0 0 1 1.5 1.5v10a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17V7a1.5 1.5 0 0 1 1.5-1.5Z\"/><path d=\"M8 10h8\"/><path d=\"M8 14h5\"/></svg>"),
+        new("ETF", "Биржевой фонд", "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"#fff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 18V9\"/><path d=\"M12 18V6\"/><path d=\"M19 18v-5\"/><path d=\"M4 18h16\"/><path d=\"M7 9H3\"/><path d=\"M14 6h-4\"/><path d=\"M21 13h-4\"/></svg>"),
+        new("Криптоактив", "Цифровой актив", "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\" fill=\"none\" stroke=\"#fff\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 3.5 19.5 8v8L12 20.5 4.5 16V8L12 3.5Z\"/><path d=\"M9.5 8.5h3.8a2.1 2.1 0 0 1 0 4.2H9.5\"/><path d=\"M9.5 12.7h4.3a2.1 2.1 0 0 1 0 4.2H9.5\"/><path d=\"M9.5 7v11\"/></svg>")
+    ];
+
+    private readonly string[] Industries =
+    [
+        "Энергетика",
+        "Технологии",
+        "Финансы",
+        "Промышленность",
+        "Потребительский сектор"
+    ];
+
+    private static readonly string[] AnalysisStages =
+    [
+        "Анализ описания",
+        "Определение сектора",
+        "Оценка позитивных факторов",
+        "Оценка рисков",
+        "Расчёт чувствительности к новостям",
+        "Формирование тегов"
+    ];
+
+    private static readonly FactorInsight[] PositiveFactors =
+    [
+        new("Государственная поддержка", "Может снижать финансовые риски на ранних стадиях и ускорять пилотные внедрения.", "Высокое влияние", "78%"),
+        new("Спрос на энергоэффективность", "Поддерживает долгосрочный рынок решений для накопления энергии и умных сетей.", "Среднее влияние", "74%"),
+        new("Технологическая специализация", "Создаёт дифференциацию, но требует регулярного подтверждения через внедрения.", "Среднее влияние", "69%"),
+        new("Экспортный потенциал СНГ", "Расширяет адресный рынок за пределы РФ при условии стабильной регуляторной среды.", "Умеренное влияние", "63%")
+    ];
+
+    private static readonly RiskInsight[] RiskFactors =
+    [
+        new("Регуляторный риск", "Регуляторные", "Изменения госполитики или правил субсидирования могут резко изменить экономику проектов.", "Средняя", "Высокий"),
+        new("Капиталоёмкость проектов", "Финансовые", "R&D и производство требуют значительных вложений до подтверждения масштабируемости.", "Высокая", "Высокий"),
+        new("Конкурентное давление", "Рыночные", "Крупные энергетические и промышленные игроки могут быстрее занять каналы продаж.", "Средняя", "Средний"),
+        new("Зависимость от господдержки", "Операционные", "Снижение бюджетного финансирования может замедлить внедрения и новые контракты.", "Средняя", "Высокий")
+    ];
+
+    private static readonly SensitivityDriver[] SensitivityDrivers =
+    [
+        new("Регуляторные новости", "Высокая"),
+        new("Господдержка", "Высокая"),
+        new("Рыночные новости", "Средняя")
+    ];
+
+    private static readonly ProfileTagGroup[] TagGroups =
+    [
+        new("Секторные", "sector-tags", ["Энергетика", "Умные сети"]),
+        new("Рисковые", "risk-tags", ["Регуляторный риск", "Зависимость от господдержки", "Капиталоёмкий сектор"]),
+        new("Поведение", "behavior-tags", ["Высокая новостная чувствительность"])
+    ];
+
+    private AssetTypeOption selectedAssetType = default!;
+    private string selectedIndustry = "Энергетика";
+    private string assetName = "КвантЭнерго";
+    private string assetDescription = "КвантЭнерго — российская энергетическая компания, разрабатывающая и внедряющая системы накопления энергии нового поколения, решения для умных сетей и распределённой генерации.\n\nКомпания ориентирована на внутренний рынок РФ и страны СНГ, при поддержке государства активно развивает экспортный потенциал.";
+    private bool isAssetTypeOpen;
+    private bool isIndustryOpen;
+    private bool isOptionalOpen;
+    private bool isProfileGenerated;
+    private bool isGenerating;
+    private bool showMethodology;
+    private bool includeGovernmentSupport = true;
+    private int growthPotential = 85;
+    private int generationStep = -1;
+    private DateTime? generatedAt;
+
+    protected override void OnInitialized()
+    {
+        selectedAssetType = AssetTypes[0];
+    }
+
+    private bool CanGenerate => !string.IsNullOrWhiteSpace(assetName) && !string.IsNullOrWhiteSpace(assetDescription);
+    private string DisplayAssetName => string.IsNullOrWhiteSpace(assetName) ? "Новый актив" : assetName.Trim();
+    private int GenerationProgress => isGenerating ? Math.Clamp((generationStep + 1) * 100 / AnalysisStages.Length, 8, 100) : 0;
+    private string GeneratedAtLabel => generatedAt?.ToString("dd.MM.yyyy HH:mm") ?? "не сформировано";
+    private string DescriptionPreview
+    {
+        get
+        {
+            var value = string.IsNullOrWhiteSpace(assetDescription) ? "Описание не заполнено." : assetDescription.Trim().Replace("\n", " ");
+            return value.Length <= 180 ? value : $"{value[..180]}...";
+        }
+    }
+
+    private void ToggleAssetType()
+    {
+        isAssetTypeOpen = !isAssetTypeOpen;
+        isIndustryOpen = false;
+    }
+
+    private void SelectAssetType(AssetTypeOption type)
+    {
+        selectedAssetType = type;
+        isAssetTypeOpen = false;
+    }
+
+    private void ToggleOptional()
+    {
+        isOptionalOpen = !isOptionalOpen;
+        isAssetTypeOpen = false;
+        isIndustryOpen = false;
+    }
+
+    private void ToggleIndustry()
+    {
+        isIndustryOpen = !isIndustryOpen;
+        isAssetTypeOpen = false;
+    }
+
+    private void SelectIndustry(string industry)
+    {
+        selectedIndustry = industry;
+        isIndustryOpen = false;
+    }
+
+    private async Task GenerateProfile()
+    {
+        if (!CanGenerate || isGenerating)
+        {
+            return;
+        }
+
+        isGenerating = true;
+        isProfileGenerated = false;
+        showMethodology = false;
+        isAssetTypeOpen = false;
+        isIndustryOpen = false;
+        isOptionalOpen = false;
+
+        for (var i = 0; i < AnalysisStages.Length; i++)
+        {
+            generationStep = i;
+            StateHasChanged();
+            await Task.Delay(320);
+        }
+
+        generatedAt = DateTime.Now;
+        generationStep = AnalysisStages.Length;
+        isGenerating = false;
+        isProfileGenerated = true;
+    }
+
+    private Task RegenerateProfile()
+    {
+        return GenerateProfile();
+    }
+
+    private void EditParameters()
+    {
+        isProfileGenerated = false;
+        isGenerating = false;
+        showMethodology = false;
+        generationStep = -1;
+    }
+
+    private void ToggleMethodology()
+    {
+        showMethodology = !showMethodology;
+    }
+
+    private void ClearForm()
+    {
+        selectedAssetType = AssetTypes[0];
+        selectedIndustry = "Энергетика";
+        assetName = string.Empty;
+        assetDescription = string.Empty;
+        includeGovernmentSupport = true;
+        growthPotential = 85;
+        isOptionalOpen = false;
+        isAssetTypeOpen = false;
+        isIndustryOpen = false;
+        isProfileGenerated = false;
+        isGenerating = false;
+        showMethodology = false;
+        generationStep = -1;
+        generatedAt = null;
+    }
+
+    private sealed record AssetTypeOption(string Name, string Description, string Icon);
+    private sealed record FactorInsight(string Title, string Detail, string Impact, string Confidence);
+    private sealed record RiskInsight(string Title, string Type, string Detail, string Probability, string Impact);
+    private sealed record SensitivityDriver(string Name, string Level);
+    private sealed record ProfileTagGroup(string Title, string Kind, string[] Items);
+}
