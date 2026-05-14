@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/" />
+  <Folder Name="/src/Exchange/">
+    <Project Path="src/Exchange/ABStock.Exchange.csproj" />
+  </Folder>
+</Solution>
