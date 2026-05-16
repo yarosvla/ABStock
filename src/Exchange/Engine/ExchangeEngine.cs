@@ -5,24 +5,28 @@ namespace ABStock.Exchange.Engine;
 public sealed class ExchangeEngine
 {
     private readonly OrderBook _orderBook = new();
+    private readonly OrderValidator _orderValidator;
     private readonly List<Trade> _trades = [];
     private readonly List<decimal> _prices;
     private decimal _lastPrice;
 
-    public ExchangeEngine(decimal startPrice = 100m)
+    public ExchangeEngine(decimal startPrice = 100m, OrderValidator? orderValidator = null)
     {
         if (startPrice <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(startPrice), "Start price must be positive.");
         }
 
+        _orderValidator = orderValidator ?? new OrderValidator();
         _lastPrice = startPrice;
         _prices = [startPrice];
     }
 
     public MarketSnapshot Submit(Order order)
     {
-        //TODO
+        _orderValidator.Validate(order);
+
+        // TODO: match buy/sell pairs in the next exchange step.
         _orderBook.Add(order);
 
         return GetSnapshot();
