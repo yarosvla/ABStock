@@ -5,19 +5,18 @@ namespace ABStock.Exchange.Engine;
 public sealed class ExchangeEngine
 {
     private readonly OrderBook _orderBook = new();
-    private readonly OrderValidator _orderValidator;
+    private readonly OrderValidator _orderValidator = new();
     private readonly List<Trade> _trades = [];
     private readonly List<decimal> _prices;
     private decimal _lastPrice;
 
-    public ExchangeEngine(decimal startPrice = 100m, OrderValidator? orderValidator = null)
+    public ExchangeEngine(decimal startPrice = 100m)
     {
         if (startPrice <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(startPrice), "Start price must be positive.");
         }
-
-        _orderValidator = orderValidator ?? new OrderValidator();
+        
         _lastPrice = startPrice;
         _prices = [startPrice];
     }
@@ -26,8 +25,8 @@ public sealed class ExchangeEngine
     {
         _orderValidator.Validate(order);
 
-        // TODO: match buy/sell pairs in the next exchange step.
         _orderBook.Add(order);
+        MatchOrders();
 
         return GetSnapshot();
     }
@@ -43,5 +42,60 @@ public sealed class ExchangeEngine
             RecentPrices = _prices.ToArray(),
             RecentTrades = _trades.ToArray()
         };
+    }
+
+    private void MatchOrders()
+    {
+        while (CanMatchBestOrders())
+        {
+            ExecuteBestMatch();
+        }
+    }
+
+    private bool CanMatchBestOrders()
+    {
+        var bestBid = _orderBook.BestBid;
+        var bestAsk = _orderBook.BestAsk;
+
+        if (bestBid?.LimitPrice is null || bestAsk?.LimitPrice is null)
+        {
+            return false;
+        }
+
+        return bestBid.LimitPrice >= bestAsk.LimitPrice;
+    }
+
+    private void ExecuteBestMatch()
+    {
+        var buyOrder = _orderBook.BestBid ?? throw new InvalidOperationException("Best bid is missing.");
+        var sellOrder = _orderBook.BestAsk ?? throw new InvalidOperationException("Best ask is missing.");
+        var quantity = Math.Min(buyOrder.Quantity, sellOrder.Quantity);
+        var price = CalculateTradePrice(buyOrder, sellOrder);
+
+        var trade = new Trade
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            BuyOrderId = buyOrder.Id,
+            SellOrderId = sellOrder.Id,
+            Price = price,
+            Quantity = quantity
+        };
+
+        _trades.Add(trade);
+        _lastPrice = price;
+        _prices.Add(price);
+
+        _orderBook.ReduceBestBidBy(quantity);
+        _orderBook.ReduceBestAskBy(quantity);
+    }
+
+    private static decimal CalculateTradePrice(Order buyOrder, Order sellOrder)
+    {
+        if (buyOrder.LimitPrice is null || sellOrder.LimitPrice is null)
+        {
+            throw new InvalidOperationException("Limit prices are required for matching.");
+        }
+
+        return (buyOrder.LimitPrice.Value + sellOrder.LimitPrice.Value) / 2m;
     }
 }
