@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/ABStock.Shared/ABStock.Shared.csproj" />
     <Project Path="src/ABStock.Agents/ABStock.Agents.csproj" />
   </Folder>
 </Solution>
