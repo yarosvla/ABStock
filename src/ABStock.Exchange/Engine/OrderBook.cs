@@ -38,6 +38,19 @@ public sealed class OrderBook
         ReduceBestOrderBy(_sellOrders, quantity);
     }
 
+    public OrderBookSnapshot GetSnapshot(int depth = 5)
+    {
+        if (depth <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(depth), "Order book depth must be positive.");
+        }
+
+        return new OrderBookSnapshot(
+            Bids: BuildLevels(_buyOrders, depth),
+            Asks: BuildLevels(_sellOrders, depth)
+        );
+    }
+
     private static void ReduceBestOrderBy(List<Order> orders, decimal quantity)
     {
         if (quantity <= 0)
@@ -64,6 +77,20 @@ public sealed class OrderBook
         }
 
         orders[0] = bestOrder with { Quantity = remainingQuantity };
+    }
+
+    private static IReadOnlyList<OrderBookLevel> BuildLevels(IReadOnlyList<Order> orders, int depth)
+    {
+        return orders
+            .Where(order => order.Price is not null)
+            .GroupBy(order => order.Price!.Value)
+            .Take(depth)
+            .Select(level => new OrderBookLevel(
+                Price: level.Key,
+                Quantity: level.Sum(order => order.Quantity),
+                OrdersCount: level.Count()
+            ))
+            .ToArray();
     }
 
     private static int CompareBuyOrders(Order left, Order right)
