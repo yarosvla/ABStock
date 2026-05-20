@@ -8,6 +8,6 @@ public class AgentState
     public AgentType AgentType { get; set; }
     public decimal Cash { get; set; }
     public int Position { get; set; }
-
+    
     public decimal GetPortfolioValue(decimal currentPrice) => Cash + Position * currentPrice;
 }
