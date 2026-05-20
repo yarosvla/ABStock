@@ -255,27 +255,12 @@
     border-radius: 7px;
 }
 
-.icon-button svg,
-.avatar-button svg,
-.usage-icon svg,
-.secondary-button svg,
-.privacy-note svg,
-.profile-action-footer svg,
-.profile-panel svg,
-.ai-generated-pill svg,
-.generated-ai-badge svg,
-.read-description-button svg,
-.summary-actions svg {
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
+.create-asset-shell .bi {
+    line-height: 1;
 }
 
-.icon-button svg {
-    width: 17px;
-    height: 17px;
-    stroke-width: 1.8;
+.icon-button .bi {
+    font-size: 17px;
 }
 
 .avatar-button {
@@ -301,10 +286,8 @@
     font-weight: 650;
 }
 
-.avatar-button svg {
-    width: 13px;
-    height: 13px;
-    stroke-width: 2;
+.avatar-button .bi {
+    font-size: 12px;
 }
 
 .create-asset-main {
@@ -642,10 +625,8 @@
     background: var(--bg-card);
 }
 
-.usage-icon svg {
-    width: 17px;
-    height: 17px;
-    stroke-width: 1.8;
+.usage-icon .bi {
+    font-size: 17px;
 }
 
 .usage-card strong {
@@ -894,10 +875,9 @@
     background: #EFF4F9;
 }
 
-.select-icon svg,
-.dropdown-option svg {
-    width: 18px;
-    height: 18px;
+.select-icon .bi,
+.dropdown-option .bi {
+    font-size: 18px;
     opacity: .82;
 }
 
@@ -911,20 +891,14 @@
 }
 
 .chevron,
-.optional-row svg {
-    width: 16px;
-    height: 16px;
+.optional-row > .bi {
     color: var(--text-muted);
-    fill: none;
-    stroke: currentColor;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    stroke-width: 2;
+    font-size: 16px;
     transition: transform 140ms ease;
 }
 
 .chevron.open,
-.optional-row.open svg {
+.optional-row.open > .bi {
     transform: rotate(180deg);
 }
 
@@ -1162,11 +1136,9 @@
     border-color: var(--border-strong);
 }
 
-.secondary-button svg,
-.profile-action-footer svg {
-    width: 16px;
-    height: 16px;
-    stroke-width: 1.8;
+.secondary-button .bi,
+.profile-action-footer .bi {
+    font-size: 16px;
 }
 
 .privacy-note {
@@ -1179,12 +1151,10 @@
     line-height: 1.45;
 }
 
-.privacy-note svg {
+.privacy-note .bi {
     flex: 0 0 auto;
-    width: 15px;
-    height: 15px;
     margin-top: 1px;
-    stroke-width: 1.8;
+    font-size: 15px;
 }
 
 .generation-panel {
@@ -1363,11 +1333,9 @@
     white-space: nowrap;
 }
 
-.generated-ai-badge svg,
-.ai-generated-pill svg {
-    width: 15px;
-    height: 15px;
-    stroke-width: 1.7;
+.generated-ai-badge .bi,
+.ai-generated-pill .bi {
+    font-size: 15px;
 }
 
 .generated-ai-badge small {
@@ -1455,9 +1423,8 @@
     margin-top: 12px;
 }
 
-.read-description-button svg {
-    width: 14px;
-    height: 14px;
+.read-description-button .bi {
+    font-size: 14px;
 }
 
 .summary-generated-note {
@@ -1526,22 +1493,9 @@
     box-shadow: var(--emblem-shadow);
 }
 
-.asset-emblem svg {
-    width: 48px;
-    height: 54px;
-    display: block;
-}
-
-.asset-emblem svg path:first-of-type {
-    display: block;
-    fill: url(#assetGradient);
-    stroke: color-mix(in srgb, var(--text-purple-soft) 42%, transparent);
-    stroke-width: 2;
-}
-
-.asset-emblem svg path:nth-of-type(2) {
-    fill: #ffffff;
-    stroke: none;
+.asset-emblem .bi {
+    color: #ffffff;
+    font-size: 34px;
 }
 
 .asset-summary-block h3 {
@@ -1606,23 +1560,12 @@
     color: var(--accent-orange) !important;
 }
 
-.kpi-card svg {
+.kpi-card > .bi {
     position: absolute;
     right: 14px;
     bottom: 14px;
-    width: 26px;
-    height: 26px;
+    font-size: 26px;
     color: color-mix(in srgb, var(--text-muted) 86%, var(--text-primary));
-    stroke-width: 1.75;
-    fill: none;
-    stroke: currentColor;
-}
-
-.kpi-card svg path,
-.kpi-card svg rect,
-.kpi-card svg circle {
-    fill: none;
-    stroke: currentColor;
 }
 
 .profile-dashboard {
@@ -1681,12 +1624,8 @@
 }
 
 .moving-panel-icon {
-    width: 25px;
-    height: 25px;
+    font-size: 25px;
     color: var(--panel-accent, var(--text-muted));
-    stroke-width: 1.9;
-    fill: none;
-    stroke: currentColor;
 }
 
 .info-button {
@@ -1880,9 +1819,8 @@
     font-weight: 560;
 }
 
-.sensitivity-link svg {
-    width: 15px;
-    height: 15px;
+.sensitivity-link .bi {
+    font-size: 15px;
 }
 
 .profile-bottom-row {
@@ -1920,11 +1858,10 @@
     line-height: 1.45;
 }
 
-.conclusion-panel svg {
-    width: 17px;
-    height: 17px;
+.conclusion-panel .bi {
     color: var(--text-muted);
-    stroke-width: 1.8;
+    font-size: 17px;
+    line-height: 1.45;
 }
 
 .profile-action-footer {
