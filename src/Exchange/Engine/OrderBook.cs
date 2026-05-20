@@ -1,4 +1,4 @@
-using ABStock.Exchange.Domain;
+using ABStock.Shared;
 
 namespace ABStock.Exchange.Engine;
 
@@ -68,13 +68,13 @@ public sealed class OrderBook
 
     private static int CompareBuyOrders(Order left, Order right)
     {
-        var priceCompare = Nullable.Compare(right.LimitPrice, left.LimitPrice);
+        var priceCompare = Nullable.Compare(right.Price, left.Price);
         return priceCompare != 0 ? priceCompare : left.CreatedAt.CompareTo(right.CreatedAt);
     }
 
     private static int CompareSellOrders(Order left, Order right)
     {
-        var priceCompare = Nullable.Compare(left.LimitPrice, right.LimitPrice);
+        var priceCompare = Nullable.Compare(left.Price, right.Price);
         return priceCompare != 0 ? priceCompare : left.CreatedAt.CompareTo(right.CreatedAt);
     }
 }

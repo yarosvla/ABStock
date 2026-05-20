@@ -1,4 +1,4 @@
-using ABStock.Exchange.Domain;
+using ABStock.Shared;
 
 namespace ABStock.Exchange.Engine;
 
@@ -33,15 +33,14 @@ public sealed class ExchangeEngine
 
     public MarketSnapshot GetSnapshot()
     {
-        return new MarketSnapshot
-        {
-            LastPrice = _lastPrice,
-            BestBid = _orderBook.BestBid?.LimitPrice,
-            BestAsk = _orderBook.BestAsk?.LimitPrice,
-            Volume = _trades.Sum(trade => trade.Quantity),
-            RecentPrices = _prices.ToArray(),
-            RecentTrades = _trades.ToArray()
-        };
+        return new MarketSnapshot(
+            LastPrice: _lastPrice,
+            BestBid: _orderBook.BestBid?.Price,
+            BestAsk: _orderBook.BestAsk?.Price,
+            Volume: _trades.Sum(trade => trade.Quantity),
+            RecentPrices: _prices.ToArray(),
+            RecentTrades: _trades.ToArray()
+        );
     }
 
     private void MatchOrders()
@@ -57,12 +56,12 @@ public sealed class ExchangeEngine
         var bestBid = _orderBook.BestBid;
         var bestAsk = _orderBook.BestAsk;
 
-        if (bestBid?.LimitPrice is null || bestAsk?.LimitPrice is null)
+        if (bestBid?.Price is null || bestAsk?.Price is null)
         {
             return false;
         }
 
-        return bestBid.LimitPrice >= bestAsk.LimitPrice;
+        return bestBid.Price >= bestAsk.Price;
     }
 
     private void ExecuteBestMatch()
@@ -72,14 +71,14 @@ public sealed class ExchangeEngine
         var quantity = Math.Min(buyOrder.Quantity, sellOrder.Quantity);
         var price = CalculateTradePrice(buyOrder, sellOrder);
 
-        var trade = new Trade
-        {
-            Id = Guid.NewGuid().ToString("N"),
-            BuyOrderId = buyOrder.Id,
-            SellOrderId = sellOrder.Id,
-            Price = price,
-            Quantity = quantity
-        };
+        var trade = new Trade(
+            Id: Guid.NewGuid(),
+            BuyOrderId: buyOrder.Id,
+            SellOrderId: sellOrder.Id,
+            Price: price,
+            Quantity: quantity,
+            ExecutedAt: DateTimeOffset.UtcNow
+        );
 
         _trades.Add(trade);
         _lastPrice = price;
@@ -91,11 +90,11 @@ public sealed class ExchangeEngine
 
     private static decimal CalculateTradePrice(Order buyOrder, Order sellOrder)
     {
-        if (buyOrder.LimitPrice is null || sellOrder.LimitPrice is null)
+        if (buyOrder.Price is null || sellOrder.Price is null)
         {
             throw new InvalidOperationException("Limit prices are required for matching.");
         }
 
-        return (buyOrder.LimitPrice.Value + sellOrder.LimitPrice.Value) / 2m;
+        return (buyOrder.Price.Value + sellOrder.Price.Value) / 2m;
     }
 }
