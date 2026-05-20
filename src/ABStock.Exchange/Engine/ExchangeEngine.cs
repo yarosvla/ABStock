@@ -83,6 +83,11 @@ public sealed class ExchangeEngine
         );
     }
 
+    public OrderBookSnapshot GetOrderBookSnapshot(int depth = 5)
+    {
+        return _orderBook.GetSnapshot(depth);
+    }
+
     private void MatchOrders()
     {
         while (CanMatchBestOrders())
@@ -115,6 +120,8 @@ public sealed class ExchangeEngine
             Id: Guid.NewGuid(),
             BuyOrderId: buyOrder.Id,
             SellOrderId: sellOrder.Id,
+            BuyerAgentName: buyOrder.AgentName,
+            SellerAgentName: sellOrder.AgentName,
             Price: price,
             Quantity: quantity,
             ExecutedAt: DateTimeOffset.UtcNow
