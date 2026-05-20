@@ -4,5 +4,5 @@ public record AgentState(
     string AgentName,
     AgentType AgentType,
     decimal Cash,
-    int Position
+    decimal Position
 );

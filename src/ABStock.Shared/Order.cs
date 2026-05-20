@@ -5,7 +5,7 @@ public record Order(
     string AgentName,
     OrderSide Side,
     OrderType Type,
-    decimal Price,
-    int Quantity,
+    decimal? Price,
+    decimal Quantity,
     DateTimeOffset CreatedAt
 );

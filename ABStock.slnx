@@ -1,7 +1,19 @@
 <Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
   <Folder Name="/src/">
     <Project Path="src/ABStock.Shared/ABStock.Shared.csproj" />
     <Project Path="src/ABStock.Agents/ABStock.Agents.csproj" />
     <Project Path="src/ABStock.UI/ABStock.UI.csproj" />
+  </Folder>
+  <Folder Name="/src/Exchange/">
+    <Project Path="src/Exchange/ABStock.Exchange.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/Exchange.Tests/">
+    <Project Path="tests/Exchange.Tests/ABStock.Exchange.Tests.csproj" />
   </Folder>
 </Solution>
