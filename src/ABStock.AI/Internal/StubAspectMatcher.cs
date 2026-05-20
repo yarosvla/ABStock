@@ -1,4 +1,4 @@
-using ABStock.AI.Models;
+using ABStock.Shared;
 
 namespace ABStock.AI.Internal;
 
