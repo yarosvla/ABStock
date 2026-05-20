@@ -1,4 +1,6 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ABStock.AI/ABStock.AI.csproj" />
   <Configurations>
     <Platform Name="Any CPU" />
     <Platform Name="x64" />
