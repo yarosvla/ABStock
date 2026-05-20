@@ -1,0 +1,773 @@
+﻿@page "/create-asset"
+@layout CreateAssetLayout
+@rendermode InteractiveServer
+
+<PageTitle>Создание актива</PageTitle>
+
+<div class="create-asset-shell @(isLightTheme ? "light-theme" : null)">
+    <nav class="top-navigation" aria-label="Основная навигация">
+        <a class="brand" href="/create-asset" aria-label="ABStock">
+            <span class="brand-mark" aria-hidden="true">
+                <img src="images/abstock-logo.png" alt="" />
+            </span>
+            <span class="brand-name">ABStock</span>
+        </a>
+
+        <div class="nav-links" aria-label="Разделы">
+            <a href="#">Торговля</a>
+            <a href="#">Спекуляции</a>
+            <a href="#">Анализ</a>
+            <a href="#">Новости</a>
+            <a href="#">Аналитика</a>
+            <a href="#">Портфель</a>
+            <a class="active" href="/create-asset">Создание актива</a>
+        </div>
+
+        <div class="nav-actions">
+            <span class="market-status"><span aria-hidden="true"></span>Рынок: открыт</span>
+            <button class="icon-button theme-toggle-button" type="button" aria-label="@(isLightTheme ? "Включить тёмную тему" : "Включить светлую тему")" @onclick="ToggleTheme">
+                <i class="bi @(isLightTheme ? "bi-sun" : "bi-moon-stars")" aria-hidden="true"></i>
+            </button>
+            <button class="icon-button" type="button" aria-label="Уведомления">
+                <i class="bi bi-bell" aria-hidden="true"></i>
+            </button>
+            <button class="icon-button" type="button" aria-label="Помощь">
+                <i class="bi bi-question-circle" aria-hidden="true"></i>
+            </button>
+            <button class="avatar-button" type="button" aria-label="Профиль пользователя">
+                <span>АК</span>
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            </button>
+        </div>
+    </nav>
+
+    <main class="create-asset-main @(isProfileGenerated ? "generated" : "draft")">
+        <aside class="side-rail" aria-label="Контекст создания актива">
+            <section class="glass-card side-card steps-card">
+                <h2>Создание актива</h2>
+                <ol class="step-list">
+                    <li class="@(isProfileGenerated || isGenerating ? "done" : "active")">
+                        <span>@(isProfileGenerated || isGenerating ? "✓" : "1")</span>
+                        <div>
+                            <strong>Ввод данных</strong>
+                            <small>Укажите параметры актива</small>
+                        </div>
+                    </li>
+                    <li class="@(isProfileGenerated ? "done" : isGenerating ? "active" : null)">
+                        <span>@(isProfileGenerated ? "✓" : "2")</span>
+                        <div>
+                            <strong>Генерация профиля</strong>
+                            <small>@(isGenerating ? AnalysisStages[Math.Clamp(generationStep, 0, AnalysisStages.Length - 1)] : "AI анализ и формирование")</small>
+                        </div>
+                    </li>
+                    <li class="@(isProfileGenerated ? "active" : null)">
+                        <span>3</span>
+                        <div>
+                            <strong>Готово</strong>
+                            <small>Проверка результата</small>
+                        </div>
+                    </li>
+                </ol>
+            </section>
+
+            <section class="glass-card side-card assistant-card">
+                <div class="side-title-row">
+                    <h2>AI-ассистент</h2>
+                    <span>Core v2.3</span>
+                </div>
+                <dl class="assistant-meta">
+                    <div>
+                        <dt>Модель</dt>
+                        <dd>ABStock AI Core v2.3</dd>
+                    </div>
+                    <div>
+                        <dt>Статус</dt>
+                        <dd><span class="status-dot"></span>@(isGenerating ? "Идёт анализ" : isProfileGenerated ? "Профиль готов" : "Готов к генерации")</dd>
+                    </div>
+                    <div>
+                        <dt>Качество данных</dt>
+                        <dd>@(CanGenerate ? "Достаточно для черновой оценки" : "Ожидает обязательные поля")</dd>
+                    </div>
+                </dl>
+                <div class="assistant-readiness" aria-label="Готовность AI-профиля">
+                    <div>
+                        <span>Поля</span>
+                        <strong>@(CanGenerate ? "2/2" : $"{CompletedRequiredFields}/2")</strong>
+                    </div>
+                    <div>
+                        <span>Источник</span>
+                        <strong>Ввод пользователя</strong>
+                    </div>
+                </div>
+                <p class="assistant-warning">Внешние источники в прототипе не используются. Оценка строится только на введённом описании и параметрах.</p>
+            </section>
+
+            <section class="glass-card side-card usage-card">
+                <h2>Куда будет использоваться актив</h2>
+                <ul>
+                    <li>
+                        <span class="usage-icon purple" aria-hidden="true">
+                            <i class="bi bi-graph-up-arrow"></i>
+                        </span>
+                        <div>
+                            <strong>Симуляции и бэктесты</strong>
+                            <small>Проверяйте стратегии на исторических данных</small>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="usage-icon green" aria-hidden="true">
+                            <i class="bi bi-shield-check"></i>
+                        </span>
+                        <div>
+                            <strong>Торговые идеи и сигналы</strong>
+                            <small>Получайте сигналы и рекомендации</small>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="usage-icon blue" aria-hidden="true">
+                            <i class="bi bi-bar-chart-line"></i>
+                        </span>
+                        <div>
+                            <strong>Портфельный анализ</strong>
+                            <small>Оценивайте вклад актива в портфель</small>
+                        </div>
+                    </li>
+                </ul>
+                <p>Актив будет доступен во всех модулях ABStock</p>
+            </section>
+        </aside>
+
+        <section class="work-stage">
+            <header class="stage-header @(isProfileGenerated ? "generated-stage-header" : null)">
+                <div class="page-header">
+                    <h1>Создание актива</h1>
+                    <p>Создайте новый актив и получите AI-профиль с оценкой факторов и рисков</p>
+                </div>
+
+                @if (isProfileGenerated)
+                {
+                    <section class="generated-progress-card" aria-label="Статус создания актива">
+                        <div class="generated-step done">
+                            <span aria-hidden="true">✓</span>
+                            <strong>1</strong>
+                            <p>Ввод данных</p>
+                        </div>
+                        <i aria-hidden="true"></i>
+                        <div class="generated-step done">
+                            <span aria-hidden="true">✓</span>
+                            <strong>2</strong>
+                            <p>Генерация профиля <small>AI анализ завершён</small></p>
+                        </div>
+                        <i aria-hidden="true"></i>
+                        <div class="generated-step active">
+                            <span aria-hidden="true">3</span>
+                            <p>Готово <small>Профиль готов к использованию</small></p>
+                        </div>
+                        <div class="generated-ai-badge">
+                            <i class="bi bi-stars" aria-hidden="true"></i>
+                            <span>AI-профиль</span>
+                            <small>Сгенерировано моделью</small>
+                        </div>
+                    </section>
+                }
+            </header>
+
+            <section class="workspace-grid @(isProfileGenerated ? "profile-visible review-mode" : isGenerating ? "generating-mode" : "profile-hidden")" aria-label="Создание актива">
+                <section class="glass-card form-card @(isProfileGenerated ? "summary-card" : null)" aria-labelledby="form-title">
+                    @if (isProfileGenerated)
+                    {
+                        <div class="profile-params-head">
+                            <h2 id="form-title">Параметры профиля</h2>
+                            <div class="summary-actions">
+                                <button class="secondary-button compact-button" type="button" @onclick="EditParameters">
+                                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                                    Редактировать
+                                </button>
+                                <button class="secondary-button compact-button" type="button" @onclick="RegenerateProfile">
+                                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                                    Перегенерировать
+                                </button>
+                            </div>
+                        </div>
+
+                        <dl class="profile-summary-spec">
+                            <div>
+                                <dt>Актив</dt>
+                                <dd>@DisplayAssetName</dd>
+                            </div>
+                            <div>
+                                <dt>Тип</dt>
+                                <dd>@selectedAssetType.Name</dd>
+                            </div>
+                            <div>
+                                <dt>Сектор</dt>
+                                <dd>@selectedIndustry</dd>
+                            </div>
+                            <div>
+                                <dt>Регион</dt>
+                                <dd>Россия / СНГ</dd>
+                            </div>
+                            <div>
+                                <dt>Валюта</dt>
+                                <dd>RUB</dd>
+                            </div>
+                            <div>
+                                <dt>Горизонт</dt>
+                                <dd>6-24 мес.</dd>
+                            </div>
+                        </dl>
+
+                        <div class="summary-description">
+                            <strong>Описание (кратко)</strong>
+                            <p>@DescriptionPreview</p>
+                        </div>
+
+                        <button class="read-description-button" type="button">
+                            Читать полное описание
+                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                        </button>
+
+                        <p class="summary-generated-note">
+                            <span aria-hidden="true">i</span>
+                            Профиль сгенерирован на основе AI-модели ABStock v1.3
+                        </p>
+                    }
+                    else if (isGenerating)
+                    {
+                        <div class="card-title-row compact">
+                            <div>
+                                <h2 id="form-title">Формирование AI-профиля</h2>
+                                <p>Модель последовательно оценивает описание, риски и чувствительность к новостям</p>
+                            </div>
+                            <span class="state-pill">Анализ</span>
+                        </div>
+
+                        <div class="generation-panel" style="--progress:@GenerationProgress%">
+                            <div class="generation-progress" aria-hidden="true"><span></span></div>
+                            <ol class="analysis-stage-list">
+                                @for (var i = 0; i < AnalysisStages.Length; i++)
+                                {
+                                    var stageClass = i < generationStep ? "done" : i == generationStep ? "current" : "pending";
+                                    <li class="@stageClass">
+                                        <span>@(i < generationStep ? "✓" : i + 1)</span>
+                                        <div>
+                                            <strong>@AnalysisStages[i]</strong>
+                                            <small>@(i == generationStep ? "Выполняется" : i < generationStep ? "Завершено" : "В очереди")</small>
+                                        </div>
+                                    </li>
+                                }
+                            </ol>
+                            <div class="profile-skeleton" aria-hidden="true">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="card-title-row">
+                            <div>
+                                <h2 id="form-title">Параметры актива</h2>
+                                <p>Укажите данные для оценки факторов роста, рисков и новостной чувствительности</p>
+                            </div>
+                            <span class="state-pill">Черновик</span>
+                        </div>
+
+                        <div class="asset-form">
+                            <div class="field-group dropdown-field">
+                                <label id="asset-type-label">Тип актива <span>*</span></label>
+                                <button class="select-control" type="button" aria-labelledby="asset-type-label" aria-expanded="@isAssetTypeOpen" @onclick="ToggleAssetType">
+                                    <span class="select-icon" aria-hidden="true">
+                                        <i class="bi @selectedAssetType.IconClass"></i>
+                                    </span>
+                                    <span>@selectedAssetType.Name</span>
+                                    <i class="bi bi-chevron-down chevron @(isAssetTypeOpen ? "open" : null)" aria-hidden="true"></i>
+                                </button>
+
+                                @if (isAssetTypeOpen)
+                                {
+                                    <div class="dropdown-panel" role="listbox" aria-label="Тип актива">
+                                        @foreach (var type in AssetTypes)
+                                        {
+                                            <button class="dropdown-option @(type.Name == selectedAssetType.Name ? "selected" : null)" type="button" role="option" aria-selected="@(type.Name == selectedAssetType.Name)" @onclick="() => SelectAssetType(type)">
+                                                <span><i class="bi @type.IconClass" aria-hidden="true"></i></span>
+                                                <strong>@type.Name</strong>
+                                                <small>@type.Description</small>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="field-group @(ShowAssetNameValidation ? "has-error" : null)">
+                                <label for="asset-name">Название актива <span>*</span></label>
+                                <input id="asset-name" type="text" placeholder="Например: КвантЭнерго" @bind="assetName" @bind:event="oninput" aria-invalid="@ShowAssetNameValidation" />
+                                @if (ShowAssetNameValidation)
+                                {
+                                    <small class="validation-message">Укажите название актива.</small>
+                                }
+                            </div>
+
+                            <div class="field-group @(ShowAssetDescriptionValidation ? "has-error" : null)">
+                                <label for="asset-description">Описание актива <span>*</span></label>
+                                <textarea id="asset-description" placeholder="Опишите бизнес-модель, регион, драйверы роста, ограничения и риски." @bind="assetDescription" @bind:event="oninput" aria-invalid="@ShowAssetDescriptionValidation"></textarea>
+                                @if (ShowAssetDescriptionValidation)
+                                {
+                                    <small class="validation-message">Добавьте описание для генерации AI-профиля.</small>
+                                }
+                                else
+                                {
+                                    <small class="field-hint">После генерации описание будет сжато в резюме.</small>
+                                }
+                            </div>
+
+                            <button class="optional-row @(isOptionalOpen ? "open" : null)" type="button" aria-expanded="@isOptionalOpen" @onclick="ToggleOptional">
+                                <span class="optional-copy">
+                                    <strong>Дополнительные параметры</strong>
+                                </span>
+                                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                            </button>
+
+                            @if (isOptionalOpen)
+                            {
+                                <div class="optional-panel">
+                                    <div class="field-group compact">
+                                        <label id="industry-label">Сектор</label>
+                                        <button class="select-control small" type="button" aria-labelledby="industry-label" aria-expanded="@isIndustryOpen" @onclick="ToggleIndustry">
+                                            <span>@selectedIndustry</span>
+                                            <i class="bi bi-chevron-down chevron @(isIndustryOpen ? "open" : null)" aria-hidden="true"></i>
+                                        </button>
+                                        @if (isIndustryOpen)
+                                        {
+                                            <div class="dropdown-panel compact-list" role="listbox" aria-label="Сектор">
+                                                @foreach (var industry in Industries)
+                                                {
+                                                    <button class="dropdown-option text-only @(industry == selectedIndustry ? "selected" : null)" type="button" role="option" @onclick="() => SelectIndustry(industry)">
+                                                        <strong>@industry</strong>
+                                                    </button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <label class="toggle-row">
+                                        <input type="checkbox" @bind="includeGovernmentSupport" />
+                                        <span>Учитывать государственную поддержку</span>
+                                    </label>
+
+                                    <label class="range-row">
+                                        <span>Потенциал роста</span>
+                                        <strong>@growthPotential%</strong>
+                                        <input type="range" min="0" max="100" step="1" @bind="growthPotential" />
+                                    </label>
+                                </div>
+                            }
+
+                            <div class="form-actions">
+                                <button class="secondary-button" type="button" @onclick="ClearForm">
+                                    <i class="bi bi-eraser" aria-hidden="true"></i>
+                                    Очистить
+                                </button>
+                                <button class="primary-button" type="button" @onclick="GenerateProfile" disabled="@isGenerating">
+                                    Сформировать AI-профиль
+                                </button>
+                            </div>
+
+                            <p class="privacy-note">
+                                <i class="bi bi-lock" aria-hidden="true"></i>
+                                Профиль формируется только по введённым данным и выбранным параметрам.
+                            </p>
+                        </div>
+                    }
+                </section>
+
+                @if (isProfileGenerated)
+                {
+                    <aside class="glass-card profile-card profile-redesign" aria-labelledby="profile-title">
+                        <div class="card-title-row profile-title-row">
+                            <h2 id="profile-title">Профиль актива</h2>
+                            <span class="ai-generated-pill">
+                                <i class="bi bi-stars" aria-hidden="true"></i>
+                                Сгенерировано AI
+                            </span>
+                        </div>
+
+                        <section class="profile-hero-card" id="profile-overview" aria-label="Сводка AI-профиля">
+                            <div class="asset-summary-block">
+                                <div class="asset-emblem compact" aria-hidden="true">
+                                    <i class="bi bi-lightning-charge-fill"></i>
+                                </div>
+                                <div>
+                                    <h3>@DisplayAssetName</h3>
+                                    <div class="profile-chip-row">
+                                        <span>@selectedAssetType.Name</span>
+                                        <span>@selectedIndustry</span>
+                                        <span>Россия / СНГ</span>
+                                        <span>RUB</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="profile-kpi-strip">
+                                <div class="kpi-card recommendation">
+                                    <span>Рекомендация</span>
+                                    <strong class="positive-text">нейтрально-позитивная</strong>
+                                    <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+                                </div>
+                                <div class="kpi-card risk">
+                                    <span>Риск</span>
+                                    <strong class="warning-text">умеренно высокий</strong>
+                                    <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
+                                </div>
+                                <div class="kpi-card horizon">
+                                    <span>Горизонт</span>
+                                    <strong>6-24 мес.</strong>
+                                    <i class="bi bi-calendar-range" aria-hidden="true"></i>
+                                </div>
+                                <div class="kpi-card confidence">
+                                    <span>Уверенность</span>
+                                    <strong class="positive-text">82%</strong>
+                                    <i class="bi bi-bullseye" aria-hidden="true"></i>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="profile-dashboard" id="profile-factors" aria-label="Ключевые выводы AI-профиля">
+                            <article class="profile-panel growth-panel">
+                                <div class="panel-title-row">
+                                    <h3>Драйверы роста</h3>
+                                    <i class="bi bi-graph-up-arrow moving-panel-icon" aria-hidden="true"></i>
+                                </div>
+                                <ul class="driver-summary-list">
+                                    @foreach (var factor in PositiveFactors.Take(3))
+                                    {
+                                        <li>
+                                            <span class="signal-dot green-dot"></span>
+                                            <strong>@factor.Title</strong>
+                                            <em>@(factor.Impact.Contains("Высок") ? "Высокое" : "Среднее")</em>
+                                        </li>
+                                    }
+                                </ul>
+                                <div class="panel-footline">
+                                    <span>Позитивное влияние</span>
+                                    <strong>78%</strong>
+                                </div>
+                            </article>
+
+                            <article class="profile-panel risk-panel">
+                                <div class="panel-title-row">
+                                    <h3>Ключевые риски</h3>
+                                    <i class="bi bi-shield-exclamation moving-panel-icon shield-icon" aria-hidden="true"></i>
+                                </div>
+                                <ul class="risk-summary-list">
+                                    @foreach (var risk in RiskFactors.Take(3))
+                                    {
+                                        <li>
+                                            <span class="signal-dot red-dot"></span>
+                                            <strong>@risk.Title</strong>
+                                            <em>@risk.Impact</em>
+                                        </li>
+                                    }
+                                </ul>
+                                <div class="panel-footline risk-footline">
+                                    <span>Общий уровень риска</span>
+                                    <strong>Умеренно высокий</strong>
+                                </div>
+                            </article>
+
+                            <article class="profile-panel sensitivity-panel" id="profile-news">
+                                <div class="panel-title-row">
+                                    <h3>Чувствительность к новостям</h3>
+                                </div>
+                                <div class="news-score-layout">
+                                    <div class="news-gauge" aria-label="86 из 100, высокая чувствительность">
+                                        <svg viewBox="0 0 180 170" aria-hidden="true">
+                                            <defs>
+                                                <linearGradient id="newsGaugeGradient"
+                                                                x1="35" y1="130"
+                                                                x2="145" y2="45"
+                                                                gradientUnits="userSpaceOnUse">
+                                                    <stop stop-color="#55C7FF" />
+                                                    <stop offset=".52" stop-color="#7C5CFF" />
+                                                    <stop offset="1" stop-color="#36D98A" />
+                                                </linearGradient>
+                                            </defs>
+
+                                            <path class="news-gauge-track"
+                                                  d="M36 126 A62 62 0 1 1 144 126"
+                                                  pathLength="100" />
+
+                                            <path class="news-gauge-value"
+                                                  d="M36 126 A62 62 0 1 1 144 126"
+                                                  pathLength="100" />
+
+                                        </svg>
+
+                                        <div class="news-gauge-score">
+                                            <strong>86</strong>
+                                            <span>/100</span>
+                                        </div>
+
+                                        <small class="news-gauge-label">Высокая</small>
+                                    </div>
+                                    <ul class="news-sensitivity-list">
+                                        @foreach (var driver in SensitivityDrivers)
+                                        {
+                                            <li class="@(driver.Level == "Высокая" ? "high" : "medium")">
+                                                <span>@driver.Name</span>
+                                                <em>@driver.Level</em>
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                                <a class="sensitivity-link" href="#profile-news">
+                                    Подробнее о чувствительности
+                                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                                </a>
+                            </article>
+                        </section>
+
+                        <section class="profile-bottom-row" id="profile-actions">
+                            <div class="profile-panel tags-panel">
+                                <h3>Ключевые теги</h3>
+                                <div class="tag-cloud sector-tags">
+                                    <span>Энергетика</span>
+                                    <span>Умные сети</span>
+                                    <span class="risk-tag">Регуляторный риск</span>
+                                    <span class="green-tag">Господдержка</span>
+                                    <span class="warning-tag">Высокая чувствительность</span>
+                                </div>
+                            </div>
+                            <div class="profile-panel conclusion-panel">
+                                <h3>Ключевые выводы</h3>
+                                <ul>
+                                    <li>
+                                        <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
+                                        Основной драйвер: господдержка и спрос на энергоэффективность
+                                    </li>
+                                    <li>
+                                        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+                                        Главный риск: регуляторные изменения и капиталоёмкость проектов
+                                    </li>
+                                    <li>
+                                        <i class="bi bi-bullseye" aria-hidden="true"></i>
+                                        Профиль: умеренно высокий риск при нейтрально-позитивной рекомендации
+                                    </li>
+                                </ul>
+                            </div>
+                        </section>
+
+                        <div class="profile-action-footer">
+                            <div class="action-buttons">
+                                <button class="primary-action" type="button">
+                                    <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
+                                    Открыть в анализе
+                                </button>
+                                <button type="button">
+                                    <i class="bi bi-activity" aria-hidden="true"></i>
+                                    Запустить симуляцию
+                                </button>
+                                <button type="button">
+                                    <i class="bi bi-star" aria-hidden="true"></i>
+                                    Добавить в watchlist
+                                </button>
+                            </div>
+                            <p>Сформировано: @GeneratedAtLabel <i class="bi bi-info-circle" aria-hidden="true"></i></p>
+                        </div>
+                    </aside>
+                }
+            </section>
+        </section>
+    </main>
+</div>
+
+@code {
+    private readonly AssetTypeOption[] AssetTypes =
+    [
+        new("Акция", "Публичная компания", "bi-graph-up-arrow"),
+        new("Облигация", "Долговой инструмент", "bi-receipt"),
+        new("ETF", "Биржевой фонд", "bi-bar-chart-line"),
+        new("Криптоактив", "Цифровой актив", "bi-currency-bitcoin")
+    ];
+
+    private readonly string[] Industries =
+    [
+        "Энергетика",
+        "Технологии",
+        "Финансы",
+        "Промышленность",
+        "Потребительский сектор"
+    ];
+
+    private static readonly string[] AnalysisStages =
+    [
+        "Анализ описания",
+        "Определение сектора",
+        "Оценка позитивных факторов",
+        "Оценка рисков",
+        "Расчёт чувствительности к новостям",
+        "Формирование тегов"
+    ];
+
+    private static readonly FactorInsight[] PositiveFactors =
+    [
+        new("Государственная поддержка", "Может снижать финансовые риски на ранних стадиях и ускорять пилотные внедрения.", "Высокое влияние", "78%"),
+        new("Спрос на энергоэффективность", "Поддерживает долгосрочный рынок решений для накопления энергии и умных сетей.", "Среднее влияние", "74%"),
+        new("Технологическая специализация", "Создаёт дифференциацию, но требует регулярного подтверждения через внедрения.", "Среднее влияние", "69%"),
+        new("Экспортный потенциал СНГ", "Расширяет адресный рынок за пределы РФ при условии стабильной регуляторной среды.", "Умеренное влияние", "63%")
+    ];
+
+    private static readonly RiskInsight[] RiskFactors =
+    [
+        new("Регуляторный риск", "Регуляторные", "Изменения госполитики или правил субсидирования могут резко изменить экономику проектов.", "Средняя", "Высокий"),
+        new("Капиталоёмкость проектов", "Финансовые", "R&D и производство требуют значительных вложений до подтверждения масштабируемости.", "Высокая", "Высокий"),
+        new("Конкурентное давление", "Рыночные", "Крупные энергетические и промышленные игроки могут быстрее занять каналы продаж.", "Средняя", "Средний"),
+        new("Зависимость от господдержки", "Операционные", "Снижение бюджетного финансирования может замедлить внедрения и новые контракты.", "Средняя", "Высокий")
+    ];
+
+    private static readonly SensitivityDriver[] SensitivityDrivers =
+    [
+        new("Регуляторные новости", "Высокая"),
+        new("Господдержка", "Высокая"),
+        new("Рыночные новости", "Средняя")
+    ];
+
+    private AssetTypeOption selectedAssetType = default!;
+    private string selectedIndustry = "Энергетика";
+    private string assetName = "КвантЭнерго";
+    private string assetDescription = "КвантЭнерго — российская энергетическая компания, разрабатывающая и внедряющая системы накопления энергии нового поколения, решения для умных сетей и распределённой генерации.\n\nКомпания ориентирована на внутренний рынок РФ и страны СНГ, при поддержке государства активно развивает экспортный потенциал.";
+    private bool isAssetTypeOpen;
+    private bool isIndustryOpen;
+    private bool isOptionalOpen;
+    private bool isProfileGenerated;
+    private bool isGenerating;
+    private bool isLightTheme;
+    private bool includeGovernmentSupport = true;
+    private int growthPotential = 85;
+    private int generationStep = -1;
+    private DateTime? generatedAt;
+    private bool wasSubmitted;
+
+    protected override void OnInitialized()
+    {
+        selectedAssetType = AssetTypes[0];
+    }
+
+    private bool CanGenerate => !string.IsNullOrWhiteSpace(assetName) && !string.IsNullOrWhiteSpace(assetDescription);
+    private int CompletedRequiredFields => (string.IsNullOrWhiteSpace(assetName) ? 0 : 1) + (string.IsNullOrWhiteSpace(assetDescription) ? 0 : 1);
+    private bool ShowAssetNameValidation => wasSubmitted && string.IsNullOrWhiteSpace(assetName);
+    private bool ShowAssetDescriptionValidation => wasSubmitted && string.IsNullOrWhiteSpace(assetDescription);
+    private string DisplayAssetName => string.IsNullOrWhiteSpace(assetName) ? "Новый актив" : assetName.Trim();
+    private int GenerationProgress => isGenerating ? Math.Clamp((generationStep + 1) * 100 / AnalysisStages.Length, 8, 100) : 0;
+    private string GeneratedAtLabel => generatedAt?.ToString("dd.MM.yyyy HH:mm") ?? "не сформировано";
+    private string DescriptionPreview
+    {
+        get
+        {
+            var value = string.IsNullOrWhiteSpace(assetDescription) ? "Описание не заполнено." : assetDescription.Trim().Replace("\n", " ");
+            return value.Length <= 180 ? value : $"{value[..180]}...";
+        }
+    }
+
+    private void ToggleAssetType()
+    {
+        isAssetTypeOpen = !isAssetTypeOpen;
+        isIndustryOpen = false;
+    }
+
+    private void SelectAssetType(AssetTypeOption type)
+    {
+        selectedAssetType = type;
+        isAssetTypeOpen = false;
+    }
+
+    private void ToggleOptional()
+    {
+        isOptionalOpen = !isOptionalOpen;
+        isAssetTypeOpen = false;
+        isIndustryOpen = false;
+    }
+
+    private void ToggleTheme()
+    {
+        isLightTheme = !isLightTheme;
+    }
+
+    private void ToggleIndustry()
+    {
+        isIndustryOpen = !isIndustryOpen;
+        isAssetTypeOpen = false;
+    }
+
+    private void SelectIndustry(string industry)
+    {
+        selectedIndustry = industry;
+        isIndustryOpen = false;
+    }
+
+    private async Task GenerateProfile()
+    {
+        wasSubmitted = true;
+
+        if (!CanGenerate || isGenerating)
+        {
+            return;
+        }
+
+        isGenerating = true;
+        isProfileGenerated = false;
+        wasSubmitted = false;
+        isAssetTypeOpen = false;
+        isIndustryOpen = false;
+        isOptionalOpen = false;
+
+        for (var i = 0; i < AnalysisStages.Length; i++)
+        {
+            generationStep = i;
+            StateHasChanged();
+            await Task.Delay(320);
+        }
+
+        generatedAt = DateTime.Now;
+        generationStep = AnalysisStages.Length;
+        isGenerating = false;
+        isProfileGenerated = true;
+    }
+
+    private Task RegenerateProfile()
+    {
+        return GenerateProfile();
+    }
+
+    private void EditParameters()
+    {
+        isProfileGenerated = false;
+        isGenerating = false;
+        wasSubmitted = false;
+        generationStep = -1;
+    }
+
+    private void ClearForm()
+    {
+        selectedAssetType = AssetTypes[0];
+        selectedIndustry = "Энергетика";
+        assetName = string.Empty;
+        assetDescription = string.Empty;
+        includeGovernmentSupport = true;
+        growthPotential = 85;
+        isOptionalOpen = false;
+        isAssetTypeOpen = false;
+        isIndustryOpen = false;
+        isProfileGenerated = false;
+        isGenerating = false;
+        wasSubmitted = false;
+        generationStep = -1;
+        generatedAt = null;
+    }
+
+    private sealed record AssetTypeOption(string Name, string Description, string IconClass);
+    private sealed record FactorInsight(string Title, string Detail, string Impact, string Confidence);
+    private sealed record RiskInsight(string Title, string Type, string Detail, string Probability, string Impact);
+    private sealed record SensitivityDriver(string Name, string Level);
+}
