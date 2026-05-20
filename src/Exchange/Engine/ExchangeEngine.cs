@@ -4,19 +4,39 @@ namespace ABStock.Exchange.Engine;
 
 public sealed class ExchangeEngine
 {
+    private const int DefaultMaxRecentPrices = 100;
+    private const int DefaultMaxRecentTrades = 50;
+
     private readonly OrderBook _orderBook = new();
     private readonly OrderValidator _orderValidator = new();
     private readonly List<Trade> _trades = [];
     private readonly List<decimal> _prices;
+    private readonly int _maxRecentPrices;
+    private readonly int _maxRecentTrades;
     private decimal _lastPrice;
 
-    public ExchangeEngine(decimal startPrice = 100m)
+    public ExchangeEngine(
+        decimal startPrice = 100m,
+        int maxRecentPrices = DefaultMaxRecentPrices,
+        int maxRecentTrades = DefaultMaxRecentTrades)
     {
         if (startPrice <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(startPrice), "Start price must be positive.");
         }
+
+        if (maxRecentPrices <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxRecentPrices), "Recent prices limit must be positive.");
+        }
+
+        if (maxRecentTrades <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maxRecentTrades), "Recent trades limit must be positive.");
+        }
         
+        _maxRecentPrices = maxRecentPrices;
+        _maxRecentTrades = maxRecentTrades;
         _lastPrice = startPrice;
         _prices = [startPrice];
     }
@@ -26,6 +46,26 @@ public sealed class ExchangeEngine
         _orderValidator.Validate(order);
 
         _orderBook.Add(order);
+        MatchOrders();
+
+        return GetSnapshot();
+    }
+
+    public MarketSnapshot SubmitMany(IEnumerable<Order> orders)
+    {
+        ArgumentNullException.ThrowIfNull(orders);
+
+        var orderBatch = orders.ToArray();
+        foreach (var order in orderBatch)
+        {
+            _orderValidator.Validate(order);
+        }
+
+        foreach (var order in orderBatch)
+        {
+            _orderBook.Add(order);
+        }
+
         MatchOrders();
 
         return GetSnapshot();
@@ -83,9 +123,25 @@ public sealed class ExchangeEngine
         _trades.Add(trade);
         _lastPrice = price;
         _prices.Add(price);
+        TrimHistory();
 
         _orderBook.ReduceBestBidBy(quantity);
         _orderBook.ReduceBestAskBy(quantity);
+    }
+
+    private void TrimHistory()
+    {
+        TrimOldest(_prices, _maxRecentPrices);
+        TrimOldest(_trades, _maxRecentTrades);
+    }
+
+    private static void TrimOldest<T>(List<T> items, int maxCount)
+    {
+        var extraItemsCount = items.Count - maxCount;
+        if (extraItemsCount > 0)
+        {
+            items.RemoveRange(0, extraItemsCount);
+        }
     }
 
     private static decimal CalculateTradePrice(Order buyOrder, Order sellOrder)
