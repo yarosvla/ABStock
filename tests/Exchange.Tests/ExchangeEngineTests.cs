@@ -106,6 +106,32 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
+    public void GetOrderBookSnapshot_ReturnsCurrentOrderBookDepth()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 98m, quantity: 2m),
+            CreateOrder(CreateId(2), OrderSide.Buy, 97m, quantity: 3m),
+            CreateOrder(CreateId(3), OrderSide.Sell, 102m, quantity: 4m),
+            CreateOrder(CreateId(4), OrderSide.Sell, 103m, quantity: 5m)
+        ]);
+
+        var orderBook = exchange.GetOrderBookSnapshot(depth: 1);
+
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(98m, bid.Price);
+        Assert.Equal(2m, bid.Quantity);
+        Assert.Equal(1, bid.OrdersCount);
+
+        var ask = Assert.Single(orderBook.Asks);
+        Assert.Equal(102m, ask.Price);
+        Assert.Equal(4m, ask.Quantity);
+        Assert.Equal(1, ask.OrdersCount);
+    }
+
+    [Fact]
     public void Submit_TrimsRecentPricesAndTradesToConfiguredLimits()
     {
         var exchange = new ExchangeEngine(
