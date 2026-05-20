@@ -13,8 +13,8 @@ public sealed class ExchangeEngineTests
         var sellOrderId = CreateId(1);
         var buyOrderId = CreateId(2);
 
-        exchange.Submit(CreateOrder(sellOrderId, OrderSide.Sell, 99m, quantity: 3m));
-        var snapshot = exchange.Submit(CreateOrder(buyOrderId, OrderSide.Buy, 101m, quantity: 3m));
+        exchange.Submit(CreateOrder(sellOrderId, OrderSide.Sell, 99m, quantity: 3m, agentName: "seller-agent"));
+        var snapshot = exchange.Submit(CreateOrder(buyOrderId, OrderSide.Buy, 101m, quantity: 3m, agentName: "buyer-agent"));
 
         Assert.Equal(100m, snapshot.LastPrice);
         Assert.Equal(3m, snapshot.Volume);
@@ -25,6 +25,8 @@ public sealed class ExchangeEngineTests
         var trade = Assert.Single(snapshot.RecentTrades);
         Assert.Equal(buyOrderId, trade.BuyOrderId);
         Assert.Equal(sellOrderId, trade.SellOrderId);
+        Assert.Equal("buyer-agent", trade.BuyerAgentName);
+        Assert.Equal("seller-agent", trade.SellerAgentName);
         Assert.Equal(100m, trade.Price);
         Assert.Equal(3m, trade.Quantity);
     }
@@ -213,11 +215,16 @@ public sealed class ExchangeEngineTests
         Assert.Throws<NotSupportedException>(() => exchange.Submit(order));
     }
 
-    private static Order CreateOrder(Guid id, OrderSide side, decimal price, decimal quantity)
+    private static Order CreateOrder(
+        Guid id,
+        OrderSide side,
+        decimal price,
+        decimal quantity,
+        string agentName = "agent-1")
     {
         return new Order(
             Id: id,
-            AgentName: "agent-1",
+            AgentName: agentName,
             Side: side,
             Type: OrderType.Limit,
             Price: price,
