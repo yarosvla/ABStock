@@ -10,7 +10,7 @@
     <ProjectReference Include="..\ABStock.Shared\ABStock.Shared.csproj" />
     <ProjectReference Include="..\ABStock.Agents\ABStock.Agents.csproj" />
     <ProjectReference Include="..\ABStock.AI\ABStock.AI.csproj" />
-    <ProjectReference Include="..\Exchange\ABStock.Exchange.csproj" />
+    <ProjectReference Include="..\ABStock.Exchange\ABStock.Exchange.csproj" />
   </ItemGroup>
 
   <ItemGroup>

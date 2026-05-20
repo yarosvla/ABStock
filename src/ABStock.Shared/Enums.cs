@@ -33,3 +33,11 @@ public enum SignalPolarity
     Neutral,
     Negative
 }
+
+public enum AssetType
+{
+    Stock,
+    Commodity,
+    Crypto,
+    Bond
+}
