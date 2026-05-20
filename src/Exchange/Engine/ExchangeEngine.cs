@@ -83,6 +83,11 @@ public sealed class ExchangeEngine
         );
     }
 
+    public OrderBookSnapshot GetOrderBookSnapshot(int depth = 5)
+    {
+        return _orderBook.GetSnapshot(depth);
+    }
+
     private void MatchOrders()
     {
         while (CanMatchBestOrders())
