@@ -1,3 +1,5 @@
+using ABStock.Shared;
+
 namespace ABStock.Agents.Models;
 
 public class AgentState
@@ -7,8 +9,5 @@ public class AgentState
     public decimal Cash { get; set; }
     public int Position { get; set; }
 
-    public decimal GetPortfolioValue(decimal currentPrice)
-    {
-        return Cash + Position * currentPrice;
-    }
+    public decimal GetPortfolioValue(decimal currentPrice) => Cash + Position * currentPrice;
 }

@@ -1,5 +1,6 @@
 using ABStock.AI.Internal;
 using ABStock.AI.Models;
+using ABStock.Shared;
 
 namespace ABStock.AI.Services;
 
@@ -24,41 +25,38 @@ public sealed class NewsProcessingService : INewsProcessingService
 
         var explanation = BuildExplanation(finBertResult, matchResult, polarity, impactScore);
 
-        return new NewsSignal
-        {
-            Polarity = polarity,
-            Confidence = finBertResult.Confidence,
-            ImpactScore = Math.Round(impactScore, 4),
-            Explanation = explanation
-        };
+        return new NewsSignal(
+            Polarity: polarity,
+            Confidence: finBertResult.Confidence,
+            ImpactScore: Math.Round(impactScore, 4),
+            Explanation: explanation
+        );
     }
 
-    private static Polarity DeterminePolarity(FinBertResult finBert, AspectMatchResult match)
+    private static SignalPolarity DeterminePolarity(FinBertResult finBert, AspectMatchResult match)
     {
         var weightedNegative = match.NegativeMatches + match.RiskMatches * 0.5m;
 
         if (match.PositiveMatches == 0 && weightedNegative == 0)
         {
-            return (finBert.PositiveProbability >= finBert.NegativeProbability ? Polarity.Positive : Polarity.Negative);
+            return finBert.PositiveProbability >= finBert.NegativeProbability
+                ? SignalPolarity.Positive
+                : SignalPolarity.Negative;
         }
 
         if (match.PositiveMatches > weightedNegative)
-        {
-            return Polarity.Positive;
-        }
+            return SignalPolarity.Positive;
 
         if (weightedNegative > match.PositiveMatches)
-        {
-            return Polarity.Negative;
-        }
+            return SignalPolarity.Negative;
 
-        return Polarity.Neutral;
+        return SignalPolarity.Neutral;
     }
 
-    private static String BuildExplanation(
+    private static string BuildExplanation(
         FinBertResult finBert,
         AspectMatchResult match,
-        Polarity polarity,
+        SignalPolarity polarity,
         decimal impactScore)
     {
         var confidence = Math.Round(finBert.Confidence * 100, 0);
