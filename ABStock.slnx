@@ -2,5 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/ABStock.Shared/ABStock.Shared.csproj" />
     <Project Path="src/ABStock.Agents/ABStock.Agents.csproj" />
+    <Project Path="src/ABStock.UI/ABStock.UI.csproj" />
   </Folder>
 </Solution>
