@@ -13,8 +13,8 @@ public sealed class ExchangeEngineTests
         var sellOrderId = CreateId(1);
         var buyOrderId = CreateId(2);
 
-        exchange.Submit(CreateOrder(sellOrderId, OrderSide.Sell, 99m, quantity: 3m));
-        var snapshot = exchange.Submit(CreateOrder(buyOrderId, OrderSide.Buy, 101m, quantity: 3m));
+        exchange.Submit(CreateOrder(sellOrderId, OrderSide.Sell, 99m, quantity: 3m, agentName: "seller-agent"));
+        var snapshot = exchange.Submit(CreateOrder(buyOrderId, OrderSide.Buy, 101m, quantity: 3m, agentName: "buyer-agent"));
 
         Assert.Equal(100m, snapshot.LastPrice);
         Assert.Equal(3m, snapshot.Volume);
@@ -25,6 +25,8 @@ public sealed class ExchangeEngineTests
         var trade = Assert.Single(snapshot.RecentTrades);
         Assert.Equal(buyOrderId, trade.BuyOrderId);
         Assert.Equal(sellOrderId, trade.SellOrderId);
+        Assert.Equal("buyer-agent", trade.BuyerAgentName);
+        Assert.Equal("seller-agent", trade.SellerAgentName);
         Assert.Equal(100m, trade.Price);
         Assert.Equal(3m, trade.Quantity);
     }
@@ -103,6 +105,32 @@ public sealed class ExchangeEngineTests
         Assert.Null(snapshot.BestAsk);
         Assert.Empty(snapshot.RecentTrades);
         Assert.Equal([100m], snapshot.RecentPrices);
+    }
+
+    [Fact]
+    public void GetOrderBookSnapshot_ReturnsCurrentOrderBookDepth()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 98m, quantity: 2m),
+            CreateOrder(CreateId(2), OrderSide.Buy, 97m, quantity: 3m),
+            CreateOrder(CreateId(3), OrderSide.Sell, 102m, quantity: 4m),
+            CreateOrder(CreateId(4), OrderSide.Sell, 103m, quantity: 5m)
+        ]);
+
+        var orderBook = exchange.GetOrderBookSnapshot(depth: 1);
+
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(98m, bid.Price);
+        Assert.Equal(2m, bid.Quantity);
+        Assert.Equal(1, bid.OrdersCount);
+
+        var ask = Assert.Single(orderBook.Asks);
+        Assert.Equal(102m, ask.Price);
+        Assert.Equal(4m, ask.Quantity);
+        Assert.Equal(1, ask.OrdersCount);
     }
 
     [Fact]
@@ -187,11 +215,16 @@ public sealed class ExchangeEngineTests
         Assert.Throws<NotSupportedException>(() => exchange.Submit(order));
     }
 
-    private static Order CreateOrder(Guid id, OrderSide side, decimal price, decimal quantity)
+    private static Order CreateOrder(
+        Guid id,
+        OrderSide side,
+        decimal price,
+        decimal quantity,
+        string agentName = "agent-1")
     {
         return new Order(
             Id: id,
-            AgentName: "agent-1",
+            AgentName: agentName,
             Side: side,
             Type: OrderType.Limit,
             Price: price,
