@@ -1,3 +1,5 @@
+using ABStock.Shared;
+
 namespace ABStock.AI.Models
 {
     public sealed record NewsAnalysisRequest

@@ -1,4 +1,3 @@
-using ABStock.AI.Models;
 using ABStock.Shared;
 
 namespace ABStock.Application.Simulation;
