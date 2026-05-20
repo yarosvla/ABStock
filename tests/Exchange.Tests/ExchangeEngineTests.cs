@@ -61,6 +61,93 @@ public sealed class ExchangeEngineTests
         Assert.Equal([100m], snapshot.RecentPrices);
     }
 
+    [Fact]
+    public void SubmitMany_ProcessesOrderBatchAndReturnsFinalSnapshot()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var snapshot = exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 2m),
+            CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 2m),
+            CreateOrder(CreateId(3), OrderSide.Sell, 103m, quantity: 1m)
+        ]);
+
+        Assert.Equal(100m, snapshot.LastPrice);
+        Assert.Equal(2m, snapshot.Volume);
+        Assert.Null(snapshot.BestBid);
+        Assert.Equal(103m, snapshot.BestAsk);
+        Assert.Equal([100m, 100m], snapshot.RecentPrices);
+
+        var trade = Assert.Single(snapshot.RecentTrades);
+        Assert.Equal(CreateId(1), trade.BuyOrderId);
+        Assert.Equal(CreateId(2), trade.SellOrderId);
+    }
+
+    [Fact]
+    public void SubmitMany_RejectsWholeBatchWhenAnyOrderIsInvalid()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var exception = Assert.Throws<ArgumentException>(() => exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 1m),
+            CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 0m)
+        ]));
+
+        var snapshot = exchange.GetSnapshot();
+
+        Assert.Contains("quantity", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(100m, snapshot.LastPrice);
+        Assert.Null(snapshot.BestBid);
+        Assert.Null(snapshot.BestAsk);
+        Assert.Empty(snapshot.RecentTrades);
+        Assert.Equal([100m], snapshot.RecentPrices);
+    }
+
+    [Fact]
+    public void Submit_TrimsRecentPricesAndTradesToConfiguredLimits()
+    {
+        var exchange = new ExchangeEngine(
+            startPrice: 100m,
+            maxRecentPrices: 3,
+            maxRecentTrades: 2);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 102m, quantity: 1m),
+            CreateOrder(CreateId(2), OrderSide.Buy, 104m, quantity: 1m),
+            CreateOrder(CreateId(3), OrderSide.Buy, 106m, quantity: 1m),
+            CreateOrder(CreateId(4), OrderSide.Sell, 100m, quantity: 1m),
+            CreateOrder(CreateId(5), OrderSide.Sell, 100m, quantity: 1m),
+            CreateOrder(CreateId(6), OrderSide.Sell, 100m, quantity: 1m)
+        ]);
+
+        var snapshot = exchange.GetSnapshot();
+
+        Assert.Equal([103m, 102m, 101m], snapshot.RecentPrices);
+        Assert.Equal(2, snapshot.RecentTrades.Count);
+        Assert.All(snapshot.RecentTrades, trade => Assert.Equal(1m, trade.Quantity));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Constructor_RejectsNonPositiveRecentPricesLimit(int maxRecentPrices)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ExchangeEngine(maxRecentPrices: maxRecentPrices));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Constructor_RejectsNonPositiveRecentTradesLimit(int maxRecentTrades)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ExchangeEngine(maxRecentTrades: maxRecentTrades));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
