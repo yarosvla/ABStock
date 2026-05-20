@@ -5,6 +5,6 @@ public record Trade(
     Guid BuyOrderId,
     Guid SellOrderId,
     decimal Price,
-    int Quantity,
+    decimal Quantity,
     DateTimeOffset ExecutedAt
 );

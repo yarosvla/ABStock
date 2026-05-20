@@ -1,4 +1,4 @@
-using ABStock.Exchange.Domain;
+using ABStock.Shared;
 
 namespace ABStock.Exchange.Engine;
 
@@ -8,14 +8,14 @@ public sealed class OrderValidator
     {
         ArgumentNullException.ThrowIfNull(order);
 
-        if (string.IsNullOrWhiteSpace(order.Id))
+        if (order.Id == Guid.Empty)
         {
             throw new ArgumentException("Order id is required.", nameof(order));
         }
 
-        if (string.IsNullOrWhiteSpace(order.AgentId))
+        if (string.IsNullOrWhiteSpace(order.AgentName))
         {
-            throw new ArgumentException("Agent id is required.", nameof(order));
+            throw new ArgumentException("Agent name is required.", nameof(order));
         }
 
         if (!Enum.IsDefined(order.Side))
@@ -43,12 +43,12 @@ public sealed class OrderValidator
 
     private static void ValidateLimitOrder(Order order)
     {
-        if (order.LimitPrice is null)
+        if (order.Price is null)
         {
             throw new ArgumentException("Limit order price is required.", nameof(order));
         }
 
-        if (order.LimitPrice <= 0)
+        if (order.Price <= 0)
         {
             throw new ArgumentException("Limit order price must be positive.", nameof(order));
         }
