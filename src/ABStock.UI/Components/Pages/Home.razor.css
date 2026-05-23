@@ -1,0 +1,496 @@
+.welcome-shell {
+    position: relative;
+    height: 100svh;
+    min-height: 100svh;
+    max-height: 100svh;
+    display: grid;
+    place-items: center;
+    padding: clamp(2rem, 2.5rem, 3rem) 24px;
+    overflow: hidden;
+    isolation: isolate;
+    color: #f8fbff;
+    background:
+        radial-gradient(circle at 72% 20%, rgba(54, 217, 138, 0.12), transparent 28rem),
+        radial-gradient(circle at 20% 76%, rgba(124, 92, 255, 0.14), transparent 26rem),
+        radial-gradient(circle at 50% 10%, rgba(85, 199, 255, 0.12), transparent 34rem),
+        linear-gradient(135deg, #05070d 0%, #091123 46%, #10161d 100%);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.market-backdrop,
+.star-field,
+.cosmic-rings,
+.market-grid,
+.price-lanes,
+.cosmic-points,
+.ticker-strip {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.market-backdrop {
+    z-index: -1;
+    overflow: hidden;
+}
+
+.star-field {
+    opacity: .58;
+    background-image:
+        radial-gradient(circle, rgba(255, 255, 255, .78) 0 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(163, 239, 201, .48) 0 1px, transparent 1.5px),
+        radial-gradient(circle, rgba(85, 199, 255, .4) 0 1px, transparent 1.5px);
+    background-position: 20px 28px, 92px 76px, 162px 22px;
+    background-size: 180px 150px, 220px 190px, 280px 230px;
+    mask-image: radial-gradient(circle at center, #000 0%, #000 64%, transparent 100%);
+    animation: star-drift 36s linear infinite;
+}
+
+.cosmic-rings span {
+    position: absolute;
+    width: 360px;
+    aspect-ratio: 1;
+    border: 1px solid rgba(85, 199, 255, .13);
+    border-radius: 50%;
+    box-shadow: inset 0 0 34px rgba(124, 92, 255, .08), 0 0 46px rgba(54, 217, 138, .08);
+    transform: rotate(-18deg) scaleY(.42);
+}
+
+.cosmic-rings span:first-child {
+    top: 8%;
+    right: 7%;
+    animation: orbit-glow 9s ease-in-out infinite;
+}
+
+.cosmic-rings span:last-child {
+    left: 8%;
+    bottom: 4%;
+    width: 430px;
+    border-color: rgba(124, 92, 255, .12);
+    animation: orbit-glow 11s ease-in-out infinite reverse;
+}
+
+.market-grid {
+    opacity: .34;
+    background-image:
+        linear-gradient(rgba(255, 255, 255, .06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, .06) 1px, transparent 1px);
+    background-size: 72px 72px;
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+    animation: grid-drift 18s linear infinite;
+}
+
+.price-lanes {
+    opacity: .62;
+}
+
+.price-lanes span {
+    position: absolute;
+    left: -12%;
+    width: 34%;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, rgba(54, 217, 138, .86), rgba(85, 199, 255, .48), transparent);
+    box-shadow: 0 0 24px rgba(54, 217, 138, .2);
+    animation: lane-sweep 7s ease-in-out infinite;
+}
+
+.price-lanes span:nth-child(1) {
+    top: 18%;
+}
+
+.price-lanes span:nth-child(2) {
+    top: 38%;
+    animation-delay: -2.4s;
+    background: linear-gradient(90deg, transparent, rgba(124, 92, 255, .78), rgba(85, 199, 255, .44), transparent);
+}
+
+.price-lanes span:nth-child(3) {
+    top: 62%;
+    animation-delay: -4.8s;
+}
+
+.price-lanes span:nth-child(4) {
+    top: 78%;
+    animation-delay: -1.2s;
+    background: linear-gradient(90deg, transparent, rgba(255, 180, 92, .7), rgba(54, 217, 138, .44), transparent);
+}
+
+.cosmic-points span {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #dff8ff;
+    box-shadow: 0 0 16px rgba(85, 199, 255, .62), 0 0 34px rgba(124, 92, 255, .28);
+    animation: cosmic-pulse 5.5s ease-in-out infinite;
+}
+
+.cosmic-points span:nth-child(1) {
+    top: 19%;
+    left: 13%;
+}
+
+.cosmic-points span:nth-child(2) {
+    top: 16%;
+    right: 18%;
+    width: 8px;
+    height: 8px;
+    background: #a3efc9;
+    animation-delay: -1.4s;
+}
+
+.cosmic-points span:nth-child(3) {
+    right: 12%;
+    bottom: 26%;
+    background: #8e74ff;
+    animation-delay: -3.1s;
+}
+
+.cosmic-points span:nth-child(4) {
+    left: 20%;
+    bottom: 18%;
+    animation-delay: -4.2s;
+}
+
+.cosmic-points span:nth-child(5) {
+    top: 48%;
+    left: 73%;
+    width: 8px;
+    height: 8px;
+    background: #36d98a;
+    animation-delay: -2.2s;
+}
+
+.ticker-strip {
+    height: 44px;
+    color: rgba(248, 251, 255, .64);
+    border-block: 1px solid rgba(255, 255, 255, .08);
+    background: rgba(6, 8, 13, .38);
+    overflow: hidden;
+    transform: rotate(-2deg);
+}
+
+.ticker-strip div {
+    width: max-content;
+    min-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 42px;
+    height: 100%;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    animation: ticker-move 24s linear infinite;
+}
+
+.ticker-strip span {
+    white-space: nowrap;
+}
+
+.ticker-top {
+    top: 12%;
+    bottom: auto;
+}
+
+.ticker-bottom {
+    top: auto;
+    bottom: 12%;
+    transform: rotate(2deg);
+}
+
+.ticker-bottom div {
+    animation-direction: reverse;
+    animation-duration: 28s;
+}
+
+.welcome-hero {
+    width: min(100%, 980px);
+    display: grid;
+    justify-items: center;
+    text-align: center;
+}
+
+.welcome-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    margin-bottom: 22px;
+    padding: 7px 14px 7px 8px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 999px;
+    color: #f8fbff;
+    background: rgba(255, 255, 255, .06);
+    text-decoration: none;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, .22);
+    backdrop-filter: blur(18px);
+}
+
+.welcome-logo {
+    width: 36px;
+    height: 36px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 999px;
+    background: #f8fbff;
+}
+
+.welcome-logo img {
+    width: 28px;
+    height: 24px;
+    display: block;
+    object-fit: contain;
+}
+
+.welcome-brand span:last-child {
+    font-size: 15px;
+    font-weight: 760;
+    letter-spacing: .04em;
+}
+
+.welcome-kicker {
+    margin: 0 0 16px;
+    color: #a3efc9;
+    font-size: clamp(.82rem, .98rem, 1rem);
+    font-weight: 760;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+
+.welcome-hero h1 {
+    max-width: 920px;
+    margin: 0;
+    color: #ffffff;
+    font-size: clamp(4.1rem, 6.7rem, 7rem);
+    line-height: .9;
+    font-weight: 820;
+    letter-spacing: 0;
+    text-wrap: balance;
+    text-shadow: 0 26px 60px rgba(0, 0, 0, .35);
+}
+
+.welcome-lead {
+    max-width: 760px;
+    margin: 18px 0 0;
+    color: #ffffff;
+    font-size: clamp(1.35rem, 1.95rem, 2.15rem);
+    line-height: 1.14;
+    font-weight: 760;
+    letter-spacing: 0;
+    text-wrap: balance;
+}
+
+.welcome-copy {
+    max-width: 680px;
+    margin: 16px 0 0;
+    color: rgba(236, 242, 250, .78);
+    font-size: clamp(1.02rem, 1.18rem, 1.25rem);
+    line-height: 1.6;
+    letter-spacing: 0;
+    text-wrap: balance;
+}
+
+.start-button {
+    min-width: 178px;
+    min-height: 56px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 28px;
+    padding: 0 28px;
+    border: 1px solid rgba(255, 255, 255, .24);
+    border-radius: 8px;
+    color: #06100c;
+    background: #36d98a;
+    box-shadow: 0 18px 42px rgba(54, 217, 138, .24), inset 0 1px 0 rgba(255, 255, 255, .34);
+    font-size: 17px;
+    font-weight: 780;
+    text-decoration: none;
+    transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.start-button:hover,
+.start-button:focus-visible {
+    color: #06100c;
+    background: #5de7a2;
+    box-shadow: 0 22px 52px rgba(54, 217, 138, .3), inset 0 1px 0 rgba(255, 255, 255, .4);
+    transform: translateY(-2px);
+}
+
+.start-button:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, .72);
+    outline-offset: 4px;
+}
+
+.start-button:active {
+    transform: translateY(0);
+}
+
+.start-button .bi {
+    font-size: 18px;
+    line-height: 1;
+}
+
+@keyframes grid-drift {
+    from {
+        transform: translate3d(0, 0, 0);
+    }
+
+    to {
+        transform: translate3d(72px, 72px, 0);
+    }
+}
+
+@keyframes lane-sweep {
+    0% {
+        transform: translate3d(0, 0, 0) scaleX(.82);
+        opacity: 0;
+    }
+
+    16%,
+    74% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate3d(340%, 0, 0) scaleX(1.18);
+        opacity: 0;
+    }
+}
+
+@keyframes cosmic-pulse {
+    0%,
+    100% {
+        opacity: .55;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translate3d(0, -8px, 0) scale(1.18);
+    }
+}
+
+@keyframes ticker-move {
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+@media (max-width: 760px) {
+    .welcome-shell {
+        place-items: start center;
+        padding: 44px 18px 34px;
+    }
+
+    .welcome-brand {
+        margin-bottom: 24px;
+    }
+
+    .welcome-hero {
+        min-height: calc(100svh - 78px);
+        align-content: center;
+    }
+
+    .welcome-hero h1 {
+        font-size: clamp(3rem, 4.55rem, 4.8rem);
+        line-height: .92;
+    }
+
+    .welcome-lead {
+        margin-top: 18px;
+        font-size: clamp(1.22rem, 1.55rem, 1.72rem);
+        line-height: 1.18;
+    }
+
+    .welcome-copy {
+        margin-top: 16px;
+        font-size: clamp(1rem, 1.1rem, 1.15rem);
+    }
+
+    .start-button {
+        width: min(100%, 320px);
+        margin-top: 26px;
+    }
+
+    .ticker-strip {
+        height: 38px;
+    }
+
+    .ticker-strip div {
+        gap: 28px;
+        font-size: 11px;
+    }
+
+    .cosmic-rings span {
+        width: 260px;
+    }
+}
+
+@media (max-width: 460px) {
+    .welcome-shell {
+        padding-inline: 16px;
+    }
+
+    .welcome-kicker {
+        letter-spacing: .1em;
+    }
+
+    .welcome-hero h1 {
+        font-size: clamp(2.7rem, 3.75rem, 4rem);
+    }
+
+    .welcome-lead {
+        font-size: clamp(1.12rem, 1.35rem, 1.48rem);
+    }
+
+    .ticker-top {
+        top: 7%;
+    }
+
+    .ticker-bottom {
+        bottom: 7%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .star-field,
+    .cosmic-rings span,
+    .market-grid,
+    .price-lanes span,
+    .cosmic-points span,
+    .ticker-strip div {
+        animation: none;
+    }
+
+    .start-button {
+        transition: none;
+    }
+}
+@keyframes star-drift {
+    from {
+        transform: translate3d(0, 0, 0);
+    }
+
+    to {
+        transform: translate3d(-180px, 150px, 0);
+    }
+}
+
+@keyframes orbit-glow {
+    0%,
+    100% {
+        opacity: .38;
+    }
+
+    50% {
+        opacity: .72;
+    }
+}
