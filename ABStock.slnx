@@ -15,6 +15,9 @@
     <Project Path="src/ABStock.Exchange/ABStock.Exchange.csproj" />
   </Folder>
   <Folder Name="/tests/" />
+  <Folder Name="/tests/Agents.Tests/">
+    <Project Path="tests/Agents.Tests/ABStock.Agents.Tests.csproj" />
+  </Folder>
   <Folder Name="/tests/Exchange.Tests/">
     <Project Path="tests/Exchange.Tests/ABStock.Exchange.Tests.csproj" />
   </Folder>
