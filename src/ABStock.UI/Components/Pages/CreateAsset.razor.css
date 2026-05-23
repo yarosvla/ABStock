@@ -1079,6 +1079,7 @@
 
 .secondary-button,
 .primary-button,
+.profile-action-footer a,
 .profile-action-footer button,
 .read-description-button {
     min-height: 42px;
@@ -1096,6 +1097,7 @@
 
 .secondary-button,
 .read-description-button,
+.profile-action-footer a,
 .profile-action-footer button {
     border: 1px solid var(--border);
     color: var(--text-soft);
@@ -1104,6 +1106,7 @@
 
 .secondary-button:hover,
 .read-description-button:hover,
+.profile-action-footer a:hover,
 .profile-action-footer button:hover {
     color: var(--text);
     background: var(--surface-hover);
@@ -1125,6 +1128,7 @@
 
 .primary-button:active,
 .secondary-button:active,
+.profile-action-footer a:active,
 .profile-action-footer button:active {
     transform: translateY(1px);
 }
@@ -2025,6 +2029,7 @@
 
     .secondary-button,
     .primary-button,
+    .profile-action-footer a,
     .profile-action-footer button {
         width: 100%;
     }
