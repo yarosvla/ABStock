@@ -1,4 +1,5 @@
 using ABStock.Agents.Models;
+using ABStock.Shared;
 
 namespace ABStock.Agents;
 
@@ -17,34 +18,15 @@ public abstract class AgentBase : ITradeAgent
         };
     }
 
-    public abstract AgentDecision Decide();
+    public abstract AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal);
 
-    protected bool CanBuy(decimal price, int quantity)
-    {
-        return State.Cash >= price * quantity;
-    }
+    protected bool CanBuy(decimal price, decimal quantity) => State.Cash >= price * quantity;
 
-    protected bool CanSell(int quantity)
-    {
-        return State.Position >= quantity;
-    }
+    protected bool CanSell(decimal quantity) => State.Position >= quantity;
 
-    protected TradeProposal CreateProposal(TradeSide side, decimal price, int quantity)
-    {
-        return new TradeProposal
-        {
-            Side = side,
-            Price = price,
-            Quantity = quantity
-        };
-    }
+    protected Order CreateOrder(OrderSide side, decimal price, decimal quantity) =>
+        new(Guid.NewGuid(), State.AgentName, side, OrderType.Limit, price, quantity, DateTimeOffset.UtcNow);
 
-    protected AgentDecision HoldDecision(string explanation)
-    {
-        return new AgentDecision
-        {
-            Action = TradeAction.Hold,
-            Explanation = explanation
-        };
-    }
+    protected AgentDecision HoldDecision(string explanation) =>
+        new(State.AgentName, TradeAction.Hold, explanation, []);
 }

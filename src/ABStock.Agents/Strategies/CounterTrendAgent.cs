@@ -1,4 +1,4 @@
-using ABStock.Agents.Models;
+using ABStock.Shared;
 
 namespace ABStock.Agents.Strategies;
 
@@ -7,9 +7,9 @@ public class CounterTrendAgent : AgentBase
     public CounterTrendAgent(decimal initialCash)
         : base("CounterTrend", AgentType.CounterTrend, initialCash) { }
 
-    // TODO
-    public override AgentDecision Decide()
+    // TODO: implement counter-trend logic using snapshot.RecentPrices
+    public override AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal)
     {
-        return HoldDecision("No market data available yet");
+        return HoldDecision("Not implemented yet");
     }
 }
