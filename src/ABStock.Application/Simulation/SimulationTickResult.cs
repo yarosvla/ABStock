@@ -6,7 +6,7 @@ public record AgentSnapshot(
     string Name,
     AgentType Type,
     decimal Cash,
-    int Position,
+    decimal Position,
     decimal PortfolioValue
 );
 
