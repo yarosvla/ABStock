@@ -1,11 +1,75 @@
 ﻿@page "/"
-@inject NavigationManager Navigation
+@layout CreateAssetLayout
 
 <PageTitle>ABStock</PageTitle>
 
-@code {
-    protected override void OnInitialized()
-    {
-        Navigation.NavigateTo("/create-asset", replace: true);
-    }
-}
+<main class="welcome-shell">
+    <div class="market-backdrop" aria-hidden="true">
+        <div class="star-field"></div>
+        <div class="cosmic-rings">
+            <span></span>
+            <span></span>
+        </div>
+        <div class="market-grid"></div>
+        <div class="price-lanes">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <div class="cosmic-points">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <div class="ticker-strip ticker-top">
+            <div>
+                <span>ABST +4.18%</span>
+                <span>AI IDX 1284.42</span>
+                <span>VOL 82.6M</span>
+                <span>RISK LOW</span>
+                <span>ALPHA +1.73</span>
+                <span>ABST +4.18%</span>
+                <span>AI IDX 1284.42</span>
+                <span>VOL 82.6M</span>
+                <span>RISK LOW</span>
+                <span>ALPHA +1.73</span>
+            </div>
+        </div>
+        <div class="ticker-strip ticker-bottom">
+            <div>
+                <span>PORTFOLIO +12.4%</span>
+                <span>SIGNAL BUY</span>
+                <span>SPREAD 0.08</span>
+                <span>MODEL READY</span>
+                <span>RETURN +6.2%</span>
+                <span>PORTFOLIO +12.4%</span>
+                <span>SIGNAL BUY</span>
+                <span>SPREAD 0.08</span>
+                <span>MODEL READY</span>
+                <span>RETURN +6.2%</span>
+            </div>
+        </div>
+    </div>
+
+    <section class="welcome-hero" aria-labelledby="welcome-title">
+        <a class="welcome-brand" href="/" aria-label="ABStock">
+            <span class="welcome-logo" aria-hidden="true">
+                <img src="images/abstock-logo.png" alt="" />
+            </span>
+            <span>ABStock</span>
+        </a>
+
+        <p class="welcome-kicker">AI-платформа для рынка активов</p>
+        <h1 id="welcome-title">ABStock</h1>
+        <p class="welcome-lead">Создавайте активы и запускайте торговые идеи быстрее</p>
+        <p class="welcome-copy">Опишите актив, получите AI-профиль и переходите к анализу торговых сценариев в одном рабочем пространстве.</p>
+
+        <a class="start-button" href="/create-asset">
+            <span>Начать</span>
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+        </a>
+    </section>
+</main>
