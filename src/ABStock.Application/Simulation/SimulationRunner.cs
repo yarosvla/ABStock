@@ -6,9 +6,15 @@ namespace ABStock.Application.Simulation;
 
 public sealed class SimulationRunner : ISimulationRunner
 {
+    private readonly IExchangeEngineFactory _exchangeEngineFactory;
     private volatile NewsSignal? _pendingNews;
 
     public event Action<SimulationTickResult>? OnTick;
+
+    public SimulationRunner(IExchangeEngineFactory exchangeEngineFactory)
+    {
+        _exchangeEngineFactory = exchangeEngineFactory;
+    }
 
     public void SubmitNews(NewsSignal signal)
     {
@@ -17,7 +23,7 @@ public sealed class SimulationRunner : ISimulationRunner
 
     public async Task StartAsync(SimulationConfig config, CancellationToken ct)
     {
-        var exchange = new ExchangeEngine(config.StartPrice);
+        var exchange = _exchangeEngineFactory.Create(config.StartPrice);
         var agents = new AgentFactory().Create(config.Agents);
         var tick = 0;
 

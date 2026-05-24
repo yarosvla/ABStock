@@ -2,7 +2,7 @@ using ABStock.Shared;
 
 namespace ABStock.Exchange.Engine;
 
-public sealed class ExchangeEngine
+public sealed class ExchangeEngine : IExchangeEngine
 {
     private const int DefaultMaxRecentPrices = 100;
     private const int DefaultMaxRecentTrades = 50;
