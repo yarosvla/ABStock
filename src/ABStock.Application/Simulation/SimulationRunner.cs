@@ -44,6 +44,7 @@ public sealed class SimulationRunner : ISimulationRunner
             OnTick?.Invoke(new SimulationTickResult(
                 ++tick,
                 newSnapshot,
+                exchange.GetOrderBookSnapshot(),
                 GetAgentSnapshots(agents, newSnapshot.LastPrice)
             ));
 
