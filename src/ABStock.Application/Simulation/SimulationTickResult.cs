@@ -13,5 +13,6 @@ public record AgentSnapshot(
 public record SimulationTickResult(
     int Tick,
     MarketSnapshot Snapshot,
+    OrderBookSnapshot OrderBook,
     IReadOnlyList<AgentSnapshot> Agents
 );
