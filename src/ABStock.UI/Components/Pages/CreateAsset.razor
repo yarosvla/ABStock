@@ -6,7 +6,7 @@
 
 <div class="create-asset-shell @(isLightTheme ? "light-theme" : null)">
     <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/create-asset" aria-label="ABStock">
+        <a class="brand" href="/" aria-label="ABStock">
             <span class="brand-mark" aria-hidden="true">
                 <img src="images/abstock-logo.png" alt="" />
             </span>
@@ -39,135 +39,31 @@
         </div>
     </nav>
 
-    <main class="create-asset-main @(isProfileGenerated ? "generated" : "draft")">
-        <aside class="side-rail" aria-label="Контекст создания актива">
-            <section class="glass-card side-card steps-card">
-                <h2>Создание актива</h2>
-                <ol class="step-list">
-                    <li class="@(isProfileGenerated || isGenerating ? "done" : "active")">
-                        <span>@(isProfileGenerated || isGenerating ? "✓" : "1")</span>
-                        <div>
-                            <strong>Ввод данных</strong>
-                            <small>Укажите параметры актива</small>
-                        </div>
-                    </li>
-                    <li class="@(isProfileGenerated ? "done" : isGenerating ? "active" : null)">
-                        <span>@(isProfileGenerated ? "✓" : "2")</span>
-                        <div>
-                            <strong>Генерация профиля</strong>
-                            <small>@(isGenerating ? AnalysisStages[Math.Clamp(generationStep, 0, AnalysisStages.Length - 1)] : "AI анализ и формирование")</small>
-                        </div>
-                    </li>
-                    <li class="@(isProfileGenerated ? "active" : null)">
-                        <span>3</span>
-                        <div>
-                            <strong>Готово</strong>
-                            <small>Проверка результата</small>
-                        </div>
-                    </li>
-                </ol>
-            </section>
-
-            <section class="glass-card side-card assistant-card">
-                <div class="side-title-row">
-                    <h2>AI-ассистент</h2>
-                    <span>Core v2.3</span>
-                </div>
-                <dl class="assistant-meta">
-                    <div>
-                        <dt>Модель</dt>
-                        <dd>ABStock AI Core v2.3</dd>
-                    </div>
-                    <div>
-                        <dt>Статус</dt>
-                        <dd><span class="status-dot"></span>@(isGenerating ? "Идёт анализ" : isProfileGenerated ? "Профиль готов" : "Готов к генерации")</dd>
-                    </div>
-                    <div>
-                        <dt>Качество данных</dt>
-                        <dd>@(CanGenerate ? "Достаточно для черновой оценки" : "Ожидает обязательные поля")</dd>
-                    </div>
-                </dl>
-                <div class="assistant-readiness" aria-label="Готовность AI-профиля">
-                    <div>
-                        <span>Поля</span>
-                        <strong>@(CanGenerate ? "2/2" : $"{CompletedRequiredFields}/2")</strong>
-                    </div>
-                    <div>
-                        <span>Источник</span>
-                        <strong>Ввод пользователя</strong>
-                    </div>
-                </div>
-                <p class="assistant-warning">Внешние источники в прототипе не используются. Оценка строится только на введённом описании и параметрах.</p>
-            </section>
-
-            <section class="glass-card side-card usage-card">
-                <h2>Куда будет использоваться актив</h2>
-                <ul>
-                    <li>
-                        <span class="usage-icon purple" aria-hidden="true">
-                            <i class="bi bi-graph-up-arrow"></i>
-                        </span>
-                        <div>
-                            <strong>Симуляции и бэктесты</strong>
-                            <small>Проверяйте стратегии на исторических данных</small>
-                        </div>
-                    </li>
-                    <li>
-                        <span class="usage-icon green" aria-hidden="true">
-                            <i class="bi bi-shield-check"></i>
-                        </span>
-                        <div>
-                            <strong>Торговые идеи и сигналы</strong>
-                            <small>Получайте сигналы и рекомендации</small>
-                        </div>
-                    </li>
-                    <li>
-                        <span class="usage-icon blue" aria-hidden="true">
-                            <i class="bi bi-bar-chart-line"></i>
-                        </span>
-                        <div>
-                            <strong>Портфельный анализ</strong>
-                            <small>Оценивайте вклад актива в портфель</small>
-                        </div>
-                    </li>
-                </ul>
-                <p>Актив будет доступен во всех модулях ABStock</p>
-            </section>
-        </aside>
-
+    <main class="create-asset-main @(isProfileGenerated ? "generated" : isGenerating ? "generating" : "draft")">
         <section class="work-stage">
-            <header class="stage-header @(isProfileGenerated ? "generated-stage-header" : null)">
+            <header class="stage-header">
                 <div class="page-header">
-                    <h1>Создание актива</h1>
-                    <p>Создайте новый актив и получите AI-профиль с оценкой факторов и рисков</p>
+                    <span class="page-kicker">AI asset workbench</span>
+                    <h1>@(isProfileGenerated ? "AI-профиль готов" : isGenerating ? "Формируем AI-профиль" : "Создание актива")</h1>
+                    <p>@(isProfileGenerated ? "Проверьте сгенерированные параметры и переходите к торговым сценариям." : "Опишите актив, уточните параметры и получите профиль с факторами роста, рисками и чувствительностью к новостям.")</p>
                 </div>
 
-                @if (isProfileGenerated)
-                {
-                    <section class="generated-progress-card" aria-label="Статус создания актива">
-                        <div class="generated-step done">
-                            <span aria-hidden="true">✓</span>
-                            <strong>1</strong>
-                            <p>Ввод данных</p>
-                        </div>
-                        <i aria-hidden="true"></i>
-                        <div class="generated-step done">
-                            <span aria-hidden="true">✓</span>
-                            <strong>2</strong>
-                            <p>Генерация профиля <small>AI анализ завершён</small></p>
-                        </div>
-                        <i aria-hidden="true"></i>
-                        <div class="generated-step active">
-                            <span aria-hidden="true">3</span>
-                            <p>Готово <small>Профиль готов к использованию</small></p>
-                        </div>
-                        <div class="generated-ai-badge">
-                            <i class="bi bi-stars" aria-hidden="true"></i>
-                            <span>AI-профиль</span>
-                            <small>Сгенерировано моделью</small>
-                        </div>
-                    </section>
-                }
+                <section class="workflow-progress" aria-label="Статус создания актива">
+                    <div class="workflow-step @(isProfileGenerated || isGenerating ? "done" : "active")">
+                        <span aria-hidden="true">@(isProfileGenerated || isGenerating ? "✓" : "1")</span>
+                        <strong>Ввод данных</strong>
+                    </div>
+                    <i aria-hidden="true"></i>
+                    <div class="workflow-step @(isProfileGenerated ? "done" : isGenerating ? "active" : null)">
+                        <span aria-hidden="true">@(isProfileGenerated ? "✓" : "2")</span>
+                        <strong>AI-анализ</strong>
+                    </div>
+                    <i aria-hidden="true"></i>
+                    <div class="workflow-step @(isProfileGenerated ? "active" : null)">
+                        <span aria-hidden="true">3</span>
+                        <strong>Готово</strong>
+                    </div>
+                </section>
             </header>
 
             <section class="workspace-grid @(isProfileGenerated ? "profile-visible review-mode" : isGenerating ? "generating-mode" : "profile-hidden")" aria-label="Создание актива">
@@ -266,6 +162,7 @@
                     {
                         <div class="card-title-row">
                             <div>
+                                <span class="demo-badge">Демо-черновик</span>
                                 <h2 id="form-title">Параметры актива</h2>
                                 <p>Укажите данные для оценки факторов роста, рисков и новостной чувствительности</p>
                             </div>
@@ -273,29 +170,20 @@
                         </div>
 
                         <div class="asset-form">
-                            <div class="field-group dropdown-field">
+                            <div class="field-group asset-type-field">
                                 <label id="asset-type-label">Тип актива <span>*</span></label>
-                                <button class="select-control" type="button" aria-labelledby="asset-type-label" aria-expanded="@isAssetTypeOpen" @onclick="ToggleAssetType">
-                                    <span class="select-icon" aria-hidden="true">
-                                        <i class="bi @selectedAssetType.IconClass"></i>
-                                    </span>
-                                    <span>@selectedAssetType.Name</span>
-                                    <i class="bi bi-chevron-down chevron @(isAssetTypeOpen ? "open" : null)" aria-hidden="true"></i>
-                                </button>
-
-                                @if (isAssetTypeOpen)
-                                {
-                                    <div class="dropdown-panel" role="listbox" aria-label="Тип актива">
-                                        @foreach (var type in AssetTypes)
-                                        {
-                                            <button class="dropdown-option @(type.Name == selectedAssetType.Name ? "selected" : null)" type="button" role="option" aria-selected="@(type.Name == selectedAssetType.Name)" @onclick="() => SelectAssetType(type)">
-                                                <span><i class="bi @type.IconClass" aria-hidden="true"></i></span>
-                                                <strong>@type.Name</strong>
-                                                <small>@type.Description</small>
-                                            </button>
-                                        }
-                                    </div>
-                                }
+                                <div class="asset-type-grid" role="group" aria-labelledby="asset-type-label">
+                                    @foreach (var type in AssetTypes)
+                                    {
+                                        <button class="asset-type-tile @(type.Name == selectedAssetType.Name ? "selected" : null)" type="button" aria-pressed="@(type.Name == selectedAssetType.Name)" @onclick="() => SelectAssetType(type)">
+                                            <span class="select-icon" aria-hidden="true">
+                                                <i class="bi @type.IconClass"></i>
+                                            </span>
+                                            <strong>@type.Name</strong>
+                                            <small>@type.Description</small>
+                                        </button>
+                                    }
+                                </div>
                             </div>
 
                             <div class="field-group @(ShowAssetNameValidation ? "has-error" : null)">
@@ -362,23 +250,89 @@
                                 </div>
                             }
 
-                            <div class="form-actions">
-                                <button class="secondary-button" type="button" @onclick="ClearForm">
-                                    <i class="bi bi-eraser" aria-hidden="true"></i>
-                                    Очистить
-                                </button>
-                                <button class="primary-button" type="button" @onclick="GenerateProfile" disabled="@isGenerating">
-                                    Сформировать AI-профиль
-                                </button>
-                            </div>
+                            <div class="form-footer">
+                                <p class="privacy-note">
+                                    <i class="bi bi-lock" aria-hidden="true"></i>
+                                    Профиль формируется только по введённым данным и выбранным параметрам.
+                                </p>
 
-                            <p class="privacy-note">
-                                <i class="bi bi-lock" aria-hidden="true"></i>
-                                Профиль формируется только по введённым данным и выбранным параметрам.
-                            </p>
+                                <div class="form-actions">
+                                    <button class="secondary-button" type="button" @onclick="ClearForm">
+                                        <i class="bi bi-eraser" aria-hidden="true"></i>
+                                        Очистить
+                                    </button>
+                                    <button class="primary-button" type="button" @onclick="GenerateProfile" disabled="@isGenerating">
+                                        Сформировать AI-профиль
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     }
                 </section>
+
+                @if (!isProfileGenerated && !isGenerating)
+                {
+                    <aside class="glass-card ai-preview-card" aria-label="Предпросмотр AI-профиля">
+                        <div class="preview-title-row">
+                            <div>
+                                <span>ABStock AI Core v2.3</span>
+                                <h2>Предпросмотр профиля</h2>
+                            </div>
+                            <div class="preview-orbit" aria-hidden="true">
+                                <i class="bi bi-stars"></i>
+                            </div>
+                        </div>
+
+                        <dl class="preview-metrics">
+                            <div>
+                                <dt>Актив</dt>
+                                <dd>@DisplayAssetName</dd>
+                            </div>
+                            <div>
+                                <dt>Тип</dt>
+                                <dd>@selectedAssetType.Name</dd>
+                            </div>
+                            <div>
+                                <dt>Сектор</dt>
+                                <dd>@selectedIndustry</dd>
+                            </div>
+                            <div>
+                                <dt>Источник</dt>
+                                <dd>Ввод пользователя</dd>
+                            </div>
+                        </dl>
+
+                        <div class="preview-readiness" style="--ready:@(CompletedRequiredFields * 50)%">
+                            <div>
+                                <span>Готовность данных</span>
+                                <strong>@(CompletedRequiredFields * 50)%</strong>
+                            </div>
+                            <span aria-hidden="true"><i></i></span>
+                        </div>
+
+                        <section class="preview-summary">
+                            <h3>Будущий профиль</h3>
+                            <p>@DescriptionPreview</p>
+                        </section>
+
+                        <ul class="preview-usage-list" aria-label="Модули использования">
+                            <li>
+                                <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+                                <span>Торговые идеи</span>
+                            </li>
+                            <li>
+                                <i class="bi bi-activity" aria-hidden="true"></i>
+                                <span>Симуляции</span>
+                            </li>
+                            <li>
+                                <i class="bi bi-shield-check" aria-hidden="true"></i>
+                                <span>Риск-анализ</span>
+                            </li>
+                        </ul>
+
+                        <p class="assistant-warning">В прототипе профиль формируется только по введённому описанию и выбранным параметрам.</p>
+                    </aside>
+                }
 
                 @if (isProfileGenerated)
                 {
