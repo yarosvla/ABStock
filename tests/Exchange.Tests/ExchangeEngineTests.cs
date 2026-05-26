@@ -87,6 +87,53 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
+    public void SubmitMany_MatchesMultipleAgentOrdersAndUpdatesFinalSnapshot()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var snapshot = exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 110m, quantity: 5m, agentName: "trend-agent"),
+            CreateOrder(CreateId(2), OrderSide.Sell, 100m, quantity: 2m, agentName: "market-maker"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 106m, quantity: 1m, agentName: "news-agent")
+        ]);
+
+        Assert.Equal(108m, snapshot.LastPrice);
+        Assert.Equal(3m, snapshot.Volume);
+        Assert.Equal(110m, snapshot.BestBid);
+        Assert.Null(snapshot.BestAsk);
+        Assert.Equal([100m, 105m, 108m], snapshot.RecentPrices);
+
+        Assert.Collection(
+            snapshot.RecentTrades,
+            firstTrade =>
+            {
+                Assert.Equal(CreateId(1), firstTrade.BuyOrderId);
+                Assert.Equal(CreateId(2), firstTrade.SellOrderId);
+                Assert.Equal("trend-agent", firstTrade.BuyerAgentName);
+                Assert.Equal("market-maker", firstTrade.SellerAgentName);
+                Assert.Equal(105m, firstTrade.Price);
+                Assert.Equal(2m, firstTrade.Quantity);
+            },
+            secondTrade =>
+            {
+                Assert.Equal(CreateId(1), secondTrade.BuyOrderId);
+                Assert.Equal(CreateId(3), secondTrade.SellOrderId);
+                Assert.Equal("trend-agent", secondTrade.BuyerAgentName);
+                Assert.Equal("news-agent", secondTrade.SellerAgentName);
+                Assert.Equal(108m, secondTrade.Price);
+                Assert.Equal(1m, secondTrade.Quantity);
+            });
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(110m, bid.Price);
+        Assert.Equal(2m, bid.Quantity);
+        Assert.Equal(1, bid.OrdersCount);
+        Assert.Empty(orderBook.Asks);
+    }
+
+    [Fact]
     public void SubmitMany_RejectsWholeBatchWhenAnyOrderIsInvalid()
     {
         var exchange = new ExchangeEngine(startPrice: 100m);
@@ -105,6 +152,49 @@ public sealed class ExchangeEngineTests
         Assert.Null(snapshot.BestAsk);
         Assert.Empty(snapshot.RecentTrades);
         Assert.Equal([100m], snapshot.RecentPrices);
+    }
+
+    [Fact]
+    public void SubmitMany_DoesNotMatchOrdersFromSameAgent()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var snapshot = exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 2m, agentName: "agent-a"),
+            CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 2m, agentName: "agent-a")
+        ]);
+
+        Assert.Equal(100m, snapshot.LastPrice);
+        Assert.Equal(0m, snapshot.Volume);
+        Assert.Equal(101m, snapshot.BestBid);
+        Assert.Equal(99m, snapshot.BestAsk);
+        Assert.Empty(snapshot.RecentTrades);
+        Assert.Equal([100m], snapshot.RecentPrices);
+    }
+
+    [Fact]
+    public void SubmitMany_SkipsSelfTradeAndMatchesCompatibleOtherAgentOrder()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var snapshot = exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 105m, quantity: 1m, agentName: "agent-a"),
+            CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 1m, agentName: "agent-a"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 101m, quantity: 1m, agentName: "agent-b")
+        ]);
+
+        Assert.Equal(103m, snapshot.LastPrice);
+        Assert.Equal(1m, snapshot.Volume);
+        Assert.Null(snapshot.BestBid);
+        Assert.Equal(99m, snapshot.BestAsk);
+
+        var trade = Assert.Single(snapshot.RecentTrades);
+        Assert.Equal(CreateId(1), trade.BuyOrderId);
+        Assert.Equal(CreateId(3), trade.SellOrderId);
+        Assert.Equal("agent-a", trade.BuyerAgentName);
+        Assert.Equal("agent-b", trade.SellerAgentName);
     }
 
     [Fact]
@@ -220,17 +310,22 @@ public sealed class ExchangeEngineTests
         OrderSide side,
         decimal price,
         decimal quantity,
-        string agentName = "agent-1")
+        string? agentName = null)
     {
         return new Order(
             Id: id,
-            AgentName: agentName,
+            AgentName: agentName ?? GetDefaultAgentName(side),
             Side: side,
             Type: OrderType.Limit,
             Price: price,
             Quantity: quantity,
             CreatedAt: DateTimeOffset.UtcNow
         );
+    }
+
+    private static string GetDefaultAgentName(OrderSide side)
+    {
+        return side == OrderSide.Buy ? "buyer-agent" : "seller-agent";
     }
 
     private static Guid CreateId(int id)

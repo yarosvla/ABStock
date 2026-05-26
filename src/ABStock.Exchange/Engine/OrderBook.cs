@@ -38,6 +38,40 @@ public sealed class OrderBook
         ReduceBestOrderBy(_sellOrders, quantity);
     }
 
+    public (Order BuyOrder, Order SellOrder)? FindBestMatch()
+    {
+        foreach (var buyOrder in _buyOrders)
+        {
+            if (buyOrder.Price is null)
+            {
+                continue;
+            }
+
+            var sellOrder = _sellOrders.FirstOrDefault(sell =>
+                sell.Price is not null &&
+                sell.Price <= buyOrder.Price &&
+                !IsSameAgent(buyOrder, sell));
+
+            if (sellOrder is not null)
+            {
+                return (buyOrder, sellOrder);
+            }
+        }
+
+        return null;
+    }
+
+    public void Reduce(Order order, decimal quantity)
+    {
+        if (order.Side == OrderSide.Buy)
+        {
+            ReduceOrderBy(_buyOrders, order, quantity);
+            return;
+        }
+
+        ReduceOrderBy(_sellOrders, order, quantity);
+    }
+
     public OrderBookSnapshot GetSnapshot(int depth = 5)
     {
         if (depth <= 0)
@@ -79,6 +113,35 @@ public sealed class OrderBook
         orders[0] = bestOrder with { Quantity = remainingQuantity };
     }
 
+    private static void ReduceOrderBy(List<Order> orders, Order order, decimal quantity)
+    {
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(quantity), "Quantity must be positive.");
+        }
+
+        var orderIndex = orders.FindIndex(existing => existing.Id == order.Id);
+        if (orderIndex < 0)
+        {
+            throw new InvalidOperationException("Order is not present in the order book.");
+        }
+
+        var currentOrder = orders[orderIndex];
+        if (quantity > currentOrder.Quantity)
+        {
+            throw new InvalidOperationException("Cannot reduce order by more than its current quantity.");
+        }
+
+        var remainingQuantity = currentOrder.Quantity - quantity;
+        if (remainingQuantity == 0)
+        {
+            orders.RemoveAt(orderIndex);
+            return;
+        }
+
+        orders[orderIndex] = currentOrder with { Quantity = remainingQuantity };
+    }
+
     private static IReadOnlyList<OrderBookLevel> BuildLevels(IReadOnlyList<Order> orders, int depth)
     {
         return orders
@@ -103,5 +166,10 @@ public sealed class OrderBook
     {
         var priceCompare = Nullable.Compare(left.Price, right.Price);
         return priceCompare != 0 ? priceCompare : left.CreatedAt.CompareTo(right.CreatedAt);
+    }
+
+    private static bool IsSameAgent(Order left, Order right)
+    {
+        return string.Equals(left.AgentName, right.AgentName, StringComparison.Ordinal);
     }
 }

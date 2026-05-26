@@ -1,6 +1,10 @@
 @page "/trading"
 @layout CreateAssetLayout
 @rendermode InteractiveServer
+@using ABStock.Application.Simulation
+@using ABStock.Shared
+@implements IDisposable
+@inject ISimulationRunner SimulationRunner
 
 <PageTitle>Торги</PageTitle>
 
@@ -331,7 +335,23 @@
     private static readonly int[] GridX = [34, 152, 270, 388, 506, 624, 742, 860];
     private static readonly int[] GridY = [58, 112, 166, 220, 274, 328];
 
-    private static readonly MarketMetric[] MarketMetrics =
+    private MarketMetric[] MarketMetrics => latestTick is null
+        ? FallbackMarketMetrics
+        : BuildMarketMetrics(latestTick);
+
+    private OrderBookRow[] SellOrders => latestTick is null
+        ? FallbackSellOrders
+        : BuildOrderBookRows(latestTick.OrderBook.Asks);
+
+    private OrderBookRow[] BuyOrders => latestTick is null
+        ? FallbackBuyOrders
+        : BuildOrderBookRows(latestTick.OrderBook.Bids);
+
+    private TradeRow[] RecentTrades => latestTick is null
+        ? FallbackRecentTrades
+        : BuildTradeRows(latestTick.Snapshot.RecentTrades);
+
+    private static readonly MarketMetric[] FallbackMarketMetrics =
     [
         new("Текущая цена", "124.35 ₽", "+4.65 ₽ (+3.88%)", "positive", "6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4", "6,42 6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4 94,42"),
         new("Лучший bid", "124.30 ₽", "1 250 шт.", "positive", "4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8", "4,42 4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8 94,42"),
@@ -351,7 +371,7 @@
         new("Статус", "Актив создан", "positive")
     ];
 
-    private static readonly OrderBookRow[] SellOrders =
+    private static readonly OrderBookRow[] FallbackSellOrders =
     [
         new("124.60", "3 900", "13 400", 80),
         new("124.55", "2 800", "9 500", 66),
@@ -360,7 +380,7 @@
         new("124.40", "4 100", "4 100", 92)
     ];
 
-    private static readonly OrderBookRow[] BuyOrders =
+    private static readonly OrderBookRow[] FallbackBuyOrders =
     [
         new("124.30", "1 250", "1 250", 36),
         new("124.25", "2 300", "3 550", 52),
@@ -369,7 +389,7 @@
         new("124.10", "3 200", "12 550", 78)
     ];
 
-    private static readonly TradeRow[] RecentTrades =
+    private static readonly TradeRow[] FallbackRecentTrades =
     [
         new("15:42:18", "124.35", "320", "Покупка", "buy"),
         new("15:42:12", "124.30", "150", "Продажа", "sell"),
@@ -384,6 +404,8 @@
     ];
 
     private string selectedTimeframe = "5м";
+    private SimulationTickResult? latestTick;
+    private CancellationTokenSource? simulationCts;
 
     private static readonly CandlePoint[] Candles =
     [
@@ -477,6 +499,120 @@
     private void SelectTimeframe(string timeframe)
     {
         selectedTimeframe = timeframe;
+    }
+
+    protected override void OnInitialized()
+    {
+        SimulationRunner.OnTick += HandleTick;
+        simulationCts = new CancellationTokenSource();
+
+        _ = RunSimulationAsync(simulationCts.Token);
+    }
+
+    private async Task RunSimulationAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await SimulationRunner.StartAsync(CreateDemoConfig(), cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void HandleTick(SimulationTickResult tickResult)
+    {
+        latestTick = tickResult;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private static SimulationConfig CreateDemoConfig() =>
+        new(
+            "КвантЭнерго",
+            "Демо-актив для проверки связки UI, Application и Exchange.",
+            AssetType.Stock,
+            124.35m,
+            TimeSpan.FromSeconds(1),
+            [
+                new AgentSpec(AgentType.MarketMaker, 100_000m),
+                new AgentSpec(AgentType.TrendFollowing, 100_000m),
+                new AgentSpec(AgentType.CounterTrend, 100_000m),
+                new AgentSpec(AgentType.NewsDriven, 100_000m)
+            ]);
+
+    private static MarketMetric[] BuildMarketMetrics(SimulationTickResult tickResult)
+    {
+        var snapshot = tickResult.Snapshot;
+        var bestBidQuantity = tickResult.OrderBook.Bids.FirstOrDefault()?.Quantity ?? 0m;
+        var bestAskQuantity = tickResult.OrderBook.Asks.FirstOrDefault()?.Quantity ?? 0m;
+
+        return
+        [
+            new("Текущая цена", FormatMoney(snapshot.LastPrice), $"Тик {tickResult.Tick}", "positive", "6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4", "6,42 6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4 94,42"),
+            new("Лучший bid", FormatNullableMoney(snapshot.BestBid), $"{FormatQuantity(bestBidQuantity)} шт.", "positive", "4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8", "4,42 4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8 94,42"),
+            new("Лучший ask", FormatNullableMoney(snapshot.BestAsk), $"{FormatQuantity(bestAskQuantity)} шт.", "negative", "5,16 15,24 25,19 36,31 46,27 57,35 67,28 78,25 88,17 94,12", "5,42 5,16 15,24 25,19 36,31 46,27 57,35 67,28 78,25 88,17 94,12 94,42"),
+            new("Объём торгов", FormatQuantity(snapshot.Volume), $"{snapshot.RecentTrades.Count} сделок", "volume", "8,38 8,27 20,27 20,18 32,18 32,7 44,7 44,14 56,14 56,24 68,24 68,12 80,12 80,18 92,18 92,22", "")
+        ];
+    }
+
+    private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels)
+    {
+        var maxQuantity = levels.Count == 0 ? 0m : levels.Max(level => level.Quantity);
+        var total = 0m;
+
+        return levels
+            .Take(5)
+            .Select(level =>
+            {
+                total += level.Quantity;
+
+                return new OrderBookRow(
+                    FormatPrice(level.Price),
+                    FormatQuantity(level.Quantity),
+                    FormatQuantity(total),
+                    CalculateDepth(level.Quantity, maxQuantity));
+            })
+            .ToArray();
+    }
+
+    private static TradeRow[] BuildTradeRows(IReadOnlyList<Trade> trades) =>
+        trades
+            .OrderByDescending(trade => trade.ExecutedAt)
+            .Take(8)
+            .Select(trade => new TradeRow(
+                trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
+                FormatPrice(trade.Price),
+                FormatQuantity(trade.Quantity),
+                trade.BuyerAgentName,
+                "buy"))
+            .ToArray();
+
+    private static string FormatNullableMoney(decimal? value) => value is null ? "-" : FormatMoney(value.Value);
+
+    private static string FormatMoney(decimal value) => $"{value:F2} ₽";
+
+    private static string FormatPrice(decimal value) => value.ToString("F2");
+
+    private static string FormatQuantity(decimal value) => value % 1m == 0m
+        ? value.ToString("0")
+        : value.ToString("0.##");
+
+    private static int CalculateDepth(decimal quantity, decimal maxQuantity)
+    {
+        if (maxQuantity <= 0m)
+        {
+            return 0;
+        }
+
+        var depth = (int)Math.Ceiling((double)(quantity / maxQuantity * 100m));
+        return Math.Clamp(depth, 8, 100);
+    }
+
+    public void Dispose()
+    {
+        SimulationRunner.OnTick -= HandleTick;
+        simulationCts?.Cancel();
+        simulationCts?.Dispose();
     }
 
     private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string Projection);
