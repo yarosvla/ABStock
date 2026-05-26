@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ABStock.AI\ABStock.AI.csproj" />
     <ProjectReference Include="..\ABStock.Application\ABStock.Application.csproj" />
   </ItemGroup>
 
