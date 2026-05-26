@@ -2,7 +2,7 @@ using ABStock.Shared;
 
 namespace ABStock.Exchange.Engine;
 
-public sealed class ExchangeEngine
+public sealed class ExchangeEngine : IExchangeEngine
 {
     private const int DefaultMaxRecentPrices = 100;
     private const int DefaultMaxRecentTrades = 50;
@@ -90,29 +90,20 @@ public sealed class ExchangeEngine
 
     private void MatchOrders()
     {
-        while (CanMatchBestOrders())
+        while (true)
         {
-            ExecuteBestMatch();
+            var match = _orderBook.FindBestMatch();
+            if (match is null)
+            {
+                return;
+            }
+
+            ExecuteMatch(match.Value.BuyOrder, match.Value.SellOrder);
         }
     }
 
-    private bool CanMatchBestOrders()
+    private void ExecuteMatch(Order buyOrder, Order sellOrder)
     {
-        var bestBid = _orderBook.BestBid;
-        var bestAsk = _orderBook.BestAsk;
-
-        if (bestBid?.Price is null || bestAsk?.Price is null)
-        {
-            return false;
-        }
-
-        return bestBid.Price >= bestAsk.Price;
-    }
-
-    private void ExecuteBestMatch()
-    {
-        var buyOrder = _orderBook.BestBid ?? throw new InvalidOperationException("Best bid is missing.");
-        var sellOrder = _orderBook.BestAsk ?? throw new InvalidOperationException("Best ask is missing.");
         var quantity = Math.Min(buyOrder.Quantity, sellOrder.Quantity);
         var price = CalculateTradePrice(buyOrder, sellOrder);
 
@@ -132,8 +123,8 @@ public sealed class ExchangeEngine
         _prices.Add(price);
         TrimHistory();
 
-        _orderBook.ReduceBestBidBy(quantity);
-        _orderBook.ReduceBestAskBy(quantity);
+        _orderBook.Reduce(buyOrder, quantity);
+        _orderBook.Reduce(sellOrder, quantity);
     }
 
     private void TrimHistory()
