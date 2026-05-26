@@ -317,6 +317,7 @@
     color: #ffffff;
     background: linear-gradient(135deg, #8e74ff, #6bd3ff);
     box-shadow: 0 22px 52px rgba(124, 92, 255, .34), 0 0 42px rgba(85, 199, 255, .18), inset 0 1px 0 rgba(255, 255, 255, .42);
+
     transform: translateY(-2px);
 }
 
