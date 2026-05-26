@@ -10,7 +10,7 @@
 
 <div class="trading-shell">
     <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/create-asset" aria-label="ABStock">
+        <a class="brand" href="/" aria-label="ABStock">
             <span class="brand-mark" aria-hidden="true">
                 <img src="images/abstock-logo.png" alt="" />
             </span>
@@ -121,21 +121,20 @@
                 </div>
 
                 <section class="glass-card chart-card" aria-labelledby="chart-title">
-                    <div class="chart-toolbar">
-                        <div class="tool-icons" aria-hidden="true">
-                            <i class="bi bi-crosshair"></i>
-                            <i class="bi bi-slash-lg"></i>
-                            <i class="bi bi-sliders"></i>
-                            <i class="bi bi-brush"></i>
-                            <i class="bi bi-type"></i>
-                            <i class="bi bi-bounding-box"></i>
-                            <i class="bi bi-emoji-smile"></i>
-                            <i class="bi bi-rulers"></i>
-                            <i class="bi bi-search"></i>
-                            <i class="bi bi-magnet"></i>
-                            <i class="bi bi-lock"></i>
-                        </div>
+                    <div class="tool-icons" aria-hidden="true">
+                        <i class="bi bi-crosshair"></i>
+                        <i class="bi bi-slash-lg"></i>
+                        <i class="bi bi-sliders"></i>
+                        <i class="bi bi-brush"></i>
+                        <i class="bi bi-type"></i>
+                        <i class="bi bi-bounding-box"></i>
+                        <i class="bi bi-emoji-smile"></i>
+                        <i class="bi bi-rulers"></i>
+                        <i class="bi bi-search"></i>
+                        <i class="bi bi-magnet"></i>
+                    </div>
 
+                    <div class="chart-toolbar">
                         <div class="chart-topline">
                             <div class="timeframe-row" aria-label="Таймфрейм">
                                 @foreach (var item in Timeframes)
@@ -213,12 +212,12 @@
                             </g>
 
                             <g class="price-tag">
-                                <rect x="900" y="102" width="52" height="20" rx="3" />
-                                <text x="908" y="116">124.35</text>
+                                <rect x="850" y="101" width="60" height="22" rx="7" />
+                                <text x="860" y="116">124.35</text>
                             </g>
                             <g class="volume-tag">
-                                <rect x="900" y="328" width="52" height="20" rx="3" />
-                                <text x="908" y="342">32.14K</text>
+                                <rect x="850" y="327" width="60" height="22" rx="7" />
+                                <text x="860" y="342">32.14K</text>
                             </g>
                         </svg>
                     </div>
@@ -294,47 +293,39 @@
                     }
                 </section>
             </aside>
-        </section>
 
-        <section class="glass-card status-strip" aria-label="Статус рынка">
-            <div class="status-primary">
-                <span aria-hidden="true"><i class="bi bi-broadcast-pin"></i></span>
-                <div>
-                    <small>Статус рынка</small>
-                    <strong>Торги запущены</strong>
+            <section class="glass-card status-strip" aria-label="Показатели рынка">
+                <div class="status-metric">
+                    <small>С момента запуска</small>
+                    <strong class="positive">00:18:42</strong>
                 </div>
-            </div>
-
-            <div class="status-metric">
-                <small>С момента запуска</small>
-                <strong class="positive">00:18:42</strong>
-            </div>
-            <div class="status-metric">
-                <small>Количество сделок</small>
-                <strong>3 214</strong>
-            </div>
-            <div class="status-metric">
-                <small>Участников</small>
-                <strong>86</strong>
-            </div>
-            <div class="status-metric status-range">
-                <small>Дневной диапазон</small>
-                <strong>119.20 ₽ — 124.80 ₽</strong>
-                <div class="range-track" aria-hidden="true">
-                    <span></span>
-                    <i></i>
+                <div class="status-metric">
+                    <small>Количество сделок</small>
+                    <strong>3 214</strong>
                 </div>
-            </div>
-            <div class="status-metric">
-                <small>Ликвидность</small>
-                <strong class="positive">Высокая</strong>
-                <span>Спред 0.10 ₽ (0.08%)</span>
-            </div>
+                <div class="status-metric">
+                    <small>Участников</small>
+                    <strong>86</strong>
+                </div>
+                <div class="status-metric status-range">
+                    <small>Дневной диапазон</small>
+                    <strong>119.20 ₽ — 124.80 ₽</strong>
+                    <div class="range-track" aria-hidden="true">
+                        <span></span>
+                        <i></i>
+                    </div>
+                </div>
+                <div class="status-metric">
+                    <small>Ликвидность</small>
+                    <strong class="positive">Высокая</strong>
+                    <span>Спред 0.10 ₽ (0.08%)</span>
+                </div>
 
-            <button class="portfolio-button" type="button">
-                <i class="bi bi-briefcase" aria-hidden="true"></i>
-                <span>Открыть портфель</span>
-            </button>
+                <button class="portfolio-button" type="button">
+                    <i class="bi bi-briefcase" aria-hidden="true"></i>
+                    <span>Открыть портфель</span>
+                </button>
+            </section>
         </section>
     </main>
 </div>
@@ -407,7 +398,9 @@
         new("15:41:58", "124.30", "450", "Покупка", "buy"),
         new("15:41:52", "124.35", "300", "Покупка", "buy"),
         new("15:41:45", "124.25", "200", "Продажа", "sell"),
-        new("15:41:39", "124.30", "500", "Покупка", "buy")
+        new("15:41:39", "124.30", "500", "Покупка", "buy"),
+        new("15:41:33", "124.35", "260", "Покупка", "buy"),
+        new("15:41:28", "124.20", "180", "Продажа", "sell")
     ];
 
     private string selectedTimeframe = "5м";
