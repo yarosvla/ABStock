@@ -3,7 +3,7 @@ using ABStock.Shared;
 
 namespace ABStock.Agents;
 
-public sealed class AgentFactory
+public sealed class AgentFactory : IAgentFactory
 {
     public IReadOnlyList<ITradeAgent> Create(IReadOnlyList<AgentSpec> specs) =>
         specs.Select<AgentSpec, ITradeAgent>(spec => spec.Type switch
