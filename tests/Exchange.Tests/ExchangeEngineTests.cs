@@ -155,6 +155,38 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
+    public void SubmitManyWithResult_ReturnsAcceptedRejectedTradesAndSnapshot()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var result = exchange.SubmitManyWithResult(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 1m, agentName: "buyer-agent"),
+            CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 1m, agentName: "seller-agent"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 99m, quantity: 0m, agentName: "invalid-agent")
+        ]);
+
+        Assert.Equal(2, result.AcceptedOrders.Count);
+
+        var rejectedOrder = Assert.Single(result.RejectedOrders);
+        Assert.Equal(CreateId(3), rejectedOrder.Order?.Id);
+        Assert.Contains("quantity", rejectedOrder.Reason, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(100m, result.Snapshot.LastPrice);
+        Assert.Equal(1m, result.Snapshot.Volume);
+        Assert.Null(result.Snapshot.BestBid);
+        Assert.Null(result.Snapshot.BestAsk);
+
+        var trade = Assert.Single(result.Trades);
+        Assert.Equal(CreateId(1), trade.BuyOrderId);
+        Assert.Equal(CreateId(2), trade.SellOrderId);
+        Assert.Equal("buyer-agent", trade.BuyerAgentName);
+        Assert.Equal("seller-agent", trade.SellerAgentName);
+        Assert.Equal(100m, trade.Price);
+        Assert.Equal(1m, trade.Quantity);
+    }
+
+    [Fact]
     public void SubmitMany_DoesNotMatchOrdersFromSameAgent()
     {
         var exchange = new ExchangeEngine(startPrice: 100m);
