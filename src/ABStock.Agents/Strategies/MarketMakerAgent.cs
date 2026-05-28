@@ -8,8 +8,8 @@ public class MarketMakerAgent : AgentBase
     private readonly decimal _orderQuantity;
     private readonly decimal _maxPosition;
 
-    public MarketMakerAgent(decimal initialCash, decimal spreadPercent = 0.01m, decimal orderQuantity = 1m, decimal maxPosition = 10m)
-        : base("MarketMaker", AgentType.MarketMaker, initialCash)
+    public MarketMakerAgent(decimal initialCash, decimal initialPosition = 0, decimal spreadPercent = 0.01m, decimal orderQuantity = 1m, decimal maxPosition = 10m)
+        : base("MarketMaker", AgentType.MarketMaker, initialCash, initialPosition)
     {
         _spreadPercent = spreadPercent;
         _orderQuantity = orderQuantity;
