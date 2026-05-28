@@ -37,9 +37,13 @@ public sealed class SimulationRunner : ISimulationRunner
                 .SelectMany(a => a.Decide(snapshot, news).Orders)
                 .ToList();
 
-            var newSnapshot = allOrders.Count > 0
-                ? exchange.SubmitMany(allOrders)
-                : snapshot;
+            var newSnapshot = snapshot;
+            if (allOrders.Count > 0)
+            {
+                var submitResult = exchange.SubmitManyWithResult(allOrders);
+                ApplyTradesToAgents(agents, submitResult.Trades);
+                newSnapshot = submitResult.Snapshot;
+            }
 
             OnTick?.Invoke(new SimulationTickResult(
                 ++tick,
@@ -49,6 +53,32 @@ public sealed class SimulationRunner : ISimulationRunner
             ));
 
             await Task.Delay(config.TickInterval, ct);
+        }
+    }
+
+    private static void ApplyTradesToAgents(
+        IReadOnlyList<ITradeAgent> agents,
+        IReadOnlyList<Trade> trades)
+    {
+        var agentsByName = agents.ToDictionary(
+            agent => agent.State.AgentName,
+            StringComparer.Ordinal);
+
+        foreach (var trade in trades)
+        {
+            var tradeValue = trade.Price * trade.Quantity;
+
+            if (agentsByName.TryGetValue(trade.BuyerAgentName, out var buyer))
+            {
+                buyer.State.Cash -= tradeValue;
+                buyer.State.Position += trade.Quantity;
+            }
+
+            if (agentsByName.TryGetValue(trade.SellerAgentName, out var seller))
+            {
+                seller.State.Cash += tradeValue;
+                seller.State.Position -= trade.Quantity;
+            }
         }
     }
 

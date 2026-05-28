@@ -71,6 +71,46 @@ public sealed class ExchangeEngine : IExchangeEngine
         return GetSnapshot();
     }
 
+    public SubmitResult SubmitWithResult(Order order)
+    {
+        return SubmitManyWithResult([order]);
+    }
+
+    public SubmitResult SubmitManyWithResult(IEnumerable<Order> orders)
+    {
+        ArgumentNullException.ThrowIfNull(orders);
+
+        var acceptedOrders = new List<Order>();
+        var rejectedOrders = new List<RejectedOrder>();
+
+        foreach (var order in orders)
+        {
+            try
+            {
+                _orderValidator.Validate(order);
+                acceptedOrders.Add(order);
+            }
+            catch (Exception exception)
+            {
+                rejectedOrders.Add(new RejectedOrder(order, exception.Message));
+            }
+        }
+
+        foreach (var order in acceptedOrders)
+        {
+            _orderBook.Add(order);
+        }
+
+        var trades = MatchOrders();
+
+        return new SubmitResult(
+            Snapshot: GetSnapshot(),
+            Trades: trades,
+            AcceptedOrders: acceptedOrders.ToArray(),
+            RejectedOrders: rejectedOrders.ToArray()
+        );
+    }
+
     public MarketSnapshot GetSnapshot()
     {
         return new MarketSnapshot(
@@ -88,21 +128,23 @@ public sealed class ExchangeEngine : IExchangeEngine
         return _orderBook.GetSnapshot(depth);
     }
 
-    private void MatchOrders()
+    private IReadOnlyList<Trade> MatchOrders()
     {
+        var trades = new List<Trade>();
+
         while (true)
         {
             var match = _orderBook.FindBestMatch();
             if (match is null)
             {
-                return;
+                return trades;
             }
 
-            ExecuteMatch(match.Value.BuyOrder, match.Value.SellOrder);
+            trades.Add(ExecuteMatch(match.Value.BuyOrder, match.Value.SellOrder));
         }
     }
 
-    private void ExecuteMatch(Order buyOrder, Order sellOrder)
+    private Trade ExecuteMatch(Order buyOrder, Order sellOrder)
     {
         var quantity = Math.Min(buyOrder.Quantity, sellOrder.Quantity);
         var price = CalculateTradePrice(buyOrder, sellOrder);
@@ -125,6 +167,8 @@ public sealed class ExchangeEngine : IExchangeEngine
 
         _orderBook.Reduce(buyOrder, quantity);
         _orderBook.Reduce(sellOrder, quantity);
+
+        return trade;
     }
 
     private void TrimHistory()
