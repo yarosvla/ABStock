@@ -7,14 +7,14 @@ public abstract class AgentBase : ITradeAgent
 {
     public AgentState State { get; }
 
-    protected AgentBase(string name, AgentType type, decimal initialCash)
+    protected AgentBase(string name, AgentType type, decimal initialCash, decimal initialPosition = 0)
     {
         State = new AgentState
         {
             AgentName = name,
             AgentType = type,
             Cash = initialCash,
-            Position = 0
+            Position = initialPosition
         };
     }
 
