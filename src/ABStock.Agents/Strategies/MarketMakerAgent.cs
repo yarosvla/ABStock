@@ -6,14 +6,12 @@ public class MarketMakerAgent : AgentBase
 {
     private readonly decimal _spreadPercent;
     private readonly decimal _orderQuantity;
-    private readonly decimal _maxPosition;
 
-    public MarketMakerAgent(decimal initialCash, decimal initialPosition = 0, decimal spreadPercent = 0.01m, decimal orderQuantity = 1m, decimal maxPosition = 10m)
+    public MarketMakerAgent(decimal initialCash, decimal initialPosition = 0, decimal spreadPercent = 0.01m, decimal orderQuantity = 1m)
         : base("MarketMaker", AgentType.MarketMaker, initialCash, initialPosition)
     {
         _spreadPercent = spreadPercent;
         _orderQuantity = orderQuantity;
-        _maxPosition = maxPosition;
     }
 
     public override AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal)
@@ -23,7 +21,7 @@ public class MarketMakerAgent : AgentBase
 
         var orders = new List<Order>();
 
-        if (CanBuy(bidPrice, _orderQuantity) && State.Position < _maxPosition)
+        if (CanBuy(bidPrice, _orderQuantity))
             orders.Add(CreateOrder(OrderSide.Buy, bidPrice, _orderQuantity));
 
         if (CanSell(_orderQuantity))
