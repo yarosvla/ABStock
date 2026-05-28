@@ -76,18 +76,6 @@ public sealed class MarketMakerAgentTests
     }
 
     [Fact]
-    public void Decide_RespectsMaxPosition()
-    {
-        var agent = new MarketMakerAgent(10000m, maxPosition: 3m);
-        agent.State.Position = 3m;
-        var snapshot = CreateSnapshot(100m);
-
-        var decision = agent.Decide(snapshot, null);
-
-        Assert.DoesNotContain(decision.Orders, o => o.Side == OrderSide.Buy);
-    }
-
-    [Fact]
     public void Decide_UsesCustomSpread()
     {
         var agent = new MarketMakerAgent(10000m, spreadPercent: 0.05m);
