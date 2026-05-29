@@ -27,8 +27,8 @@
 
         <div class="nav-actions">
             <span class="market-status"><span aria-hidden="true"></span>Торги запущены</span>
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>15:42:18</span>
-            <span class="date-chip">23 мая 2025</span>
+            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
+            <span class="date-chip">@Clock.Date</span>
             <button class="icon-button" type="button" aria-label="Уведомления">
                 <i class="bi bi-bell" aria-hidden="true"></i>
                 <span class="notification-badge">3</span>
@@ -98,15 +98,10 @@
                             @if (metric.Accent == "volume")
                             {
                                 <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
-                                    <rect x="4" y="28" width="7" height="10" rx="2" />
-                                    <rect x="14" y="22" width="7" height="16" rx="2" />
-                                    <rect x="24" y="16" width="7" height="22" rx="2" />
-                                    <rect x="34" y="10" width="7" height="28" rx="2" />
-                                    <rect x="44" y="18" width="7" height="20" rx="2" />
-                                    <rect x="54" y="24" width="7" height="14" rx="2" />
-                                    <rect x="64" y="20" width="7" height="18" rx="2" />
-                                    <rect x="74" y="24" width="7" height="14" rx="2" />
-                                    <rect x="84" y="26" width="7" height="12" rx="2" />
+                                    @foreach (var bar in metric.Bars)
+                                    {
+                                        <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
+                                    }
                                 </svg>
                             }
                             else
@@ -120,20 +115,8 @@
                     }
                 </div>
 
+                @{ var chartData = ChartData; }
                 <section class="glass-card chart-card" aria-labelledby="chart-title">
-                    <div class="tool-icons" aria-hidden="true">
-                        <i class="bi bi-crosshair"></i>
-                        <i class="bi bi-slash-lg"></i>
-                        <i class="bi bi-sliders"></i>
-                        <i class="bi bi-brush"></i>
-                        <i class="bi bi-type"></i>
-                        <i class="bi bi-bounding-box"></i>
-                        <i class="bi bi-emoji-smile"></i>
-                        <i class="bi bi-rulers"></i>
-                        <i class="bi bi-search"></i>
-                        <i class="bi bi-magnet"></i>
-                    </div>
-
                     <div class="chart-toolbar">
                         <div class="chart-topline">
                             <div class="timeframe-row" aria-label="Таймфрейм">
@@ -141,20 +124,18 @@
                                 {
                                     <button class="@(item == selectedTimeframe ? "active" : null)" type="button" @onclick="() => SelectTimeframe(item)">@item</button>
                                 }
-                                <button type="button"><i class="bi bi-graph-up" aria-hidden="true"></i> Индикаторы</button>
-                                <button type="button"><i class="bi bi-gear" aria-hidden="true"></i> Настройки</button>
                             </div>
-                            <span class="market-active"><i class="bi bi-record-circle" aria-hidden="true"></i>Рынок активен</span>
+                            <span class="market-active"><i class="bi bi-record-circle" aria-hidden="true"></i>@chartData.MarketState</span>
                         </div>
 
                         <div class="chart-header">
                             <h2 id="chart-title">КвантЭнерго · @selectedTimeframe · ABStock</h2>
                             <dl>
-                                <div><dt>ОТКР</dt><dd>124.22</dd></div>
-                                <div><dt>МАКС</dt><dd>124.45</dd></div>
-                                <div><dt>МИН</dt><dd>124.18</dd></div>
-                                <div><dt>ЗАКР</dt><dd>124.35</dd></div>
-                                <div><dt></dt><dd class="positive">+0.13 (+0.10%)</dd></div>
+                                <div><dt>ОТКР</dt><dd>@chartData.Open</dd></div>
+                                <div><dt>МАКС</dt><dd>@chartData.High</dd></div>
+                                <div><dt>МИН</dt><dd>@chartData.Low</dd></div>
+                                <div><dt>ЗАКР</dt><dd>@chartData.Close</dd></div>
+                                <div><dt></dt><dd class="@chartData.ChangeClass">@chartData.Change</dd></div>
                             </dl>
                         </div>
                     </div>
@@ -163,112 +144,106 @@
                         <svg class="price-chart" viewBox="0 0 960 430" role="img" aria-label="Свечной график цены КвантЭнерго">
                             <defs>
                                 <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
-                                    <stop offset="0" stop-color="#142238" />
-                                    <stop offset="1" stop-color="#0A1220" />
+                                    <stop offset="0" stop-color="#122842" />
+                                    <stop offset="0.54" stop-color="#0E1B2E" />
+                                    <stop offset="1" stop-color="#09111F" />
+                                </linearGradient>
+                                <linearGradient id="chartGlow" x1="0" x2="1" y1="0" y2="0">
+                                    <stop offset="0" stop-color="#7C5CFF" stop-opacity="0.18" />
+                                    <stop offset="0.52" stop-color="#55C7FF" stop-opacity="0.1" />
+                                    <stop offset="1" stop-color="#36D98A" stop-opacity="0.12" />
                                 </linearGradient>
                             </defs>
                             <rect width="960" height="430" fill="url(#chartFill)" />
+                            <rect x="@ChartPanelLeft" y="18" width="@ChartPanelWidth" height="332" rx="10" fill="url(#chartGlow)" />
 
-                            @foreach (var x in GridX)
+                            @foreach (var x in chartData.GridX)
                             {
-                                <line class="grid-line" x1="@x" y1="18" x2="@x" y2="346" />
+                                <line class="grid-line vertical-grid-line" x1="@x" y1="@ChartPlotTop" x2="@x" y2="@ChartPlotBottom" />
                             }
-                            @foreach (var y in GridY)
+                            @foreach (var label in chartData.PriceLabels)
                             {
-                                <line class="grid-line" x1="20" y1="@y" x2="918" y2="@y" />
+                                <line class="grid-line horizontal-grid-line" x1="@ChartPlotLeft" y1="@label.Y" x2="@ChartPlotRight" y2="@label.Y" />
                             }
 
-                            <line class="price-marker-line" x1="20" y1="112" x2="918" y2="112" />
-                            <text class="volume-label" x="34" y="76">Объём (SMA, 9) <tspan>32.14K</tspan></text>
-                            <polyline class="indicator-line ma-fast" points="20,258 120,240 220,224 320,204 420,176 520,148 620,121 720,112 820,126 918,118" />
-                            <polyline class="indicator-line ma-slow" points="20,300 120,284 220,270 320,250 420,226 520,204 620,180 720,158 820,150 918,140" />
-                            <polyline class="indicator-line vwap-line" points="20,282 140,268 260,254 380,236 500,218 620,198 740,184 860,172 918,164" />
+                            <line class="price-marker-line" x1="@ChartPlotLeft" y1="@chartData.LastPriceY" x2="@chartData.PlotRight" y2="@chartData.LastPriceY" />
 
-                            @foreach (var candle in Candles)
+                            @foreach (var candle in chartData.Candles)
                             {
                                 <g class="candle @(candle.IsUp ? "up" : "down")">
                                     <line x1="@candle.X" y1="@candle.HighY" x2="@candle.X" y2="@candle.LowY" />
-                                    <rect x="@(candle.X - 4)" y="@Math.Min(candle.OpenY, candle.CloseY)" width="8" height="@Math.Max(5, Math.Abs(candle.OpenY - candle.CloseY))" rx="1" />
-                                    <rect class="volume" x="@(candle.X - 4)" y="@GetVolumeY(candle.Volume)" width="8" height="@candle.Volume" rx="1" />
+                                    <rect x="@candle.BodyX" y="@candle.BodyY" width="@candle.BodyWidth" height="@candle.BodyHeight" rx="1.5" />
                                 </g>
                             }
 
                             <g class="axis-labels">
-                                <text x="924" y="58">125.00</text>
-                                <text x="924" y="112">124.35</text>
-                                <text x="924" y="139">124.00</text>
-                                <text x="924" y="193">123.50</text>
-                                <text x="924" y="247">123.00</text>
-                                <text x="924" y="301">122.50</text>
-                                <text x="924" y="343">122.00</text>
-                                <text x="34" y="377">10:00</text>
-                                <text x="152" y="377">11:00</text>
-                                <text x="270" y="377">12:00</text>
-                                <text x="388" y="377">13:00</text>
-                                <text x="506" y="377">14:00</text>
-                                <text x="624" y="377">15:00</text>
-                                <text x="742" y="377">16:00</text>
-                                <text x="858" y="377">17:00</text>
+                                @foreach (var label in chartData.PriceLabels)
+                                {
+                                    @SvgText(ChartAxisLabelX, label.Y, label.Text, "end")
+                                }
+                                @foreach (var label in chartData.TickLabels)
+                                {
+                                    @SvgText(label.X, 377, label.Text, "middle")
+                                }
                             </g>
 
                             <g class="price-tag">
-                                <rect x="850" y="101" width="60" height="22" rx="7" />
-                                <text x="860" y="116">124.35</text>
-                            </g>
-                            <g class="volume-tag">
-                                <rect x="850" y="327" width="60" height="22" rx="7" />
-                                <text x="860" y="342">32.14K</text>
+                                <rect x="@chartData.PriceTagX" y="@chartData.PriceTagY" width="66" height="22" rx="7" />
+                                <text x="@chartData.PriceTagTextX" y="@chartData.PriceTagTextY">@chartData.LastPrice</text>
                             </g>
                         </svg>
                     </div>
 
                     <footer class="chart-footer">
-                        <span>15:42:18 (UTC+3)</span>
+                        <span>@chartData.UpdatedAt</span>
                     </footer>
                 </section>
             </section>
 
             <aside class="right-column">
+                @{ var orderBook = OrderBookData; }
                 <section class="glass-card order-book" aria-labelledby="book-title">
                     <h2 id="book-title">Книга заявок</h2>
                     <div class="book-head">
-                        <span>Цена (₽)</span>
-                        <span>Объём (шт.)</span>
-                        <span>Сумма (шт.)</span>
+                        <span class="book-cell-price">Цена (₽)</span>
+                        <span class="book-cell-volume">Объём (шт.)</span>
+                        <span class="book-cell-total">Сумма (шт.)</span>
                     </div>
 
                     <div class="book-side sells">
                         <svg class="book-depth-shape ask-depth" viewBox="0 0 300 125" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="M0 0 H220 V22 H210 V44 H238 V64 H252 V84 H276 V125 H0 Z" />
-                            <path class="depth-line" d="M220 0 V22 H210 V44 H238 V64 H252 V84 H276 V125" />
+                            <path d="@orderBook.AskFillPath" />
+                            <path class="depth-line" d="@orderBook.AskLinePath" />
                         </svg>
-                        @foreach (var row in SellOrders)
+                        @foreach (var row in orderBook.Asks)
                         {
                             <div class="book-row">
-                                <strong>@row.Price</strong>
-                                <span>@row.Volume</span>
-                                <span>@row.Total</span>
+                                <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                <strong class="book-cell-price">@row.Price</strong>
+                                <span class="book-cell-volume">@row.Volume</span>
+                                <span class="book-cell-total">@row.Total</span>
                             </div>
                         }
                     </div>
 
                     <div class="spread-row">
-                        <i class="bi bi-caret-left-fill" aria-hidden="true"></i>
-                        <strong>124.35 ₽</strong>
-                        <span>+4.65 ₽ (+3.88%)</span>
+                        <i class="@Spread.Icon" aria-hidden="true"></i>
+                        <strong>@Spread.Value</strong>
+                        <span>@Spread.Detail</span>
                     </div>
 
                     <div class="book-side buys">
                         <svg class="book-depth-shape bid-depth" viewBox="0 0 300 125" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="M300 0 H132 V22 H112 V44 H92 V64 H118 V86 H72 V125 H300 Z" />
-                            <path class="depth-line" d="M132 0 V22 H112 V44 H92 V64 H118 V86 H72 V125" />
+                            <path d="@orderBook.BidFillPath" />
+                            <path class="depth-line" d="@orderBook.BidLinePath" />
                         </svg>
-                        @foreach (var row in BuyOrders)
+                        @foreach (var row in orderBook.Bids)
                         {
                             <div class="book-row">
-                                <strong>@row.Price</strong>
-                                <span>@row.Volume</span>
-                                <span>@row.Total</span>
+                                <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                <strong class="book-cell-price">@row.Price</strong>
+                                <span class="book-cell-volume">@row.Volume</span>
+                                <span class="book-cell-total">@row.Total</span>
                             </div>
                         }
                     </div>
@@ -280,7 +255,7 @@
                         <span>Время</span>
                         <span>Цена (₽)</span>
                         <span>Объём (шт.)</span>
-                        <span>Сторона</span>
+                        <span>Участники</span>
                     </div>
                     @foreach (var trade in RecentTrades)
                     {
@@ -294,31 +269,32 @@
                 </section>
             </aside>
 
+            @{ var status = Status; }
             <section class="glass-card status-strip" aria-label="Показатели рынка">
                 <div class="status-metric">
                     <small>С момента запуска</small>
-                    <strong class="positive">00:18:42</strong>
+                    <strong class="positive">@status.Elapsed</strong>
                 </div>
                 <div class="status-metric">
                     <small>Количество сделок</small>
-                    <strong>3 214</strong>
+                    <strong>@status.TradeCount</strong>
                 </div>
                 <div class="status-metric">
                     <small>Участников</small>
-                    <strong>86</strong>
+                    <strong>@status.Participants</strong>
                 </div>
                 <div class="status-metric status-range">
                     <small>Дневной диапазон</small>
-                    <strong>119.20 ₽ — 124.80 ₽</strong>
+                    <strong>@status.Range</strong>
                     <div class="range-track" aria-hidden="true">
                         <span></span>
-                        <i></i>
+                        <i style="@status.RangeMarkerStyle"></i>
                     </div>
                 </div>
                 <div class="status-metric">
                     <small>Ликвидность</small>
-                    <strong class="positive">Высокая</strong>
-                    <span>Спред 0.10 ₽ (0.08%)</span>
+                    <strong class="@status.LiquidityClass">@status.Liquidity</strong>
+                    <span>@status.LiquidityDetail</span>
                 </div>
 
                 <a class="portfolio-button" href="/news">
@@ -332,32 +308,28 @@
 
 @code {
     private static readonly string[] Timeframes = ["1м", "5м", "15м", "1ч", "4ч", "1д"];
-    private static readonly int[] GridX = [34, 152, 270, 388, 506, 624, 742, 860];
-    private static readonly int[] GridY = [58, 112, 166, 220, 274, 328];
+    private const decimal DemoStartPrice = 124.35m;
+    private const double ChartPanelLeft = 18;
+    private const double ChartPanelWidth = 906;
+    private const double ChartPlotLeft = 34;
+    private const double ChartPlotRight = 884;
+    private const double ChartAxisLabelX = 914;
+    private const double ChartPlotTop = 28;
+    private const double ChartPlotBottom = 336;
+    private const double ChartPlotHeight = ChartPlotBottom - ChartPlotTop;
+    private const int MetricHistoryLimit = 24;
 
-    private MarketMetric[] MarketMetrics => latestTick is null
-        ? FallbackMarketMetrics
-        : BuildMarketMetrics(latestTick);
+    private MarketMetric[] MarketMetrics => BuildMarketMetrics(latestTick);
 
-    private OrderBookRow[] SellOrders => latestTick is null
-        ? FallbackSellOrders
-        : BuildOrderBookRows(latestTick.OrderBook.Asks);
+    private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
 
-    private OrderBookRow[] BuyOrders => latestTick is null
-        ? FallbackBuyOrders
-        : BuildOrderBookRows(latestTick.OrderBook.Bids);
+    private SpreadData Spread => BuildSpreadData(latestTick);
 
-    private TradeRow[] RecentTrades => latestTick is null
-        ? FallbackRecentTrades
-        : BuildTradeRows(latestTick.Snapshot.RecentTrades);
+    private StatusStripData Status => BuildStatusStripData(latestTick);
 
-    private static readonly MarketMetric[] FallbackMarketMetrics =
-    [
-        new("Текущая цена", "124.35 ₽", "+4.65 ₽ (+3.88%)", "positive", "6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4", "6,42 6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4 94,42"),
-        new("Лучший bid", "124.30 ₽", "1 250 шт.", "positive", "4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8", "4,42 4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8 94,42"),
-        new("Лучший ask", "124.40 ₽", "4 100 шт.", "negative", "5,16 15,24 25,19 36,31 46,27 57,35 67,28 78,25 88,17 94,12", "5,42 5,16 15,24 25,19 36,31 46,27 57,35 67,28 78,25 88,17 94,12 94,42"),
-        new("Объём торгов", "1.24M", "152.3 млн ₽", "volume", "8,38 8,27 20,27 20,18 32,18 32,7 44,7 44,14 56,14 56,24 68,24 68,12 80,12 80,18 92,18 92,22", "")
-    ];
+    private ClockData Clock => BuildClockData();
+
+    private TradeRow[] RecentTrades => BuildTradeRows(latestTick?.Snapshot.RecentTrades ?? []);
 
     private static readonly AssetParameter[] AssetParameters =
     [
@@ -371,130 +343,19 @@
         new("Статус", "Актив создан", "positive")
     ];
 
-    private static readonly OrderBookRow[] FallbackSellOrders =
-    [
-        new("124.60", "3 900", "13 400", 80),
-        new("124.55", "2 800", "9 500", 66),
-        new("124.50", "2 600", "6 700", 57),
-        new("124.45", "1 700", "4 100", 44),
-        new("124.40", "4 100", "4 100", 92)
-    ];
-
-    private static readonly OrderBookRow[] FallbackBuyOrders =
-    [
-        new("124.30", "1 250", "1 250", 36),
-        new("124.25", "2 300", "3 550", 52),
-        new("124.20", "3 100", "6 650", 70),
-        new("124.15", "2 700", "9 350", 63),
-        new("124.10", "3 200", "12 550", 78)
-    ];
-
-    private static readonly TradeRow[] FallbackRecentTrades =
-    [
-        new("15:42:18", "124.35", "320", "Покупка", "buy"),
-        new("15:42:12", "124.30", "150", "Продажа", "sell"),
-        new("15:42:07", "124.35", "210", "Покупка", "buy"),
-        new("15:42:03", "124.40", "180", "Продажа", "sell"),
-        new("15:41:58", "124.30", "450", "Покупка", "buy"),
-        new("15:41:52", "124.35", "300", "Покупка", "buy"),
-        new("15:41:45", "124.25", "200", "Продажа", "sell"),
-        new("15:41:39", "124.30", "500", "Покупка", "buy"),
-        new("15:41:33", "124.35", "260", "Покупка", "buy"),
-        new("15:41:28", "124.20", "180", "Продажа", "sell")
-    ];
-
     private string selectedTimeframe = "5м";
     private SimulationTickResult? latestTick;
     private CancellationTokenSource? simulationCts;
+    private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
+    private DateTimeOffset startedAt = DateTimeOffset.Now;
+    private decimal previousVolume;
+    private readonly HashSet<Guid> seenTradeIds = [];
+    private readonly List<decimal> priceMetricHistory = [DemoStartPrice];
+    private readonly List<decimal> bidMetricHistory = [DemoStartPrice];
+    private readonly List<decimal> askMetricHistory = [DemoStartPrice];
+    private readonly List<decimal> volumeMetricHistory = [0m];
 
-    private static readonly CandlePoint[] Candles =
-    [
-        new(38, 258, 240, 268, 248, 46, true),
-        new(48, 246, 232, 260, 236, 58, true),
-        new(58, 235, 228, 252, 248, 34, false),
-        new(68, 249, 236, 266, 260, 42, false),
-        new(78, 260, 250, 276, 256, 30, true),
-        new(88, 255, 244, 265, 248, 38, true),
-        new(98, 247, 232, 252, 236, 64, true),
-        new(108, 236, 226, 248, 242, 50, false),
-        new(118, 242, 232, 250, 238, 28, true),
-        new(128, 236, 226, 244, 230, 62, true),
-        new(138, 230, 218, 239, 222, 74, true),
-        new(148, 223, 216, 238, 234, 44, false),
-        new(158, 235, 224, 244, 228, 32, true),
-        new(168, 228, 218, 238, 222, 42, true),
-        new(178, 222, 214, 233, 218, 30, true),
-        new(188, 218, 206, 226, 211, 56, true),
-        new(198, 210, 198, 220, 204, 39, true),
-        new(208, 205, 196, 218, 216, 48, false),
-        new(218, 216, 204, 224, 209, 35, true),
-        new(228, 209, 198, 219, 202, 42, true),
-        new(238, 202, 194, 215, 211, 66, false),
-        new(248, 211, 204, 222, 207, 44, true),
-        new(258, 207, 198, 216, 201, 38, true),
-        new(268, 201, 192, 210, 196, 31, true),
-        new(278, 196, 188, 207, 202, 58, false),
-        new(288, 202, 194, 212, 198, 35, true),
-        new(298, 198, 188, 208, 192, 49, true),
-        new(308, 192, 182, 202, 187, 34, true),
-        new(318, 187, 176, 198, 192, 40, false),
-        new(328, 192, 184, 202, 188, 32, true),
-        new(338, 188, 178, 198, 182, 36, true),
-        new(348, 182, 170, 192, 174, 62, true),
-        new(358, 174, 164, 184, 180, 42, false),
-        new(368, 180, 170, 188, 174, 38, true),
-        new(378, 174, 166, 184, 170, 52, true),
-        new(388, 170, 160, 180, 164, 34, true),
-        new(398, 164, 154, 174, 158, 36, true),
-        new(408, 158, 148, 168, 153, 48, true),
-        new(418, 153, 144, 164, 160, 36, false),
-        new(428, 160, 150, 168, 154, 31, true),
-        new(438, 154, 145, 164, 149, 42, true),
-        new(448, 149, 138, 160, 144, 50, true),
-        new(458, 144, 134, 154, 150, 35, false),
-        new(468, 150, 142, 160, 146, 58, true),
-        new(478, 146, 136, 156, 140, 34, true),
-        new(488, 140, 130, 150, 136, 42, true),
-        new(498, 136, 126, 146, 130, 32, true),
-        new(508, 130, 120, 140, 126, 74, true),
-        new(518, 126, 116, 136, 132, 44, false),
-        new(528, 132, 122, 142, 128, 39, true),
-        new(538, 128, 118, 138, 124, 52, true),
-        new(548, 124, 114, 134, 118, 36, true),
-        new(558, 118, 108, 128, 112, 46, true),
-        new(568, 112, 104, 122, 118, 38, false),
-        new(578, 118, 110, 128, 114, 42, true),
-        new(588, 114, 104, 124, 108, 36, true),
-        new(598, 108, 98, 118, 102, 34, true),
-        new(608, 102, 92, 112, 98, 40, true),
-        new(618, 98, 90, 108, 104, 31, false),
-        new(628, 104, 96, 114, 100, 46, true),
-        new(638, 100, 92, 110, 96, 38, true),
-        new(648, 96, 88, 106, 100, 44, false),
-        new(658, 100, 92, 110, 104, 36, false),
-        new(668, 104, 96, 114, 108, 42, false),
-        new(678, 108, 98, 118, 112, 52, false),
-        new(688, 112, 104, 122, 116, 34, false),
-        new(698, 116, 106, 126, 120, 40, false),
-        new(708, 120, 112, 130, 116, 38, true),
-        new(718, 116, 108, 126, 112, 48, true),
-        new(728, 112, 104, 122, 108, 34, true),
-        new(738, 108, 100, 118, 104, 44, true),
-        new(748, 104, 96, 114, 100, 36, true),
-        new(758, 100, 92, 110, 106, 32, false),
-        new(768, 106, 98, 116, 110, 42, false),
-        new(778, 110, 102, 120, 114, 38, false),
-        new(788, 114, 106, 124, 118, 52, false),
-        new(798, 118, 110, 128, 122, 36, false),
-        new(808, 122, 114, 132, 126, 58, false),
-        new(818, 126, 118, 136, 130, 44, false),
-        new(828, 130, 122, 140, 126, 40, true),
-        new(838, 126, 118, 136, 122, 34, true),
-        new(848, 122, 114, 132, 118, 48, true),
-        new(858, 118, 110, 128, 122, 38, false)
-    ];
-
-    private static double GetVolumeY(double height) => 346 - height;
+    private PriceChartData ChartData => BuildPriceChartData(latestTick, selectedTimeframe, lastChartUpdate);
 
     private void SelectTimeframe(string timeframe)
     {
@@ -505,6 +366,7 @@
     {
         SimulationRunner.OnTick += HandleTick;
         simulationCts = new CancellationTokenSource();
+        startedAt = DateTimeOffset.Now;
 
         _ = RunSimulationAsync(simulationCts.Token);
     }
@@ -523,6 +385,8 @@
     private void HandleTick(SimulationTickResult tickResult)
     {
         latestTick = tickResult;
+        lastChartUpdate = DateTimeOffset.Now;
+        UpdateMetricHistory(tickResult);
         _ = InvokeAsync(StateHasChanged);
     }
 
@@ -531,7 +395,7 @@
             "КвантЭнерго",
             "Демо-актив для проверки связки UI, Application и Exchange.",
             AssetType.Stock,
-            124.35m,
+            DemoStartPrice,
             TimeSpan.FromSeconds(1),
             [
                 new AgentSpec(AgentType.MarketMaker, 100_000m, 100m),
@@ -540,19 +404,75 @@
                 new AgentSpec(AgentType.NewsDriven, 100_000m, 50m)
             ]);
 
-    private static MarketMetric[] BuildMarketMetrics(SimulationTickResult tickResult)
+    private void UpdateMetricHistory(SimulationTickResult tickResult)
     {
         var snapshot = tickResult.Snapshot;
-        var bestBidQuantity = tickResult.OrderBook.Bids.FirstOrDefault()?.Quantity ?? 0m;
-        var bestAskQuantity = tickResult.OrderBook.Asks.FirstOrDefault()?.Quantity ?? 0m;
+        var volumeDelta = Math.Max(0m, snapshot.Volume - previousVolume);
+        previousVolume = snapshot.Volume;
+
+        AppendMetricValue(priceMetricHistory, snapshot.LastPrice);
+        AppendMetricValue(volumeMetricHistory, volumeDelta);
+
+        if (snapshot.BestBid is not null)
+        {
+            AppendMetricValue(bidMetricHistory, snapshot.BestBid.Value);
+        }
+
+        if (snapshot.BestAsk is not null)
+        {
+            AppendMetricValue(askMetricHistory, snapshot.BestAsk.Value);
+        }
+
+        foreach (var trade in snapshot.RecentTrades)
+        {
+            seenTradeIds.Add(trade.Id);
+        }
+    }
+
+    private static void AppendMetricValue(List<decimal> values, decimal value)
+    {
+        values.Add(value);
+        if (values.Count > MetricHistoryLimit)
+        {
+            values.RemoveRange(0, values.Count - MetricHistoryLimit);
+        }
+    }
+
+    private MarketMetric[] BuildMarketMetrics(SimulationTickResult? tickResult)
+    {
+        var snapshot = tickResult?.Snapshot;
+        var bestBidQuantity = tickResult?.OrderBook.Bids.FirstOrDefault()?.Quantity ?? 0m;
+        var bestAskQuantity = tickResult?.OrderBook.Asks.FirstOrDefault()?.Quantity ?? 0m;
+        var lastPrice = snapshot?.LastPrice ?? DemoStartPrice;
+        var bestBid = snapshot?.BestBid;
+        var bestAsk = snapshot?.BestAsk;
+        var volume = snapshot?.Volume ?? 0m;
+        var tradeCount = snapshot?.RecentTrades.Count ?? 0;
+        var priceAccent = GetChangeClass(priceMetricHistory);
+        var bidAccent = GetChangeClass(bidMetricHistory);
+        var askAccent = GetChangeClass(askMetricHistory);
 
         return
         [
-            new("Текущая цена", FormatMoney(snapshot.LastPrice), $"Тик {tickResult.Tick}", "positive", "6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4", "6,42 6,34 16,26 25,29 36,15 45,20 55,10 65,13 76,8 88,12 94,4 94,42"),
-            new("Лучший bid", FormatNullableMoney(snapshot.BestBid), $"{FormatQuantity(bestBidQuantity)} шт.", "positive", "4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8", "4,42 4,35 14,27 24,31 35,16 45,19 55,17 65,21 76,18 88,19 94,8 94,42"),
-            new("Лучший ask", FormatNullableMoney(snapshot.BestAsk), $"{FormatQuantity(bestAskQuantity)} шт.", "negative", "5,16 15,24 25,19 36,31 46,27 57,35 67,28 78,25 88,17 94,12", "5,42 5,16 15,24 25,19 36,31 46,27 57,35 67,28 78,25 88,17 94,12 94,42"),
-            new("Объём торгов", FormatQuantity(snapshot.Volume), $"{snapshot.RecentTrades.Count} сделок", "volume", "8,38 8,27 20,27 20,18 32,18 32,7 44,7 44,14 56,14 56,24 68,24 68,12 80,12 80,18 92,18 92,22", "")
+            new("Текущая цена", FormatMoney(lastPrice), tickResult is null ? "ожидание тика" : $"Тик {tickResult.Tick}", priceAccent, BuildSparkline(priceMetricHistory), BuildArea(priceMetricHistory), []),
+            new("Лучший bid", FormatNullableMoney(bestBid), $"{FormatQuantity(bestBidQuantity)} шт.", bidAccent, BuildSparkline(bidMetricHistory), BuildArea(bidMetricHistory), []),
+            new("Лучший ask", FormatNullableMoney(bestAsk), $"{FormatQuantity(bestAskQuantity)} шт.", askAccent, BuildSparkline(askMetricHistory), BuildArea(askMetricHistory), []),
+            new("Объём торгов", FormatQuantity(volume), $"{tradeCount} сделок", "volume", "", "", BuildVolumeBars(volumeMetricHistory))
         ];
+    }
+
+    private static OrderBookViewData BuildOrderBookData(OrderBookSnapshot? orderBook)
+    {
+        var asks = orderBook?.Asks ?? [];
+        var bids = orderBook?.Bids ?? [];
+
+        return new OrderBookViewData(
+            BuildOrderBookRows(asks),
+            BuildOrderBookRows(bids),
+            BuildDepthFillPath(asks, false),
+            BuildDepthLinePath(asks, false),
+            BuildDepthFillPath(bids, true),
+            BuildDepthLinePath(bids, true));
     }
 
     private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels)
@@ -565,12 +485,14 @@
             .Select(level =>
             {
                 total += level.Quantity;
+                var depth = CalculateDepth(level.Quantity, maxQuantity);
 
                 return new OrderBookRow(
                     FormatPrice(level.Price),
                     FormatQuantity(level.Quantity),
                     FormatQuantity(total),
-                    CalculateDepth(level.Quantity, maxQuantity));
+                    depth,
+                    $"width: {depth}%");
             })
             .ToArray();
     }
@@ -583,9 +505,61 @@
                 trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
                 FormatPrice(trade.Price),
                 FormatQuantity(trade.Quantity),
-                trade.BuyerAgentName,
-                "buy"))
+                FormatTradeParticipants(trade.BuyerAgentName, trade.SellerAgentName),
+                GetTradeClass(trade)))
             .ToArray();
+
+    private SpreadData BuildSpreadData(SimulationTickResult? tickResult)
+    {
+        var snapshot = tickResult?.Snapshot;
+        if (snapshot?.BestBid is null || snapshot.BestAsk is null)
+        {
+            return new SpreadData("bi bi-dash", FormatMoney(snapshot?.LastPrice ?? DemoStartPrice), "Спред недоступен");
+        }
+
+        var spread = snapshot.BestAsk.Value - snapshot.BestBid.Value;
+        var mid = (snapshot.BestAsk.Value + snapshot.BestBid.Value) / 2m;
+        var spreadPercent = mid == 0m ? 0m : spread / mid * 100m;
+
+        return new SpreadData(
+            spread <= 0m ? "bi bi-caret-left-fill" : "bi bi-arrows-collapse",
+            FormatMoney(snapshot.LastPrice),
+            $"Спред {FormatPrice(spread)} ₽ ({spreadPercent:0.00}%)");
+    }
+
+    private StatusStripData BuildStatusStripData(SimulationTickResult? tickResult)
+    {
+        var snapshot = tickResult?.Snapshot;
+        var prices = snapshot?.RecentPrices.Count > 0
+            ? snapshot.RecentPrices
+            : [DemoStartPrice];
+        var low = prices.Min();
+        var high = prices.Max();
+        var last = snapshot?.LastPrice ?? DemoStartPrice;
+        var rangePosition = high == low ? 50 : (int)Math.Round((last - low) / (high - low) * 100m);
+        var spread = BuildSpreadData(tickResult);
+        var bidDepth = tickResult?.OrderBook.Bids.Sum(level => level.Quantity) ?? 0m;
+        var askDepth = tickResult?.OrderBook.Asks.Sum(level => level.Quantity) ?? 0m;
+        var totalDepth = bidDepth + askDepth;
+        var liquidity = GetLiquidity(tickResult, totalDepth);
+        var elapsed = DateTimeOffset.Now - startedAt;
+
+        return new StatusStripData(
+            elapsed.ToString(@"hh\:mm\:ss"),
+            FormatQuantity(seenTradeIds.Count),
+            FormatQuantity(tickResult?.Agents.Count ?? 0),
+            $"{FormatMoney(low)} - {FormatMoney(high)}",
+            $"left: {Math.Clamp(rangePosition, 0, 100)}%",
+            liquidity.Label,
+            liquidity.ClassName,
+            $"{spread.Detail}; глубина {FormatQuantity(totalDepth)} шт.");
+    }
+
+    private static ClockData BuildClockData()
+    {
+        var now = DateTimeOffset.Now;
+        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
+    }
 
     private static string FormatNullableMoney(decimal? value) => value is null ? "-" : FormatMoney(value.Value);
 
@@ -608,6 +582,444 @@
         return Math.Clamp(depth, 8, 100);
     }
 
+    private static string GetChangeClass(IReadOnlyList<decimal> values)
+    {
+        if (values.Count < 2)
+        {
+            return "positive";
+        }
+
+        return values[^1] >= values[0] ? "positive" : "negative";
+    }
+
+    private static string BuildSparkline(IReadOnlyList<decimal> values)
+    {
+        if (values.Count == 0)
+        {
+            return "";
+        }
+
+        return string.Join(" ", BuildChartPoints(values, 6, 94, 5, 36)
+            .Select(point => $"{FormatSvgNumber(point.X)},{FormatSvgNumber(point.Y)}"));
+    }
+
+    private static string BuildArea(IReadOnlyList<decimal> values)
+    {
+        var points = BuildSparkline(values);
+        if (string.IsNullOrWhiteSpace(points))
+        {
+            return "";
+        }
+
+        var firstX = FormatSvgNumber(6);
+        var lastX = FormatSvgNumber(94);
+        return $"{firstX},42 {points} {lastX},42";
+    }
+
+    private static BarRect[] BuildVolumeBars(IReadOnlyList<decimal> values)
+    {
+        const int barCount = 9;
+        const double width = 7;
+        var source = values.Count == 0 ? [0m] : values.TakeLast(barCount).ToArray();
+        var maxValue = Math.Max(source.Max(), 1m);
+        var bars = new BarRect[barCount];
+        var padCount = barCount - source.Length;
+
+        for (var index = 0; index < barCount; index++)
+        {
+            var value = index < padCount ? 0m : source[index - padCount];
+            var height = 6 + (double)(value / maxValue) * 30;
+            var x = 4 + index * 10;
+            bars[index] = new BarRect(x, 38 - height, width, height);
+        }
+
+        return bars;
+    }
+
+    private static Point[] BuildChartPoints(IReadOnlyList<decimal> values, double minX, double maxX, double minY, double maxY)
+    {
+        var source = values.Count == 0 ? [0m] : values.ToArray();
+        var minValue = source.Min();
+        var maxValue = source.Max();
+        var range = maxValue - minValue;
+        var width = maxX - minX;
+        var height = maxY - minY;
+
+        if (source.Length == 1)
+        {
+            return [new Point((minX + maxX) / 2, (minY + maxY) / 2)];
+        }
+
+        return source
+            .Select((value, index) =>
+            {
+                var x = minX + width * index / (source.Length - 1);
+                var ratio = range == 0m ? 0.5 : (double)((value - minValue) / range);
+                var y = maxY - height * ratio;
+                return new Point(x, y);
+            })
+            .ToArray();
+    }
+
+    private static string BuildDepthFillPath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
+    {
+        var linePath = BuildDepthLinePath(levels, isBid);
+        return isBid
+            ? $"{linePath} V125 H300 Z"
+            : $"{linePath} V125 H0 Z";
+    }
+
+    private static string BuildDepthLinePath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
+    {
+        if (levels.Count == 0)
+        {
+            return isBid ? "M300 0 H300" : "M0 0 H0";
+        }
+
+        var rows = levels.Take(5).ToArray();
+        var rowHeight = 125d / rows.Length;
+        var maxTotal = rows.Sum(level => level.Quantity);
+        var cumulative = 0m;
+        var segments = new List<string>();
+
+        for (var index = 0; index < rows.Length; index++)
+        {
+            cumulative += rows[index].Quantity;
+            var ratio = maxTotal == 0m ? 0d : (double)(cumulative / maxTotal);
+            var x = isBid ? 286 - ratio * 226 : 14 + ratio * 226;
+            var y = index * rowHeight + rowHeight / 2;
+
+            if (index == 0)
+            {
+                segments.Add($"M{FormatSvgNumber(isBid ? 286 : 14)} {FormatSvgNumber(y)} L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
+            }
+            else
+            {
+                segments.Add($"L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
+            }
+        }
+
+        return string.Join(" ", segments);
+    }
+
+    private static string GetTradeClass(Trade trade)
+    {
+        if (string.Equals(trade.BuyerAgentName, "MarketMaker", StringComparison.Ordinal))
+        {
+            return "sell";
+        }
+
+        return "buy";
+    }
+
+    private static string FormatTradeParticipants(string buyer, string seller) =>
+        $"{FormatAgentName(buyer)} / {FormatAgentName(seller)}";
+
+    private static string FormatAgentName(string agentName)
+    {
+        if (string.IsNullOrWhiteSpace(agentName))
+        {
+            return "-";
+        }
+
+        var compactName = agentName switch
+        {
+            "TrendFollowing" => "Trend",
+            "CounterTrend" => "Counter",
+            "MarketMaker" => "Maker",
+            _ => null
+        };
+
+        if (compactName is not null)
+        {
+            return compactName;
+        }
+
+        var builder = new System.Text.StringBuilder(agentName.Length + 4);
+
+        for (var index = 0; index < agentName.Length; index++)
+        {
+            var current = agentName[index];
+            if (index > 0 &&
+                char.IsUpper(current) &&
+                (char.IsLower(agentName[index - 1]) ||
+                 (index + 1 < agentName.Length && char.IsLower(agentName[index + 1]))))
+            {
+                builder.Append(' ');
+            }
+
+            builder.Append(current);
+        }
+
+        return builder.ToString();
+    }
+
+    private static (string Label, string ClassName) GetLiquidity(SimulationTickResult? tickResult, decimal totalDepth)
+    {
+        if (tickResult?.Snapshot.BestBid is null || tickResult.Snapshot.BestAsk is null)
+        {
+            return ("Нет данных", "");
+        }
+
+        var mid = (tickResult.Snapshot.BestBid.Value + tickResult.Snapshot.BestAsk.Value) / 2m;
+        var spreadPercent = mid == 0m ? 100m : (tickResult.Snapshot.BestAsk.Value - tickResult.Snapshot.BestBid.Value) / mid * 100m;
+
+        if (spreadPercent <= 0.5m && totalDepth >= 10m)
+        {
+            return ("Высокая", "positive");
+        }
+
+        if (spreadPercent <= 2m && totalDepth >= 4m)
+        {
+            return ("Средняя", "");
+        }
+
+        return ("Низкая", "negative");
+    }
+
+    private static string GetRussianMonthName(int month) =>
+        month switch
+        {
+            1 => "января",
+            2 => "февраля",
+            3 => "марта",
+            4 => "апреля",
+            5 => "мая",
+            6 => "июня",
+            7 => "июля",
+            8 => "августа",
+            9 => "сентября",
+            10 => "октября",
+            11 => "ноября",
+            12 => "декабря",
+            _ => ""
+        };
+
+    private static string FormatSvgNumber(double value) =>
+        value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+    private static PriceChartData BuildPriceChartData(
+        SimulationTickResult? tickResult,
+        string timeframe,
+        DateTimeOffset updatedAt)
+    {
+        var prices = tickResult?.Snapshot.RecentPrices.Count > 0
+            ? tickResult.Snapshot.RecentPrices.ToArray()
+            : [DemoStartPrice];
+
+        var groups = BuildPriceGroups(prices, GetTimeframeGroupSize(timeframe));
+        var rangeLow = groups.Min(group => group.Low);
+        var rangeHigh = groups.Max(group => group.High);
+        var padding = Math.Max((rangeHigh - rangeLow) * 0.12m, 0.05m);
+        var minPrice = rangeLow - padding;
+        var maxPrice = rangeHigh + padding;
+
+        if (minPrice == maxPrice)
+        {
+            minPrice -= 0.05m;
+            maxPrice += 0.05m;
+        }
+
+        var candleStep = GetTimeframeCandleStep(timeframe);
+        var plotRight = GetChartPlotRight(groups.Length, candleStep);
+        var candles = BuildCandlePoints(groups, minPrice, maxPrice, candleStep);
+        var firstPrice = prices[0];
+        var lastPrice = tickResult?.Snapshot.LastPrice ?? prices[^1];
+        var change = lastPrice - firstPrice;
+        var percent = firstPrice == 0m ? 0m : change / firstPrice * 100m;
+        var changeClass = change >= 0m ? "positive" : "negative";
+        var sign = change >= 0m ? "+" : "";
+        var lastPriceY = ScalePrice(lastPrice, minPrice, maxPrice);
+        var priceTagX = Math.Clamp(plotRight - 66, ChartPlotLeft + 8, ChartPlotRight - 66);
+
+        return new PriceChartData(
+            candles,
+            BuildPriceLabels(minPrice, maxPrice),
+            BuildTickLabels(candles, tickResult?.Tick ?? 0),
+            BuildGridX(timeframe),
+            plotRight,
+            FormatPrice(groups[0].Open),
+            FormatPrice(groups.Max(group => group.High)),
+            FormatPrice(groups.Min(group => group.Low)),
+            FormatPrice(lastPrice),
+            $"{sign}{FormatPrice(change)} ({sign}{percent:0.00}%)",
+            changeClass,
+            FormatPrice(lastPrice),
+            lastPriceY,
+            priceTagX,
+            Math.Clamp(lastPriceY - 11, ChartPlotTop, ChartPlotBottom - 22),
+            priceTagX + 10,
+            Math.Clamp(lastPriceY + 4, ChartPlotTop + 15, ChartPlotBottom - 7),
+            tickResult is null ? "Ожидание первого тика" : $"Рынок активен · тик {tickResult.Tick}",
+            $"Обновлено {updatedAt.ToLocalTime():HH:mm:ss}");
+    }
+
+    private static PriceGroup[] BuildPriceGroups(IReadOnlyList<decimal> prices, int groupSize)
+    {
+        var groups = new List<PriceGroup>();
+
+        for (var index = 0; index < prices.Count; index += groupSize)
+        {
+            var chunk = prices.Skip(index).Take(groupSize).ToArray();
+            groups.Add(new PriceGroup(
+                chunk[0],
+                chunk.Max(),
+                chunk.Min(),
+                chunk[^1]));
+        }
+
+        return groups.ToArray();
+    }
+
+    private static CandlePoint[] BuildCandlePoints(
+        IReadOnlyList<PriceGroup> groups,
+        decimal minPrice,
+        decimal maxPrice,
+        double candleStep)
+    {
+        var bodyWidth = Math.Clamp(candleStep * 0.44, 5, 13);
+
+        return groups
+            .Select((group, index) =>
+            {
+                var x = ChartPlotLeft + candleStep * index;
+                var openY = ScalePrice(group.Open, minPrice, maxPrice);
+                var closeY = ScalePrice(group.Close, minPrice, maxPrice);
+                var bodyHeight = Math.Max(5, Math.Abs(openY - closeY));
+
+                return new CandlePoint(
+                    x,
+                    ScalePrice(group.High, minPrice, maxPrice),
+                    ScalePrice(group.Low, minPrice, maxPrice),
+                    x - bodyWidth / 2,
+                    Math.Min(openY, closeY),
+                    bodyWidth,
+                    bodyHeight,
+                    group.Close >= group.Open);
+            })
+            .ToArray();
+    }
+
+    private static AxisLabel[] BuildPriceLabels(decimal minPrice, decimal maxPrice)
+    {
+        const int labelCount = 6;
+        var labels = new AxisLabel[labelCount];
+
+        for (var index = 0; index < labelCount; index++)
+        {
+            var ratio = labelCount == 1 ? 0 : (double)index / (labelCount - 1);
+            var price = maxPrice - (maxPrice - minPrice) * (decimal)ratio;
+            var y = ChartPlotTop + ChartPlotHeight * ratio;
+            labels[index] = new AxisLabel(0, y, FormatPrice(price));
+        }
+
+        return labels;
+    }
+
+    private static AxisLabel[] BuildTickLabels(IReadOnlyList<CandlePoint> candles, int latestTick)
+    {
+        if (candles.Count == 0)
+        {
+            return [];
+        }
+
+        var labelCount = Math.Min(6, candles.Count);
+        var indexes = new List<int>(labelCount);
+
+        for (var index = 0; index < labelCount; index++)
+        {
+            var ratio = labelCount == 1 ? 0 : (double)index / (labelCount - 1);
+            var candleIndex = (int)Math.Round((candles.Count - 1) * ratio);
+            if (!indexes.Contains(candleIndex))
+            {
+                indexes.Add(candleIndex);
+            }
+        }
+
+        return indexes
+            .Select(index =>
+            {
+                var relativeTick = Math.Max(0, candles.Count - 1 - index);
+                return new AxisLabel(candles[index].X, 0, $"t-{relativeTick}");
+            })
+            .ToArray();
+    }
+
+    private static double[] BuildGridX(string timeframe)
+    {
+        var lineCount = GetTimeframeGridLineCount(timeframe);
+        var lines = new double[lineCount];
+
+        for (var index = 0; index < lineCount; index++)
+        {
+            var ratio = lineCount == 1 ? 0 : (double)index / (lineCount - 1);
+            lines[index] = ChartPlotLeft + (ChartPlotRight - ChartPlotLeft) * ratio;
+        }
+
+        return lines;
+    }
+
+    private static double GetChartPlotRight(int candleCount, double candleStep)
+    {
+        var width = Math.Max(0, candleCount - 1) * candleStep;
+        return Math.Clamp(ChartPlotLeft + width, ChartPlotLeft + 116, ChartPlotRight);
+    }
+
+    private static double ScalePrice(decimal price, decimal minPrice, decimal maxPrice)
+    {
+        var ratio = (double)((price - minPrice) / (maxPrice - minPrice));
+        return ChartPlotBottom - ChartPlotHeight * ratio;
+    }
+
+    private static int GetTimeframeGroupSize(string timeframe) =>
+        timeframe switch
+        {
+            "1м" => 1,
+            "5м" => 2,
+            "15м" => 4,
+            "1ч" => 8,
+            "4ч" => 12,
+            "1д" => 20,
+            _ => 2
+        };
+
+    private static double GetTimeframeCandleStep(string timeframe) =>
+        timeframe switch
+        {
+            "1м" => 11,
+            "5м" => 18,
+            "15м" => 26,
+            "1ч" => 36,
+            "4ч" => 48,
+            "1д" => 62,
+            _ => 18
+        };
+
+    private static int GetTimeframeGridLineCount(string timeframe) =>
+        timeframe switch
+        {
+            "1м" => 12,
+            "5м" => 10,
+            "15м" => 8,
+            "1ч" => 7,
+            "4ч" => 5,
+            "1д" => 4,
+            _ => 8
+        };
+
+    private static Microsoft.AspNetCore.Components.MarkupString SvgText(double x, double y, string text, string anchor = "start")
+    {
+        var markup = string.Format(
+            System.Globalization.CultureInfo.InvariantCulture,
+            "<text x=\"{0:0.##}\" y=\"{1:0.##}\" text-anchor=\"{2}\" fill=\"#8EA0BA\" font-size=\"12\" font-weight=\"560\">{3}</text>",
+            x,
+            y,
+            System.Net.WebUtility.HtmlEncode(anchor),
+            System.Net.WebUtility.HtmlEncode(text));
+
+        return new Microsoft.AspNetCore.Components.MarkupString(markup);
+    }
+
     public void Dispose()
     {
         SimulationRunner.OnTick -= HandleTick;
@@ -615,9 +1027,51 @@
         simulationCts?.Dispose();
     }
 
-    private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string Projection);
+    private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
-    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth);
+    private sealed record OrderBookViewData(
+        IReadOnlyList<OrderBookRow> Asks,
+        IReadOnlyList<OrderBookRow> Bids,
+        string AskFillPath,
+        string AskLinePath,
+        string BidFillPath,
+        string BidLinePath);
+    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle);
+    private sealed record SpreadData(string Icon, string Value, string Detail);
+    private sealed record StatusStripData(
+        string Elapsed,
+        string TradeCount,
+        string Participants,
+        string Range,
+        string RangeMarkerStyle,
+        string Liquidity,
+        string LiquidityClass,
+        string LiquidityDetail);
+    private sealed record ClockData(string Time, string Date);
     private sealed record TradeRow(string Time, string Price, string Volume, string Side, string SideClass);
-    private sealed record CandlePoint(double X, double OpenY, double HighY, double LowY, double CloseY, double Volume, bool IsUp);
+    private sealed record PriceChartData(
+        IReadOnlyList<CandlePoint> Candles,
+        IReadOnlyList<AxisLabel> PriceLabels,
+        IReadOnlyList<AxisLabel> TickLabels,
+        IReadOnlyList<double> GridX,
+        double PlotRight,
+        string Open,
+        string High,
+        string Low,
+        string Close,
+        string Change,
+        string ChangeClass,
+        string LastPrice,
+        double LastPriceY,
+        double PriceTagX,
+        double PriceTagY,
+        double PriceTagTextX,
+        double PriceTagTextY,
+        string MarketState,
+        string UpdatedAt);
+    private sealed record PriceGroup(decimal Open, decimal High, decimal Low, decimal Close);
+    private sealed record CandlePoint(double X, double HighY, double LowY, double BodyX, double BodyY, double BodyWidth, double BodyHeight, bool IsUp);
+    private sealed record AxisLabel(double X, double Y, string Text);
+    private sealed record BarRect(double X, double Y, double Width, double Height);
+    private sealed record Point(double X, double Y);
 }
