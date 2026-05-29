@@ -1,4 +1,5 @@
 using ABStock.Application.Simulation;
+using ABStock.Application.Simulation.Diagnostics;
 using ABStock.Agents;
 using ABStock.Exchange.Extensions;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,15 @@ public static class ServiceCollectionExtensions
         services.AddABStockExchange();
         services.TryAddSingleton<IAgentFactory, AgentFactory>();
         services.TryAddSingleton<ISimulationRunner, SimulationRunner>();
+        return services;
+    }
+
+    public static IServiceCollection AddABStockSimulationDiagnostics(this IServiceCollection services)
+    {
+        services.RemoveAll<ISimulationRunner>();
+        services.TryAddSingleton<DebugSimulationRunner>();
+        services.TryAddSingleton<ISimulationRunner>(provider => provider.GetRequiredService<DebugSimulationRunner>());
+        services.TryAddSingleton<ISimulationDebugControl>(provider => provider.GetRequiredService<DebugSimulationRunner>());
         return services;
     }
 }
