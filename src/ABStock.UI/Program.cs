@@ -10,6 +10,11 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 builder.Services.AddABStockApplication();
 builder.Services.AddABStockAI();
 
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddABStockSimulationDiagnostics();
+}
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
