@@ -61,6 +61,20 @@ public sealed class OrderBook
         return null;
     }
 
+    public Order? FindBestAskFor(Order buyOrder)
+    {
+        return _sellOrders.FirstOrDefault(sellOrder =>
+            sellOrder.Price is not null &&
+            !IsSameAgent(buyOrder, sellOrder));
+    }
+
+    public Order? FindBestBidFor(Order sellOrder)
+    {
+        return _buyOrders.FirstOrDefault(buyOrder =>
+            buyOrder.Price is not null &&
+            !IsSameAgent(buyOrder, sellOrder));
+    }
+
     public void Reduce(Order order, decimal quantity)
     {
         if (order.Side == OrderSide.Buy)
