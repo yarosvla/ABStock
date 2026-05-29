@@ -411,7 +411,7 @@
                                         <span>Position</span>
                                         <span>Value</span>
                                     </div>
-                                    @foreach (var agent in latestTick?.Agents ?? [])
+                                    @foreach (var agent in latestTick?.Agents ?? Array.Empty<AgentSnapshot>())
                                     {
                                         <div class="debug-agent-row">
                                             <strong>@agent.Name</strong>
