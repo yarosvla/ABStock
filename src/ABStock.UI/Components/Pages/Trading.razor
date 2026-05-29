@@ -405,7 +405,6 @@
 
     private string selectedTimeframe = "5м";
     private SimulationTickResult? latestTick;
-    private CancellationTokenSource? simulationCts;
 
     private static readonly CandlePoint[] Candles =
     [
@@ -504,20 +503,14 @@
     protected override void OnInitialized()
     {
         SimulationRunner.OnTick += HandleTick;
-        simulationCts = new CancellationTokenSource();
+        latestTick = SimulationRunner.Current;
 
-        _ = RunSimulationAsync(simulationCts.Token);
+        _ = RunSimulationAsync();
     }
 
-    private async Task RunSimulationAsync(CancellationToken cancellationToken)
+    private async Task RunSimulationAsync()
     {
-        try
-        {
-            await SimulationRunner.StartAsync(CreateDemoConfig(), cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+        await SimulationRunner.StartAsync(CreateDemoConfig());
     }
 
     private void HandleTick(SimulationTickResult tickResult)
@@ -611,8 +604,6 @@
     public void Dispose()
     {
         SimulationRunner.OnTick -= HandleTick;
-        simulationCts?.Cancel();
-        simulationCts?.Dispose();
     }
 
     private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string Projection);
