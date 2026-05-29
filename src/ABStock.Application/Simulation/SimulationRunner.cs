@@ -8,6 +8,7 @@ public sealed class SimulationRunner : ISimulationRunner
 {
     private readonly object _sync = new();
     private readonly IExchangeEngineFactory _exchangeEngineFactory;
+    private readonly IAgentFactory _agentFactory;
     private CancellationTokenSource? _runCts;
     private Task? _runTask;
     private SimulationTickResult? _current;
@@ -38,9 +39,12 @@ public sealed class SimulationRunner : ISimulationRunner
         }
     }
 
-    public SimulationRunner(IExchangeEngineFactory exchangeEngineFactory)
+    public SimulationRunner(
+        IExchangeEngineFactory exchangeEngineFactory,
+        IAgentFactory agentFactory)
     {
         _exchangeEngineFactory = exchangeEngineFactory;
+        _agentFactory = agentFactory;
     }
 
     public void SubmitNews(NewsSignal signal)
@@ -63,7 +67,7 @@ public sealed class SimulationRunner : ISimulationRunner
             }
 
             var exchange = _exchangeEngineFactory.Create(config.StartPrice);
-            var agents = new AgentFactory().Create(config.Agents);
+            var agents = _agentFactory.Create(config.Agents);
 
             _tick = 0;
             _current = null;
