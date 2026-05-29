@@ -33,12 +33,13 @@ public sealed class OrderValidator
             throw new ArgumentException("Order quantity must be positive.", nameof(order));
         }
 
-        if (order.Type == OrderType.Market)
+        if (order.Type == OrderType.Limit)
         {
-            throw new NotSupportedException("Market orders are not supported yet. Use a limit order.");
+            ValidateLimitOrder(order);
+            return;
         }
 
-        ValidateLimitOrder(order);
+        ValidateMarketOrder(order);
     }
 
     private static void ValidateLimitOrder(Order order)
@@ -51,6 +52,14 @@ public sealed class OrderValidator
         if (order.Price <= 0)
         {
             throw new ArgumentException("Limit order price must be positive.", nameof(order));
+        }
+    }
+
+    private static void ValidateMarketOrder(Order order)
+    {
+        if (order.Price is not null)
+        {
+            throw new ArgumentException("Market order price must be empty.", nameof(order));
         }
     }
 }
