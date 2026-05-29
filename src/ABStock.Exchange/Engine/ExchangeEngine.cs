@@ -45,8 +45,7 @@ public sealed class ExchangeEngine : IExchangeEngine
     {
         _orderValidator.Validate(order);
 
-        _orderBook.Add(order);
-        MatchOrders();
+        ProcessAcceptedOrder(order);
 
         return GetSnapshot();
     }
@@ -63,10 +62,8 @@ public sealed class ExchangeEngine : IExchangeEngine
 
         foreach (var order in orderBatch)
         {
-            _orderBook.Add(order);
+            ProcessAcceptedOrder(order);
         }
-
-        MatchOrders();
 
         return GetSnapshot();
     }
@@ -96,12 +93,11 @@ public sealed class ExchangeEngine : IExchangeEngine
             }
         }
 
+        var trades = new List<Trade>();
         foreach (var order in acceptedOrders)
         {
-            _orderBook.Add(order);
+            trades.AddRange(ProcessAcceptedOrder(order));
         }
-
-        var trades = MatchOrders();
 
         return new SubmitResult(
             Snapshot: GetSnapshot(),
@@ -128,6 +124,41 @@ public sealed class ExchangeEngine : IExchangeEngine
         return _orderBook.GetSnapshot(depth);
     }
 
+    private IReadOnlyList<Trade> ProcessAcceptedOrder(Order order)
+    {
+        if (order.Type == OrderType.Market)
+        {
+            return ExecuteMarketOrder(order);
+        }
+
+        _orderBook.Add(order);
+        return MatchOrders();
+    }
+
+    private IReadOnlyList<Trade> ExecuteMarketOrder(Order marketOrder)
+    {
+        var trades = new List<Trade>();
+        var remainingQuantity = marketOrder.Quantity;
+
+        while (remainingQuantity > 0)
+        {
+            var restingOrder = marketOrder.Side == OrderSide.Buy
+                ? _orderBook.FindBestAskFor(marketOrder)
+                : _orderBook.FindBestBidFor(marketOrder);
+
+            if (restingOrder is null)
+            {
+                return trades;
+            }
+
+            var quantity = Math.Min(remainingQuantity, restingOrder.Quantity);
+            trades.Add(ExecuteMarketMatch(marketOrder, restingOrder, quantity));
+            remainingQuantity -= quantity;
+        }
+
+        return trades;
+    }
+
     private IReadOnlyList<Trade> MatchOrders()
     {
         var trades = new List<Trade>();
@@ -149,6 +180,32 @@ public sealed class ExchangeEngine : IExchangeEngine
         var quantity = Math.Min(buyOrder.Quantity, sellOrder.Quantity);
         var price = CalculateTradePrice(buyOrder, sellOrder);
 
+        var trade = RecordTrade(buyOrder, sellOrder, price, quantity);
+
+        _orderBook.Reduce(buyOrder, quantity);
+        _orderBook.Reduce(sellOrder, quantity);
+
+        return trade;
+    }
+
+    private Trade ExecuteMarketMatch(Order marketOrder, Order restingOrder, decimal quantity)
+    {
+        if (restingOrder.Price is null)
+        {
+            throw new InvalidOperationException("Resting limit price is required for market matching.");
+        }
+
+        var buyOrder = marketOrder.Side == OrderSide.Buy ? marketOrder : restingOrder;
+        var sellOrder = marketOrder.Side == OrderSide.Sell ? marketOrder : restingOrder;
+        var trade = RecordTrade(buyOrder, sellOrder, restingOrder.Price.Value, quantity);
+
+        _orderBook.Reduce(restingOrder, quantity);
+
+        return trade;
+    }
+
+    private Trade RecordTrade(Order buyOrder, Order sellOrder, decimal price, decimal quantity)
+    {
         var trade = new Trade(
             Id: Guid.NewGuid(),
             BuyOrderId: buyOrder.Id,
@@ -164,9 +221,6 @@ public sealed class ExchangeEngine : IExchangeEngine
         _lastPrice = price;
         _prices.Add(price);
         TrimHistory();
-
-        _orderBook.Reduce(buyOrder, quantity);
-        _orderBook.Reduce(sellOrder, quantity);
 
         return trade;
     }
