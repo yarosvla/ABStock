@@ -705,22 +705,30 @@
     stroke-width: 2px;
 }
 
-.candle line {
+.price-area {
+    fill: rgba(54, 217, 138, .14);
+}
+
+.price-line {
+    fill: none;
+    stroke: #36d98a;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 7px rgba(54, 217, 138, .34));
+}
+
+.price-point {
+    fill: #0e1b2e;
+    stroke: rgba(54, 217, 138, .82);
     stroke-width: 1.7;
 }
 
-.candle.up line,
-.candle.up rect {
-    stroke: var(--accent-green);
-    fill: var(--accent-green);
-    filter: drop-shadow(0 0 5px rgba(54, 217, 138, .22));
-}
-
-.candle.down line,
-.candle.down rect {
-    stroke: var(--accent-red);
-    fill: var(--accent-red);
-    filter: drop-shadow(0 0 5px rgba(255, 107, 95, .18));
+.price-point.latest {
+    fill: #36d98a;
+    stroke: #f8fbff;
+    stroke-width: 2;
+    filter: drop-shadow(0 0 8px rgba(54, 217, 138, .55));
 }
 
 .price-tag rect {
