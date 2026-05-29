@@ -1,10 +1,16 @@
 @page "/trading"
 @layout CreateAssetLayout
 @rendermode InteractiveServer
+@using ABStock.Application.Simulation.Diagnostics
 @using ABStock.Application.Simulation
 @using ABStock.Shared
+@using Microsoft.AspNetCore.Hosting
+@using Microsoft.Extensions.DependencyInjection
+@using Microsoft.Extensions.Hosting
 @implements IDisposable
 @inject ISimulationRunner SimulationRunner
+@inject IServiceProvider Services
+@inject IWebHostEnvironment Environment
 
 <PageTitle>Торги</PageTitle>
 
@@ -335,6 +341,89 @@
                                 <span>Добавить новость</span>
                             </a>
                         </section>
+
+                        @if (DebugControl is not null)
+                        {
+                            <section class="glass-card debug-panel" aria-labelledby="debug-title">
+                                <div class="debug-header">
+                                    <h2 id="debug-title">Debug</h2>
+                                    <span>@debugMessage</span>
+                                </div>
+
+                                <div class="debug-grid">
+                                    <div class="debug-group">
+                                        <label>
+                                            Участник
+                                            <input @bind="debugAgentName" />
+                                        </label>
+                                        <label>
+                                            Сторона
+                                            <select @bind="debugOrderSide">
+                                                <option value="@OrderSide.Buy">Buy</option>
+                                                <option value="@OrderSide.Sell">Sell</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            Тип
+                                            <select @bind="debugOrderType">
+                                                <option value="@OrderType.Limit">Limit</option>
+                                                <option value="@OrderType.Market">Market</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            Цена
+                                            <input type="number" step="0.01" disabled="@(debugOrderType == OrderType.Market)" @bind="debugOrderPrice" />
+                                        </label>
+                                        <label>
+                                            Кол-во
+                                            <input type="number" step="0.01" min="0.01" @bind="debugOrderQuantity" />
+                                        </label>
+                                        <button type="button" @onclick="SubmitDebugOrder">Добавить заявку</button>
+                                    </div>
+
+                                    <div class="debug-group">
+                                        <label>
+                                            Агент
+                                            <select @bind="debugAgentType">
+                                                <option value="@AgentType.MarketMaker">MarketMaker</option>
+                                                <option value="@AgentType.TrendFollowing">TrendFollowing</option>
+                                                <option value="@AgentType.CounterTrend">CounterTrend</option>
+                                                <option value="@AgentType.NewsDriven">NewsDriven</option>
+                                            </select>
+                                        </label>
+                                        <label>
+                                            Cash
+                                            <input type="number" step="100" min="0" @bind="debugAgentCash" />
+                                        </label>
+                                        <label>
+                                            Position
+                                            <input type="number" step="1" min="0" @bind="debugAgentPosition" />
+                                        </label>
+                                        <button type="button" @onclick="AddDebugAgent">Добавить агента</button>
+                                    </div>
+                                </div>
+
+                                <div class="debug-agents">
+                                    <div class="debug-agents-head">
+                                        <span>Имя</span>
+                                        <span>Тип</span>
+                                        <span>Cash</span>
+                                        <span>Position</span>
+                                        <span>Value</span>
+                                    </div>
+                                    @foreach (var agent in latestTick?.Agents ?? [])
+                                    {
+                                        <div class="debug-agent-row">
+                                            <strong>@agent.Name</strong>
+                                            <span>@agent.Type</span>
+                                            <span>@FormatMoney(agent.Cash)</span>
+                                            <span>@FormatQuantity(agent.Position)</span>
+                                            <span>@FormatMoney(agent.PortfolioValue)</span>
+                                        </div>
+                                    }
+                                </div>
+                            </section>
+                        }
                     </section>
                 </main>
             </div>
@@ -364,6 +453,11 @@
 
     private TradeRow[] RecentTrades => BuildTradeRows(latestTick?.Snapshot.RecentTrades ?? []);
 
+    private ISimulationDebugControl? DebugControl =>
+        Environment.IsDevelopment()
+            ? Services.GetService<ISimulationDebugControl>()
+            : null;
+
     private static readonly AssetParameter[] AssetParameters =
     [
         new("Тип актива", "Акция", null),
@@ -386,6 +480,15 @@
     private readonly List<decimal> bidMetricHistory = [DemoStartPrice];
     private readonly List<decimal> askMetricHistory = [DemoStartPrice];
     private readonly List<decimal> volumeMetricHistory = [0m];
+    private string debugAgentName = "Manual";
+    private OrderSide debugOrderSide = OrderSide.Buy;
+    private OrderType debugOrderType = OrderType.Limit;
+    private decimal? debugOrderPrice = DemoStartPrice;
+    private decimal debugOrderQuantity = 1m;
+    private AgentType debugAgentType = AgentType.TrendFollowing;
+    private decimal debugAgentCash = 100_000m;
+    private decimal debugAgentPosition = 10m;
+    private string? debugMessage;
 
     private PriceChartData ChartData => BuildPriceChartData(latestTick, selectedTimeframe, lastChartUpdate);
 
@@ -413,6 +516,50 @@
         lastChartUpdate = DateTimeOffset.Now;
         UpdateMetricHistory(tickResult);
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void SubmitDebugOrder()
+    {
+        var debugControl = DebugControl;
+        if (debugControl is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = debugControl.SubmitOrder(new SimulationDebugOrderRequest(
+                debugAgentName,
+                debugOrderSide,
+                debugOrderType,
+                debugOrderType == OrderType.Market ? null : debugOrderPrice,
+                debugOrderQuantity));
+
+            debugMessage = $"Заявка: принято {result.AcceptedOrders.Count}, сделок {result.Trades.Count}, отказов {result.RejectedOrders.Count}";
+        }
+        catch (Exception exception)
+        {
+            debugMessage = exception.Message;
+        }
+    }
+
+    private void AddDebugAgent()
+    {
+        var debugControl = DebugControl;
+        if (debugControl is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var agent = debugControl.AddAgent(new AgentSpec(debugAgentType, debugAgentCash, debugAgentPosition));
+            debugMessage = $"Добавлен агент {agent.Name}";
+        }
+        catch (Exception exception)
+        {
+            debugMessage = exception.Message;
+        }
     }
 
     private static SimulationConfig CreateDemoConfig() =>
