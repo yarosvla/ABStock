@@ -155,6 +155,38 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
+    public void SubmitManyWithResult_ReturnsAcceptedRejectedTradesAndSnapshot()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var result = exchange.SubmitManyWithResult(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 1m, agentName: "buyer-agent"),
+            CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 1m, agentName: "seller-agent"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 99m, quantity: 0m, agentName: "invalid-agent")
+        ]);
+
+        Assert.Equal(2, result.AcceptedOrders.Count);
+
+        var rejectedOrder = Assert.Single(result.RejectedOrders);
+        Assert.Equal(CreateId(3), rejectedOrder.Order?.Id);
+        Assert.Contains("quantity", rejectedOrder.Reason, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(100m, result.Snapshot.LastPrice);
+        Assert.Equal(1m, result.Snapshot.Volume);
+        Assert.Null(result.Snapshot.BestBid);
+        Assert.Null(result.Snapshot.BestAsk);
+
+        var trade = Assert.Single(result.Trades);
+        Assert.Equal(CreateId(1), trade.BuyOrderId);
+        Assert.Equal(CreateId(2), trade.SellOrderId);
+        Assert.Equal("buyer-agent", trade.BuyerAgentName);
+        Assert.Equal("seller-agent", trade.SellerAgentName);
+        Assert.Equal(100m, trade.Price);
+        Assert.Equal(1m, trade.Quantity);
+    }
+
+    [Fact]
     public void SubmitMany_DoesNotMatchOrdersFromSameAgent()
     {
         var exchange = new ExchangeEngine(startPrice: 100m);
@@ -289,7 +321,108 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
-    public void Submit_RejectsMarketOrdersUntilTheyAreImplemented()
+    public void Submit_MarketBuyConsumesBestAsksAndDoesNotRestInOrderBook()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.Submit(CreateOrder(CreateId(1), OrderSide.Sell, 101m, quantity: 1m, agentName: "seller-a"));
+        exchange.Submit(CreateOrder(CreateId(2), OrderSide.Sell, 102m, quantity: 3m, agentName: "seller-b"));
+
+        var snapshot = exchange.Submit(CreateMarketOrder(CreateId(3), OrderSide.Buy, quantity: 3m, agentName: "buyer-agent"));
+
+        Assert.Equal(102m, snapshot.LastPrice);
+        Assert.Equal(3m, snapshot.Volume);
+        Assert.Null(snapshot.BestBid);
+        Assert.Equal(102m, snapshot.BestAsk);
+        Assert.Equal([100m, 101m, 102m], snapshot.RecentPrices);
+
+        Assert.Collection(
+            snapshot.RecentTrades,
+            firstTrade =>
+            {
+                Assert.Equal(CreateId(3), firstTrade.BuyOrderId);
+                Assert.Equal(CreateId(1), firstTrade.SellOrderId);
+                Assert.Equal(101m, firstTrade.Price);
+                Assert.Equal(1m, firstTrade.Quantity);
+            },
+            secondTrade =>
+            {
+                Assert.Equal(CreateId(3), secondTrade.BuyOrderId);
+                Assert.Equal(CreateId(2), secondTrade.SellOrderId);
+                Assert.Equal(102m, secondTrade.Price);
+                Assert.Equal(2m, secondTrade.Quantity);
+            });
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        Assert.Empty(orderBook.Bids);
+
+        var ask = Assert.Single(orderBook.Asks);
+        Assert.Equal(102m, ask.Price);
+        Assert.Equal(1m, ask.Quantity);
+    }
+
+    [Fact]
+    public void Submit_MarketSellConsumesBestBidsAndDoesNotRestInOrderBook()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.Submit(CreateOrder(CreateId(1), OrderSide.Buy, 100m, quantity: 2m, agentName: "buyer-a"));
+        exchange.Submit(CreateOrder(CreateId(2), OrderSide.Buy, 99m, quantity: 3m, agentName: "buyer-b"));
+
+        var snapshot = exchange.Submit(CreateMarketOrder(CreateId(3), OrderSide.Sell, quantity: 4m, agentName: "seller-agent"));
+
+        Assert.Equal(99m, snapshot.LastPrice);
+        Assert.Equal(4m, snapshot.Volume);
+        Assert.Equal(99m, snapshot.BestBid);
+        Assert.Null(snapshot.BestAsk);
+        Assert.Equal([100m, 100m, 99m], snapshot.RecentPrices);
+
+        Assert.Collection(
+            snapshot.RecentTrades,
+            firstTrade =>
+            {
+                Assert.Equal(CreateId(1), firstTrade.BuyOrderId);
+                Assert.Equal(CreateId(3), firstTrade.SellOrderId);
+                Assert.Equal(100m, firstTrade.Price);
+                Assert.Equal(2m, firstTrade.Quantity);
+            },
+            secondTrade =>
+            {
+                Assert.Equal(CreateId(2), secondTrade.BuyOrderId);
+                Assert.Equal(CreateId(3), secondTrade.SellOrderId);
+                Assert.Equal(99m, secondTrade.Price);
+                Assert.Equal(2m, secondTrade.Quantity);
+            });
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(99m, bid.Price);
+        Assert.Equal(1m, bid.Quantity);
+
+        Assert.Empty(orderBook.Asks);
+    }
+
+    [Fact]
+    public void Submit_MarketOrderWithNoLiquidityDoesNotRestInOrderBook()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var snapshot = exchange.Submit(CreateMarketOrder(CreateId(1), OrderSide.Buy, quantity: 10m));
+
+        Assert.Equal(100m, snapshot.LastPrice);
+        Assert.Equal(0m, snapshot.Volume);
+        Assert.Null(snapshot.BestBid);
+        Assert.Null(snapshot.BestAsk);
+        Assert.Empty(snapshot.RecentTrades);
+        Assert.Equal([100m], snapshot.RecentPrices);
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        Assert.Empty(orderBook.Bids);
+        Assert.Empty(orderBook.Asks);
+    }
+
+    [Fact]
+    public void Submit_RejectsMarketOrdersWithPrice()
     {
         var exchange = new ExchangeEngine();
         var order = new Order(
@@ -297,12 +430,13 @@ public sealed class ExchangeEngineTests
             AgentName: "agent-1",
             Side: OrderSide.Buy,
             Type: OrderType.Market,
-            Price: null,
+            Price: 100m,
             Quantity: 1m,
             CreatedAt: DateTimeOffset.UtcNow
         );
 
-        Assert.Throws<NotSupportedException>(() => exchange.Submit(order));
+        var exception = Assert.Throws<ArgumentException>(() => exchange.Submit(order));
+        Assert.Contains("market order price", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     private static Order CreateOrder(
@@ -318,6 +452,23 @@ public sealed class ExchangeEngineTests
             Side: side,
             Type: OrderType.Limit,
             Price: price,
+            Quantity: quantity,
+            CreatedAt: DateTimeOffset.UtcNow
+        );
+    }
+
+    private static Order CreateMarketOrder(
+        Guid id,
+        OrderSide side,
+        decimal quantity,
+        string? agentName = null)
+    {
+        return new Order(
+            Id: id,
+            AgentName: agentName ?? GetDefaultAgentName(side),
+            Side: side,
+            Type: OrderType.Market,
+            Price: null,
             Quantity: quantity,
             CreatedAt: DateTimeOffset.UtcNow
         );
