@@ -34,7 +34,7 @@ public sealed class ExchangeEngine : IExchangeEngine
         {
             throw new ArgumentOutOfRangeException(nameof(maxRecentTrades), "Recent trades limit must be positive.");
         }
-        
+
         _maxRecentPrices = maxRecentPrices;
         _maxRecentTrades = maxRecentTrades;
         _lastPrice = startPrice;
@@ -45,8 +45,7 @@ public sealed class ExchangeEngine : IExchangeEngine
     {
         _orderValidator.Validate(order);
 
-        _orderBook.Add(order);
-        MatchOrders();
+        ProcessAcceptedOrder(order);
 
         return GetSnapshot();
     }
@@ -63,12 +62,49 @@ public sealed class ExchangeEngine : IExchangeEngine
 
         foreach (var order in orderBatch)
         {
-            _orderBook.Add(order);
+            ProcessAcceptedOrder(order);
         }
 
-        MatchOrders();
-
         return GetSnapshot();
+    }
+
+    public SubmitResult SubmitWithResult(Order order)
+    {
+        return SubmitManyWithResult([order]);
+    }
+
+    public SubmitResult SubmitManyWithResult(IEnumerable<Order> orders)
+    {
+        ArgumentNullException.ThrowIfNull(orders);
+
+        var acceptedOrders = new List<Order>();
+        var rejectedOrders = new List<RejectedOrder>();
+
+        foreach (var order in orders)
+        {
+            try
+            {
+                _orderValidator.Validate(order);
+                acceptedOrders.Add(order);
+            }
+            catch (Exception exception)
+            {
+                rejectedOrders.Add(new RejectedOrder(order, exception.Message));
+            }
+        }
+
+        var trades = new List<Trade>();
+        foreach (var order in acceptedOrders)
+        {
+            trades.AddRange(ProcessAcceptedOrder(order));
+        }
+
+        return new SubmitResult(
+            Snapshot: GetSnapshot(),
+            Trades: trades,
+            AcceptedOrders: acceptedOrders.ToArray(),
+            RejectedOrders: rejectedOrders.ToArray()
+        );
     }
 
     public MarketSnapshot GetSnapshot()
@@ -88,25 +124,89 @@ public sealed class ExchangeEngine : IExchangeEngine
         return _orderBook.GetSnapshot(depth);
     }
 
-    private void MatchOrders()
+    private IReadOnlyList<Trade> ProcessAcceptedOrder(Order order)
     {
+        if (order.Type == OrderType.Market)
+        {
+            return ExecuteMarketOrder(order);
+        }
+
+        _orderBook.Add(order);
+
+        return MatchOrders();
+    }
+
+    private IReadOnlyList<Trade> ExecuteMarketOrder(Order marketOrder)
+    {
+        var trades = new List<Trade>();
+        var remainingQuantity = marketOrder.Quantity;
+
+        while (remainingQuantity > 0)
+        {
+            var restingOrder = marketOrder.Side == OrderSide.Buy
+                ? _orderBook.FindBestAskFor(marketOrder)
+                : _orderBook.FindBestBidFor(marketOrder);
+
+            if (restingOrder is null)
+            {
+                return trades;
+            }
+
+            var quantity = Math.Min(remainingQuantity, restingOrder.Quantity);
+            trades.Add(ExecuteMarketMatch(marketOrder, restingOrder, quantity));
+            remainingQuantity -= quantity;
+        }
+
+        return trades;
+    }
+
+    private IReadOnlyList<Trade> MatchOrders()
+    {
+        var trades = new List<Trade>();
+
         while (true)
         {
             var match = _orderBook.FindBestMatch();
             if (match is null)
             {
-                return;
+                return trades;
             }
 
-            ExecuteMatch(match.Value.BuyOrder, match.Value.SellOrder);
+            trades.Add(ExecuteMatch(match.Value.BuyOrder, match.Value.SellOrder));
         }
     }
 
-    private void ExecuteMatch(Order buyOrder, Order sellOrder)
+    private Trade ExecuteMatch(Order buyOrder, Order sellOrder)
     {
         var quantity = Math.Min(buyOrder.Quantity, sellOrder.Quantity);
         var price = CalculateTradePrice(buyOrder, sellOrder);
 
+        var trade = RecordTrade(buyOrder, sellOrder, price, quantity);
+
+        _orderBook.Reduce(buyOrder, quantity);
+        _orderBook.Reduce(sellOrder, quantity);
+
+        return trade;
+    }
+
+    private Trade ExecuteMarketMatch(Order marketOrder, Order restingOrder, decimal quantity)
+    {
+        if (restingOrder.Price is null)
+        {
+            throw new InvalidOperationException("Resting limit price is required for market matching.");
+        }
+
+        var buyOrder = marketOrder.Side == OrderSide.Buy ? marketOrder : restingOrder;
+        var sellOrder = marketOrder.Side == OrderSide.Sell ? marketOrder : restingOrder;
+        var trade = RecordTrade(buyOrder, sellOrder, restingOrder.Price.Value, quantity);
+
+        _orderBook.Reduce(restingOrder, quantity);
+
+        return trade;
+    }
+
+    private Trade RecordTrade(Order buyOrder, Order sellOrder, decimal price, decimal quantity)
+    {
         var trade = new Trade(
             Id: Guid.NewGuid(),
             BuyOrderId: buyOrder.Id,
@@ -123,8 +223,7 @@ public sealed class ExchangeEngine : IExchangeEngine
         _prices.Add(price);
         TrimHistory();
 
-        _orderBook.Reduce(buyOrder, quantity);
-        _orderBook.Reduce(sellOrder, quantity);
+        return trade;
     }
 
     private void TrimHistory()

@@ -67,244 +67,278 @@
                                 <span>Акция</span>
                                 <span>Энергетика</span>
                             </div>
-                            <p class="asset-state"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>Актив создан</p>
-                        </div>
-                    </div>
-                    <p class="asset-description">Инновационная энергетическая компания, разрабатывающая и внедряющая системы накопления энергии нового поколения на основе квантовых технологий.</p>
-                </section>
-
-                <section class="glass-card parameter-card" aria-labelledby="parameters-title">
-                    <h2 id="parameters-title">Параметры актива</h2>
-                    <dl class="parameter-list">
-                        @foreach (var parameter in AssetParameters)
-                        {
-                            <div>
-                                <dt>@parameter.Label</dt>
-                                <dd class="@parameter.ValueClass">@parameter.Value</dd>
+                            <p class="asset-state"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>Актив
+                                создан</p>
                             </div>
-                        }
-                    </dl>
-                </section>
-            </aside>
+                        </div>
+                        <p class="asset-description">Инновационная энергетическая компания, разрабатывающая и внедряющая
+                            системы накопления энергии нового поколения на основе квантовых технологий.</p>
+                        </section>
 
-            <section class="center-column">
-                <div class="metrics-strip" aria-label="Ключевые рыночные показатели">
-                    @foreach (var metric in MarketMetrics)
-                    {
-                        <article class="glass-card metric-card @metric.Accent">
-                            <span>@metric.Label</span>
-                            <strong>@metric.Value</strong>
-                            <small>@metric.Detail</small>
-                            @if (metric.Accent == "volume")
-                            {
-                                <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
-                                    @foreach (var bar in metric.Bars)
-                                    {
-                                        <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
-                                    }
-                                </svg>
-                            }
-                            else
-                            {
-                                <svg class="sparkline-chart" viewBox="0 0 96 42" aria-hidden="true">
-                                    <polygon points="@metric.Projection" />
-                                    <polyline points="@metric.Sparkline" />
-                                </svg>
-                            }
-                        </article>
-                    }
-                </div>
-
-                @{ var chartData = ChartData; }
-                <section class="glass-card chart-card" aria-labelledby="chart-title">
-                    <div class="chart-toolbar">
-                        <div class="chart-topline">
-                            <div class="timeframe-row" aria-label="Таймфрейм">
-                                @foreach (var item in Timeframes)
+                        <section class="glass-card parameter-card" aria-labelledby="parameters-title">
+                            <h2 id="parameters-title">Параметры актива</h2>
+                            <dl class="parameter-list">
+                                @foreach (var parameter in AssetParameters)
                                 {
-                                    <button class="@(item == selectedTimeframe ? "active" : null)" type="button" @onclick="() => SelectTimeframe(item)">@item</button>
+                                    <div>
+                                        <dt>@parameter.Label</dt>
+                                        <dd class="@parameter.ValueClass">@parameter.Value</dd>
+                                    </div>
                                 }
-                            </div>
-                            <span class="market-active"><i class="bi bi-record-circle" aria-hidden="true"></i>@chartData.MarketState</span>
-                        </div>
-
-                        <div class="chart-header">
-                            <h2 id="chart-title">КвантЭнерго · @selectedTimeframe · ABStock</h2>
-                            <dl>
-                                <div><dt>ОТКР</dt><dd>@chartData.Open</dd></div>
-                                <div><dt>МАКС</dt><dd>@chartData.High</dd></div>
-                                <div><dt>МИН</dt><dd>@chartData.Low</dd></div>
-                                <div><dt>ЗАКР</dt><dd>@chartData.Close</dd></div>
-                                <div><dt></dt><dd class="@chartData.ChangeClass">@chartData.Change</dd></div>
                             </dl>
+                        </section>
+                    </aside>
+
+                    <section class="center-column">
+                        <div class="metrics-strip" aria-label="Ключевые рыночные показатели">
+                            @foreach (var metric in MarketMetrics)
+                            {
+                                <article class="glass-card metric-card @metric.Accent">
+                                    <span>@metric.Label</span>
+                                    <strong>@metric.Value</strong>
+                                    <small>@metric.Detail</small>
+                                    @if (metric.Accent == "volume")
+                                    {
+                                        <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
+                                            @foreach (var bar in metric.Bars)
+                                            {
+                                                <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
+                                            }
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <svg class="sparkline-chart" viewBox="0 0 96 42" aria-hidden="true">
+                                            <polygon points="@metric.Projection" />
+                                            <polyline points="@metric.Sparkline" />
+                                        </svg>
+                                    }
+                                </article>
+                            }
                         </div>
-                    </div>
 
-                    <div class="chart-stage">
-                        <svg class="price-chart" viewBox="0 0 960 430" role="img" aria-label="Свечной график цены КвантЭнерго">
-                            <defs>
-                                <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
-                                    <stop offset="0" stop-color="#122842" />
-                                    <stop offset="0.54" stop-color="#0E1B2E" />
-                                    <stop offset="1" stop-color="#09111F" />
-                                </linearGradient>
-                                <linearGradient id="chartGlow" x1="0" x2="1" y1="0" y2="0">
-                                    <stop offset="0" stop-color="#7C5CFF" stop-opacity="0.18" />
-                                    <stop offset="0.52" stop-color="#55C7FF" stop-opacity="0.1" />
-                                    <stop offset="1" stop-color="#36D98A" stop-opacity="0.12" />
-                                </linearGradient>
-                            </defs>
-                            <rect width="960" height="430" fill="url(#chartFill)" />
-                            <rect x="@ChartPanelLeft" y="18" width="@ChartPanelWidth" height="332" rx="10" fill="url(#chartGlow)" />
-
-                            @foreach (var x in chartData.GridX)
-                            {
-                                <line class="grid-line vertical-grid-line" x1="@x" y1="@ChartPlotTop" x2="@x" y2="@ChartPlotBottom" />
-                            }
-                            @foreach (var label in chartData.PriceLabels)
-                            {
-                                <line class="grid-line horizontal-grid-line" x1="@ChartPlotLeft" y1="@label.Y" x2="@ChartPlotRight" y2="@label.Y" />
-                            }
-
-                            <line class="price-marker-line" x1="@ChartPlotLeft" y1="@chartData.LastPriceY" x2="@chartData.PlotRight" y2="@chartData.LastPriceY" />
-
-                            @foreach (var candle in chartData.Candles)
-                            {
-                                <g class="candle @(candle.IsUp ? "up" : "down")">
-                                    <line x1="@candle.X" y1="@candle.HighY" x2="@candle.X" y2="@candle.LowY" />
-                                    <rect x="@candle.BodyX" y="@candle.BodyY" width="@candle.BodyWidth" height="@candle.BodyHeight" rx="1.5" />
-                                </g>
-                            }
-
-                            <g class="axis-labels">
-                                @foreach (var label in chartData.PriceLabels)
-                                {
-                                    @SvgText(ChartAxisLabelX, label.Y, label.Text, "end")
-                                }
-                                @foreach (var label in chartData.TickLabels)
-                                {
-                                    @SvgText(label.X, 377, label.Text, "middle")
-                                }
-                            </g>
-
-                            <g class="price-tag">
-                                <rect x="@chartData.PriceTagX" y="@chartData.PriceTagY" width="66" height="22" rx="7" />
-                                <text x="@chartData.PriceTagTextX" y="@chartData.PriceTagTextY">@chartData.LastPrice</text>
-                            </g>
-                        </svg>
-                    </div>
-
-                    <footer class="chart-footer">
-                        <span>@chartData.UpdatedAt</span>
-                    </footer>
-                </section>
-            </section>
-
-            <aside class="right-column">
-                @{ var orderBook = OrderBookData; }
-                <section class="glass-card order-book" aria-labelledby="book-title">
-                    <h2 id="book-title">Книга заявок</h2>
-                    <div class="book-head">
-                        <span class="book-cell-price">Цена (₽)</span>
-                        <span class="book-cell-volume">Объём (шт.)</span>
-                        <span class="book-cell-total">Сумма (шт.)</span>
-                    </div>
-
-                    <div class="book-side sells">
-                        <svg class="book-depth-shape ask-depth" viewBox="0 0 300 125" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="@orderBook.AskFillPath" />
-                            <path class="depth-line" d="@orderBook.AskLinePath" />
-                        </svg>
-                        @foreach (var row in orderBook.Asks)
-                        {
-                            <div class="book-row">
-                                <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                <strong class="book-cell-price">@row.Price</strong>
-                                <span class="book-cell-volume">@row.Volume</span>
-                                <span class="book-cell-total">@row.Total</span>
-                            </div>
+                        @{
+                            var chartData = ChartData;
                         }
-                    </div>
+                        <section class="glass-card chart-card" aria-labelledby="chart-title">
+                            <div class="chart-toolbar">
+                                <div class="chart-topline">
+                                    <div class="timeframe-row" aria-label="Таймфрейм">
+                                        @foreach (var item in Timeframes)
+                                        {
+                                            <button class="@(item == selectedTimeframe ? "active" : null)" type="button"
+                                                    @onclick="() => SelectTimeframe(item)">@item</button>
+                                        }
+                                    </div>
+                                    <span class="market-active"><i class="bi bi-record-circle"
+                                                                       aria-hidden="true"></i>@chartData.MarketState</span>
+                                    </div>
 
-                    <div class="spread-row">
-                        <i class="@Spread.Icon" aria-hidden="true"></i>
-                        <strong>@Spread.Value</strong>
-                        <span>@Spread.Detail</span>
-                    </div>
+                                    <div class="chart-header">
+                                        <h2 id="chart-title">КвантЭнерго · @selectedTimeframe · ABStock</h2>
+                                        <dl>
+                                            <div>
+                                                <dt>ОТКР</dt>
+                                                <dd>@chartData.Open</dd>
+                                            </div>
+                                            <div>
+                                                <dt>МАКС</dt>
+                                                <dd>@chartData.High</dd>
+                                            </div>
+                                            <div>
+                                                <dt>МИН</dt>
+                                                <dd>@chartData.Low</dd>
+                                            </div>
+                                            <div>
+                                                <dt>ЗАКР</dt>
+                                                <dd>@chartData.Close</dd>
+                                            </div>
+                                            <div>
+                                                <dt></dt>
+                                                <dd class="@chartData.ChangeClass">@chartData.Change</dd>
+                                            </div>
+                                        </dl>
+                                    </div>
+                                </div>
 
-                    <div class="book-side buys">
-                        <svg class="book-depth-shape bid-depth" viewBox="0 0 300 125" preserveAspectRatio="none" aria-hidden="true">
-                            <path d="@orderBook.BidFillPath" />
-                            <path class="depth-line" d="@orderBook.BidLinePath" />
-                        </svg>
-                        @foreach (var row in orderBook.Bids)
-                        {
-                            <div class="book-row">
-                                <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                <strong class="book-cell-price">@row.Price</strong>
-                                <span class="book-cell-volume">@row.Volume</span>
-                                <span class="book-cell-total">@row.Total</span>
-                            </div>
+                                <div class="chart-stage">
+                                    <svg class="price-chart" viewBox="0 0 960 430" role="img"
+                                         aria-label="Свечной график цены КвантЭнерго">
+                                        <defs>
+                                            <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
+                                                <stop offset="0" stop-color="#122842" />
+                                                <stop offset="0.54" stop-color="#0E1B2E" />
+                                                <stop offset="1" stop-color="#09111F" />
+                                            </linearGradient>
+                                            <linearGradient id="chartGlow" x1="0" x2="1" y1="0" y2="0">
+                                                <stop offset="0" stop-color="#7C5CFF" stop-opacity="0.18" />
+                                                <stop offset="0.52" stop-color="#55C7FF" stop-opacity="0.1" />
+                                                <stop offset="1" stop-color="#36D98A" stop-opacity="0.12" />
+                                            </linearGradient>
+                                        </defs>
+                                        <rect width="960" height="430" fill="url(#chartFill)" />
+                                        <rect x="@ChartPanelLeft" y="18" width="@ChartPanelWidth" height="332" rx="10"
+                                              fill="url(#chartGlow)" />
+
+                                        @foreach (var x in chartData.GridX)
+                                        {
+                                            <line class="grid-line vertical-grid-line" x1="@x" y1="@ChartPlotTop" x2="@x"
+                                                  y2="@ChartPlotBottom" />
+                                        }
+                                        @foreach (var label in chartData.PriceLabels)
+                                        {
+                                            <line class="grid-line horizontal-grid-line" x1="@ChartPlotLeft" y1="@label.Y"
+                                                  x2="@ChartPlotRight" y2="@label.Y" />
+                                        }
+
+                                        <line class="price-marker-line" x1="@ChartPlotLeft" y1="@chartData.LastPriceY"
+                                              x2="@chartData.PlotRight" y2="@chartData.LastPriceY" />
+
+                                        @foreach (var candle in chartData.Candles)
+                                        {
+                                            <g class="candle @(candle.IsUp ? "up" : "down")">
+                                                <line x1="@candle.X" y1="@candle.HighY" x2="@candle.X" y2="@candle.LowY" />
+                                                <rect x="@candle.BodyX" y="@candle.BodyY" width="@candle.BodyWidth"
+                                                      height="@candle.BodyHeight" rx="1.5" />
+                                            </g>
+                                        }
+
+                                        <g class="axis-labels">
+                                            @foreach (var label in chartData.PriceLabels)
+                                            {
+                                                @SvgText(ChartAxisLabelX, label.Y, label.Text, "end")
+                                            }
+                                            @foreach (var label in chartData.TickLabels)
+                                            {
+                                                @SvgText(label.X, 377, label.Text, "middle")
+                                            }
+                                        </g>
+
+                                        <g class="price-tag">
+                                            <rect x="@chartData.PriceTagX" y="@chartData.PriceTagY" width="66" height="22" rx="7" />
+                                            <text x="@chartData.PriceTagTextX"
+                                                  y="@chartData.PriceTagTextY">@chartData.LastPrice</text>
+                                        </g>
+                                    </svg>
+                                </div>
+
+                                <footer class="chart-footer">
+                                    <span>@chartData.UpdatedAt</span>
+                                </footer>
+                            </section>
+                        </section>
+
+                        <aside class="right-column">
+                            @{
+                                var orderBook = OrderBookData;
+                            }
+                            <section class="glass-card order-book" aria-labelledby="book-title">
+                                <h2 id="book-title">Книга заявок</h2>
+                                <div class="book-head">
+                                    <span class="book-cell-price">Цена (₽)</span>
+                                    <span class="book-cell-volume">Объём (шт.)</span>
+                                    <span class="book-cell-total">Сумма (шт.)</span>
+                                </div>
+
+                                <div class="book-side sells">
+                                    <svg class="book-depth-shape ask-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
+                                         aria-hidden="true">
+                                        <path d="@orderBook.AskFillPath" />
+                                        <path class="depth-line" d="@orderBook.AskLinePath" />
+                                    </svg>
+                                    @foreach (var row in orderBook.Asks)
+                                    {
+                                        <div class="book-row">
+                                            <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                            <strong class="book-cell-price">@row.Price</strong>
+                                            <span class="book-cell-volume">@row.Volume</span>
+                                            <span class="book-cell-total">@row.Total</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="spread-row">
+                                    <i class="@Spread.Icon" aria-hidden="true"></i>
+                                    <strong>@Spread.Value</strong>
+                                    <span>@Spread.Detail</span>
+                                </div>
+
+                                <div class="book-side buys">
+                                    <svg class="book-depth-shape bid-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
+                                         aria-hidden="true">
+                                        <path d="@orderBook.BidFillPath" />
+                                        <path class="depth-line" d="@orderBook.BidLinePath" />
+                                    </svg>
+                                    @foreach (var row in orderBook.Bids)
+                                    {
+                                        <div class="book-row">
+                                            <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                            <strong class="book-cell-price">@row.Price</strong>
+                                            <span class="book-cell-volume">@row.Volume</span>
+                                            <span class="book-cell-total">@row.Total</span>
+                                        </div>
+                                    }
+                                </div>
+                            </section>
+
+                            <section class="glass-card trades-card" aria-labelledby="trades-title">
+                                <h2 id="trades-title">Последние сделки</h2>
+                                <div class="trade-head">
+                                    <span>Время</span>
+                                    <span>Цена (₽)</span>
+                                    <span>Объём (шт.)</span>
+                                    <span>Участники</span>
+                                </div>
+                                @foreach (var trade in RecentTrades)
+                                {
+                                    <div class="trade-row @trade.SideClass">
+                                        <span>@trade.Time</span>
+                                        <strong>@trade.Price</strong>
+                                        <span>@trade.Volume</span>
+                                        <em>@trade.Side</em>
+                                    </div>
+                                }
+                            </section>
+                        </aside>
+
+                        @{
+                            var status = Status;
                         }
-                    </div>
-                </section>
+                        <section class="glass-card status-strip" aria-label="Показатели рынка">
+                            <div class="status-metric">
+                                <small>С момента запуска</small>
+                                <strong class="positive">@status.Elapsed</strong>
+                            </div>
+                            <div class="status-metric">
+                                <small>Количество сделок</small>
+                                <strong>@status.TradeCount</strong>
+                            </div>
+                            <div class="status-metric">
+                                <small>Участников</small>
+                                <strong>@status.Participants</strong>
+                            </div>
+                            <div class="status-metric status-range">
+                                <small>Дневной диапазон</small>
+                                <strong>@status.Range</strong>
+                                <div class="range-track" aria-hidden="true">
+                                    <span></span>
+                                    <i style="@status.RangeMarkerStyle"></i>
+                                </div>
+                            </div>
+                            <div class="status-metric">
+                                <small>Ликвидность</small>
+                                <strong class="@status.LiquidityClass">@status.Liquidity</strong>
+                                <span>@status.LiquidityDetail</span>
+                            </div>
 
-                <section class="glass-card trades-card" aria-labelledby="trades-title">
-                    <h2 id="trades-title">Последние сделки</h2>
-                    <div class="trade-head">
-                        <span>Время</span>
-                        <span>Цена (₽)</span>
-                        <span>Объём (шт.)</span>
-                        <span>Участники</span>
-                    </div>
-                    @foreach (var trade in RecentTrades)
-                    {
-                        <div class="trade-row @trade.SideClass">
-                            <span>@trade.Time</span>
-                            <strong>@trade.Price</strong>
-                            <span>@trade.Volume</span>
-                            <em>@trade.Side</em>
-                        </div>
-                    }
-                </section>
-            </aside>
-
-            @{ var status = Status; }
-            <section class="glass-card status-strip" aria-label="Показатели рынка">
-                <div class="status-metric">
-                    <small>С момента запуска</small>
-                    <strong class="positive">@status.Elapsed</strong>
-                </div>
-                <div class="status-metric">
-                    <small>Количество сделок</small>
-                    <strong>@status.TradeCount</strong>
-                </div>
-                <div class="status-metric">
-                    <small>Участников</small>
-                    <strong>@status.Participants</strong>
-                </div>
-                <div class="status-metric status-range">
-                    <small>Дневной диапазон</small>
-                    <strong>@status.Range</strong>
-                    <div class="range-track" aria-hidden="true">
-                        <span></span>
-                        <i style="@status.RangeMarkerStyle"></i>
-                    </div>
-                </div>
-                <div class="status-metric">
-                    <small>Ликвидность</small>
-                    <strong class="@status.LiquidityClass">@status.Liquidity</strong>
-                    <span>@status.LiquidityDetail</span>
-                </div>
-
-                <a class="portfolio-button" href="/news">
-                    <i class="bi bi-newspaper" aria-hidden="true"></i>
-                    <span>Добавить новость</span>
-                </a>
-            </section>
-        </section>
-    </main>
-</div>
+                            <a class="portfolio-button" href="/news">
+                                <i class="bi bi-newspaper" aria-hidden="true"></i>
+                                <span>Добавить новость</span>
+                            </a>
+                        </section>
+                    </section>
+                </main>
+            </div>
 
 @code {
     private static readonly string[] Timeframes = ["1м", "5м", "15м", "1ч", "4ч", "1д"];
@@ -365,21 +399,14 @@
     protected override void OnInitialized()
     {
         SimulationRunner.OnTick += HandleTick;
-        simulationCts = new CancellationTokenSource();
-        startedAt = DateTimeOffset.Now;
+        latestTick = SimulationRunner.Current;
 
-        _ = RunSimulationAsync(simulationCts.Token);
+        _ = RunSimulationAsync();
     }
 
-    private async Task RunSimulationAsync(CancellationToken cancellationToken)
+    private async Task RunSimulationAsync()
     {
-        try
-        {
-            await SimulationRunner.StartAsync(CreateDemoConfig(), cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
+        await SimulationRunner.StartAsync(CreateDemoConfig());
     }
 
     private void HandleTick(SimulationTickResult tickResult)
@@ -454,10 +481,14 @@
 
         return
         [
-            new("Текущая цена", FormatMoney(lastPrice), tickResult is null ? "ожидание тика" : $"Тик {tickResult.Tick}", priceAccent, BuildSparkline(priceMetricHistory), BuildArea(priceMetricHistory), []),
-            new("Лучший bid", FormatNullableMoney(bestBid), $"{FormatQuantity(bestBidQuantity)} шт.", bidAccent, BuildSparkline(bidMetricHistory), BuildArea(bidMetricHistory), []),
-            new("Лучший ask", FormatNullableMoney(bestAsk), $"{FormatQuantity(bestAskQuantity)} шт.", askAccent, BuildSparkline(askMetricHistory), BuildArea(askMetricHistory), []),
-            new("Объём торгов", FormatQuantity(volume), $"{tradeCount} сделок", "volume", "", "", BuildVolumeBars(volumeMetricHistory))
+            new("Текущая цена", FormatMoney(lastPrice), tickResult is null ? "ожидание тика" : $"Тик {tickResult.Tick}",
+priceAccent, BuildSparkline(priceMetricHistory), BuildArea(priceMetricHistory), []),
+            new("Лучший bid", FormatNullableMoney(bestBid), $"{FormatQuantity(bestBidQuantity)} шт.", bidAccent,
+BuildSparkline(bidMetricHistory), BuildArea(bidMetricHistory), []),
+            new("Лучший ask", FormatNullableMoney(bestAsk), $"{FormatQuantity(bestAskQuantity)} шт.", askAccent,
+BuildSparkline(askMetricHistory), BuildArea(askMetricHistory), []),
+            new("Объём торгов", FormatQuantity(volume), $"{tradeCount} сделок", "volume", "", "",
+BuildVolumeBars(volumeMetricHistory))
         ];
     }
 
@@ -636,7 +667,8 @@
         return bars;
     }
 
-    private static Point[] BuildChartPoints(IReadOnlyList<decimal> values, double minX, double maxX, double minY, double maxY)
+    private static Point[] BuildChartPoints(IReadOnlyList<decimal> values, double minX, double maxX, double minY, double
+maxY)
     {
         var source = values.Count == 0 ? [0m] : values.ToArray();
         var minValue = source.Min();
@@ -762,7 +794,8 @@
         }
 
         var mid = (tickResult.Snapshot.BestBid.Value + tickResult.Snapshot.BestAsk.Value) / 2m;
-        var spreadPercent = mid == 0m ? 100m : (tickResult.Snapshot.BestAsk.Value - tickResult.Snapshot.BestBid.Value) / mid * 100m;
+        var spreadPercent = mid == 0m ? 100m : (tickResult.Snapshot.BestAsk.Value - tickResult.Snapshot.BestBid.Value) / mid *
+100m;
 
         if (spreadPercent <= 0.5m && totalDepth >= 10m)
         {
@@ -1007,7 +1040,8 @@
             _ => 8
         };
 
-    private static Microsoft.AspNetCore.Components.MarkupString SvgText(double x, double y, string text, string anchor = "start")
+    private static Microsoft.AspNetCore.Components.MarkupString SvgText(double x, double y, string text, string anchor =
+"start")
     {
         var markup = string.Format(
             System.Globalization.CultureInfo.InvariantCulture,
@@ -1023,11 +1057,10 @@
     public void Dispose()
     {
         SimulationRunner.OnTick -= HandleTick;
-        simulationCts?.Cancel();
-        simulationCts?.Dispose();
     }
 
-    private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string Projection, IReadOnlyList<BarRect> Bars);
+    private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string
+Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
     private sealed record OrderBookViewData(
         IReadOnlyList<OrderBookRow> Asks,
@@ -1070,7 +1103,8 @@
         string MarketState,
         string UpdatedAt);
     private sealed record PriceGroup(decimal Open, decimal High, decimal Low, decimal Close);
-    private sealed record CandlePoint(double X, double HighY, double LowY, double BodyX, double BodyY, double BodyWidth, double BodyHeight, bool IsUp);
+    private sealed record CandlePoint(double X, double HighY, double LowY, double BodyX, double BodyY, double BodyWidth,
+double BodyHeight, bool IsUp);
     private sealed record AxisLabel(double X, double Y, string Text);
     private sealed record BarRect(double X, double Y, double Width, double Height);
     private sealed record Point(double X, double Y);
