@@ -26,7 +26,7 @@ public sealed class SimulationRunnerIntegrationTests
 
         runner.OnTick += HandleTick;
 
-        var runTask = runner.StartAsync(CreateConfig(), cancellationTokenSource.Token);
+        await runner.StartAsync(CreateConfig(), cancellationTokenSource.Token);
 
         try
         {
@@ -44,7 +44,7 @@ public sealed class SimulationRunnerIntegrationTests
         {
             runner.OnTick -= HandleTick;
             cancellationTokenSource.Cancel();
-            await IgnoreCancellationAsync(runTask);
+            await runner.StopAsync();
         }
     }
 
@@ -70,7 +70,7 @@ public sealed class SimulationRunnerIntegrationTests
 
         runner.OnTick += HandleTick;
 
-        var runTask = runner.StartAsync(CreateConfig(), cancellationTokenSource.Token);
+        await runner.StartAsync(CreateConfig(), cancellationTokenSource.Token);
 
         try
         {
@@ -93,8 +93,45 @@ public sealed class SimulationRunnerIntegrationTests
         {
             runner.OnTick -= HandleTick;
             cancellationTokenSource.Cancel();
-            await IgnoreCancellationAsync(runTask);
+            await runner.StopAsync();
         }
+    }
+
+    [Fact]
+    public async Task StartAsync_KeepsRunnerAliveUntilStopAsync()
+    {
+        var serviceProvider = new ServiceCollection()
+            .AddABStockApplication()
+            .BuildServiceProvider();
+
+        var runner = serviceProvider.GetRequiredService<ISimulationRunner>();
+        var tickSource = new TaskCompletionSource<SimulationTickResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void HandleTick(SimulationTickResult result)
+        {
+            tickSource.TrySetResult(result);
+        }
+
+        runner.OnTick += HandleTick;
+
+        await runner.StartAsync(CreateConfig());
+
+        try
+        {
+            Assert.True(runner.IsRunning);
+
+            var completedTask = await Task.WhenAny(tickSource.Task, Task.Delay(TimeSpan.FromSeconds(3)));
+
+            Assert.Same(tickSource.Task, completedTask);
+            Assert.Same(await tickSource.Task, runner.Current);
+        }
+        finally
+        {
+            runner.OnTick -= HandleTick;
+            await runner.StopAsync();
+        }
+
+        Assert.False(runner.IsRunning);
     }
 
     private static SimulationConfig CreateConfig() =>
@@ -111,14 +148,4 @@ public sealed class SimulationRunnerIntegrationTests
                 new AgentSpec(AgentType.NewsDriven, 100_000m, 50m)
             ]);
 
-    private static async Task IgnoreCancellationAsync(Task task)
-    {
-        try
-        {
-            await task;
-        }
-        catch (OperationCanceledException)
-        {
-        }
-    }
 }
