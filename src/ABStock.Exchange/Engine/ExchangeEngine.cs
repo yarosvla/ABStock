@@ -34,7 +34,7 @@ public sealed class ExchangeEngine : IExchangeEngine
         {
             throw new ArgumentOutOfRangeException(nameof(maxRecentTrades), "Recent trades limit must be positive.");
         }
-        
+
         _maxRecentPrices = maxRecentPrices;
         _maxRecentTrades = maxRecentTrades;
         _lastPrice = startPrice;
@@ -132,6 +132,7 @@ public sealed class ExchangeEngine : IExchangeEngine
         }
 
         _orderBook.Add(order);
+
         return MatchOrders();
     }
 
