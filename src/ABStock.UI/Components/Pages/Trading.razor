@@ -163,7 +163,7 @@
 
                                 <div class="chart-stage">
                                     <svg class="price-chart" viewBox="0 0 960 430" role="img"
-                                         aria-label="Свечной график цены КвантЭнерго">
+                                         aria-label="Линейный график цены КвантЭнерго">
                                         <defs>
                                             <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
                                                 <stop offset="0" stop-color="#122842" />
@@ -194,14 +194,13 @@
                                         <line class="price-marker-line" x1="@ChartPlotLeft" y1="@chartData.LastPriceY"
                                               x2="@chartData.PlotRight" y2="@chartData.LastPriceY" />
 
-                                        @foreach (var candle in chartData.Candles)
+                                        <path class="price-area" d="@chartData.AreaPath" />
+                                        <path class="price-line" d="@chartData.LinePath" />
+                                        @foreach (var point in chartData.Points)
                                         {
-                                            <g class="candle @(candle.IsUp ? "up" : "down")">
-                                                <line x1="@candle.X" y1="@candle.HighY" x2="@candle.X" y2="@candle.LowY" />
-                                                <rect x="@candle.BodyX" y="@candle.BodyY" width="@candle.BodyWidth"
-                                                      height="@candle.BodyHeight" rx="1.5" />
-                                            </g>
+                                            <circle class="price-point" cx="@point.X" cy="@point.Y" r="2.8" />
                                         }
+                                        <circle class="price-point latest" cx="@chartData.LastPointX" cy="@chartData.LastPriceY" r="5" />
 
                                         <g class="axis-labels">
                                             @foreach (var label in chartData.PriceLabels)
@@ -341,7 +340,7 @@
             </div>
 
 @code {
-    private static readonly string[] Timeframes = ["1м", "5м", "15м", "1ч", "4ч", "1д"];
+    private static readonly string[] Timeframes = ["10с", "30с", "1м", "5м", "15м", "1ч"];
     private const decimal DemoStartPrice = 124.35m;
     private const double ChartPanelLeft = 18;
     private const double ChartPanelWidth = 906;
@@ -377,7 +376,7 @@
         new("Статус", "Актив создан", "positive")
     ];
 
-    private string selectedTimeframe = "5м";
+    private string selectedTimeframe = "30с";
     private SimulationTickResult? latestTick;
     private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
     private DateTimeOffset startedAt = DateTimeOffset.Now;
@@ -839,9 +838,9 @@ maxY)
             ? tickResult.Snapshot.RecentPrices.ToArray()
             : [DemoStartPrice];
 
-        var groups = BuildPriceGroups(prices, GetTimeframeGroupSize(timeframe));
-        var rangeLow = groups.Min(group => group.Low);
-        var rangeHigh = groups.Max(group => group.High);
+        var visiblePrices = TakeLatestPrices(prices, GetTimeframePointLimit(timeframe));
+        var rangeLow = visiblePrices.Min();
+        var rangeHigh = visiblePrices.Max();
         var padding = Math.Max((rangeHigh - rangeLow) * 0.12m, 0.05m);
         var minPrice = rangeLow - padding;
         var maxPrice = rangeHigh + padding;
@@ -852,11 +851,10 @@ maxY)
             maxPrice += 0.05m;
         }
 
-        var candleStep = GetTimeframeCandleStep(timeframe);
-        var plotRight = GetChartPlotRight(groups.Length, candleStep);
-        var candles = BuildCandlePoints(groups, minPrice, maxPrice, candleStep);
-        var firstPrice = prices[0];
-        var lastPrice = tickResult?.Snapshot.LastPrice ?? prices[^1];
+        var points = BuildLinePoints(visiblePrices, minPrice, maxPrice);
+        var plotRight = points[^1].X;
+        var firstPrice = visiblePrices[0];
+        var lastPrice = tickResult?.Snapshot.LastPrice ?? visiblePrices[^1];
         var change = lastPrice - firstPrice;
         var percent = firstPrice == 0m ? 0m : change / firstPrice * 100m;
         var changeClass = change >= 0m ? "positive" : "negative";
@@ -865,19 +863,22 @@ maxY)
         var priceTagX = Math.Clamp(plotRight - 66, ChartPlotLeft + 8, ChartPlotRight - 66);
 
         return new PriceChartData(
-            candles,
+            points,
+            BuildLinePath(points),
+            BuildAreaPath(points),
             BuildPriceLabels(minPrice, maxPrice),
-            BuildTickLabels(candles, tickResult?.Tick ?? 0),
+            BuildTickLabels(points, tickResult?.Tick ?? 0),
             BuildGridX(timeframe),
             plotRight,
-            FormatPrice(groups[0].Open),
-            FormatPrice(groups.Max(group => group.High)),
-            FormatPrice(groups.Min(group => group.Low)),
+            FormatPrice(firstPrice),
+            FormatPrice(rangeHigh),
+            FormatPrice(rangeLow),
             FormatPrice(lastPrice),
             $"{sign}{FormatPrice(change)} ({sign}{percent:0.00}%)",
             changeClass,
             FormatPrice(lastPrice),
             lastPriceY,
+            points[^1].X,
             priceTagX,
             Math.Clamp(lastPriceY - 11, ChartPlotTop, ChartPlotBottom - 22),
             priceTagX + 10,
@@ -886,50 +887,60 @@ maxY)
             $"Обновлено {updatedAt.ToLocalTime():HH:mm:ss}");
     }
 
-    private static PriceGroup[] BuildPriceGroups(IReadOnlyList<decimal> prices, int groupSize)
+    private static decimal[] TakeLatestPrices(IReadOnlyList<decimal> prices, int limit)
     {
-        var groups = new List<PriceGroup>();
-
-        for (var index = 0; index < prices.Count; index += groupSize)
-        {
-            var chunk = prices.Skip(index).Take(groupSize).ToArray();
-            groups.Add(new PriceGroup(
-                chunk[0],
-                chunk.Max(),
-                chunk.Min(),
-                chunk[^1]));
-        }
-
-        return groups.ToArray();
+        var start = Math.Max(0, prices.Count - limit);
+        return prices.Skip(start).ToArray();
     }
 
-    private static CandlePoint[] BuildCandlePoints(
-        IReadOnlyList<PriceGroup> groups,
+    private static Point[] BuildLinePoints(
+        IReadOnlyList<decimal> prices,
         decimal minPrice,
-        decimal maxPrice,
-        double candleStep)
+        decimal maxPrice)
     {
-        var bodyWidth = Math.Clamp(candleStep * 0.44, 5, 13);
+        if (prices.Count == 1)
+        {
+            return [new Point(ChartPlotRight, ScalePrice(prices[0], minPrice, maxPrice))];
+        }
 
-        return groups
-            .Select((group, index) =>
+        var width = ChartPlotRight - ChartPlotLeft;
+        return prices
+            .Select((price, index) =>
             {
-                var x = ChartPlotLeft + candleStep * index;
-                var openY = ScalePrice(group.Open, minPrice, maxPrice);
-                var closeY = ScalePrice(group.Close, minPrice, maxPrice);
-                var bodyHeight = Math.Max(5, Math.Abs(openY - closeY));
-
-                return new CandlePoint(
-                    x,
-                    ScalePrice(group.High, minPrice, maxPrice),
-                    ScalePrice(group.Low, minPrice, maxPrice),
-                    x - bodyWidth / 2,
-                    Math.Min(openY, closeY),
-                    bodyWidth,
-                    bodyHeight,
-                    group.Close >= group.Open);
+                var ratio = (double)index / (prices.Count - 1);
+                return new Point(
+                    ChartPlotLeft + width * ratio,
+                    ScalePrice(price, minPrice, maxPrice));
             })
             .ToArray();
+    }
+
+    private static string BuildLinePath(IReadOnlyList<Point> points)
+    {
+        if (points.Count == 0)
+        {
+            return "";
+        }
+
+        if (points.Count == 1)
+        {
+            var y = FormatSvgNumber(points[0].Y);
+            return $"M{FormatSvgNumber(ChartPlotLeft)} {y} L{FormatSvgNumber(ChartPlotRight)} {y}";
+        }
+
+        return string.Join(" ", points.Select((point, index) =>
+            $"{(index == 0 ? "M" : "L")}{FormatSvgNumber(point.X)} {FormatSvgNumber(point.Y)}"));
+    }
+
+    private static string BuildAreaPath(IReadOnlyList<Point> points)
+    {
+        if (points.Count == 0)
+        {
+            return "";
+        }
+
+        var linePath = BuildLinePath(points);
+        return $"{linePath} L{FormatSvgNumber(points[^1].X)} {FormatSvgNumber(ChartPlotBottom)} L{FormatSvgNumber(ChartPlotLeft)} {FormatSvgNumber(ChartPlotBottom)} Z";
     }
 
     private static AxisLabel[] BuildPriceLabels(decimal minPrice, decimal maxPrice)
@@ -948,31 +959,31 @@ maxY)
         return labels;
     }
 
-    private static AxisLabel[] BuildTickLabels(IReadOnlyList<CandlePoint> candles, int latestTick)
+    private static AxisLabel[] BuildTickLabels(IReadOnlyList<Point> points, int latestTick)
     {
-        if (candles.Count == 0)
+        if (points.Count == 0)
         {
             return [];
         }
 
-        var labelCount = Math.Min(6, candles.Count);
+        var labelCount = Math.Min(6, points.Count);
         var indexes = new List<int>(labelCount);
 
         for (var index = 0; index < labelCount; index++)
         {
             var ratio = labelCount == 1 ? 0 : (double)index / (labelCount - 1);
-            var candleIndex = (int)Math.Round((candles.Count - 1) * ratio);
-            if (!indexes.Contains(candleIndex))
+            var pointIndex = (int)Math.Round((points.Count - 1) * ratio);
+            if (!indexes.Contains(pointIndex))
             {
-                indexes.Add(candleIndex);
+                indexes.Add(pointIndex);
             }
         }
 
         return indexes
             .Select(index =>
             {
-                var relativeTick = Math.Max(0, candles.Count - 1 - index);
-                return new AxisLabel(candles[index].X, 0, $"t-{relativeTick}");
+                var relativeTick = Math.Max(0, points.Count - 1 - index);
+                return new AxisLabel(points[index].X, 0, $"t-{relativeTick}");
             })
             .ToArray();
     }
@@ -991,51 +1002,33 @@ maxY)
         return lines;
     }
 
-    private static double GetChartPlotRight(int candleCount, double candleStep)
-    {
-        var width = Math.Max(0, candleCount - 1) * candleStep;
-        return Math.Clamp(ChartPlotLeft + width, ChartPlotLeft + 116, ChartPlotRight);
-    }
-
     private static double ScalePrice(decimal price, decimal minPrice, decimal maxPrice)
     {
         var ratio = (double)((price - minPrice) / (maxPrice - minPrice));
         return ChartPlotBottom - ChartPlotHeight * ratio;
     }
 
-    private static int GetTimeframeGroupSize(string timeframe) =>
+    private static int GetTimeframePointLimit(string timeframe) =>
         timeframe switch
         {
-            "1м" => 1,
-            "5м" => 2,
-            "15м" => 4,
-            "1ч" => 8,
-            "4ч" => 12,
-            "1д" => 20,
-            _ => 2
-        };
-
-    private static double GetTimeframeCandleStep(string timeframe) =>
-        timeframe switch
-        {
-            "1м" => 11,
-            "5м" => 18,
-            "15м" => 26,
-            "1ч" => 36,
-            "4ч" => 48,
-            "1д" => 62,
-            _ => 18
+            "10с" => 10,
+            "30с" => 30,
+            "1м" => 60,
+            "5м" => 100,
+            "15м" => 100,
+            "1ч" => 100,
+            _ => 30
         };
 
     private static int GetTimeframeGridLineCount(string timeframe) =>
         timeframe switch
         {
-            "1м" => 12,
+            "10с" => 6,
+            "30с" => 8,
+            "1м" => 10,
             "5м" => 10,
             "15м" => 8,
             "1ч" => 7,
-            "4ч" => 5,
-            "1д" => 4,
             _ => 8
         };
 
@@ -1082,7 +1075,9 @@ Projection, IReadOnlyList<BarRect> Bars);
     private sealed record ClockData(string Time, string Date);
     private sealed record TradeRow(string Time, string Price, string Volume, string Side, string SideClass);
     private sealed record PriceChartData(
-        IReadOnlyList<CandlePoint> Candles,
+        IReadOnlyList<Point> Points,
+        string LinePath,
+        string AreaPath,
         IReadOnlyList<AxisLabel> PriceLabels,
         IReadOnlyList<AxisLabel> TickLabels,
         IReadOnlyList<double> GridX,
@@ -1095,15 +1090,13 @@ Projection, IReadOnlyList<BarRect> Bars);
         string ChangeClass,
         string LastPrice,
         double LastPriceY,
+        double LastPointX,
         double PriceTagX,
         double PriceTagY,
         double PriceTagTextX,
         double PriceTagTextY,
         string MarketState,
         string UpdatedAt);
-    private sealed record PriceGroup(decimal Open, decimal High, decimal Low, decimal Close);
-    private sealed record CandlePoint(double X, double HighY, double LowY, double BodyX, double BodyY, double BodyWidth,
-double BodyHeight, bool IsUp);
     private sealed record AxisLabel(double X, double Y, string Text);
     private sealed record BarRect(double X, double Y, double Width, double Height);
     private sealed record Point(double X, double Y);
