@@ -22,7 +22,7 @@ public class TrendFollowingAgent : AgentBase
         {
             if (CanBuy(buyPrice, _orderQuantity))
             {
-                var order = CreateOrder(OrderSide.Buy, buyPrice, _orderQuantity);
+                var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
                 return new AgentDecision(State.AgentName, TradeAction.Buy,
                     "No price history, placing initial buy", [order]);
             }
@@ -34,14 +34,14 @@ public class TrendFollowingAgent : AgentBase
 
         if (lastPrice >= prevPrice && CanBuy(buyPrice, _orderQuantity))
         {
-            var order = CreateOrder(OrderSide.Buy, buyPrice, _orderQuantity);
+            var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
                 $"Price rising {prevPrice:F2} -> {lastPrice:F2}, buying", [order]);
         }
 
         if (lastPrice < prevPrice && CanSell(_orderQuantity))
         {
-            var order = CreateOrder(OrderSide.Sell, sellPrice, _orderQuantity);
+            var order = CreateLimitOrder(OrderSide.Sell, sellPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
                 $"Price falling {prevPrice:F2} -> {lastPrice:F2}, selling", [order]);
         }
