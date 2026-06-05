@@ -1,0 +1,237 @@
+@page "/profile"
+@layout CreateAssetLayout
+
+<PageTitle>Профиль</PageTitle>
+
+<div class="profile-shell">
+    <nav class="top-navigation" aria-label="Основная навигация">
+        <a class="brand" href="/" aria-label="ABStock">
+            <span class="brand-mark" aria-hidden="true">
+                <img src="images/abstock-logo.png" alt="" />
+            </span>
+            <span class="brand-name">ABStock</span>
+        </a>
+
+        <div class="nav-links" aria-label="Разделы">
+            <a href="/create-asset">Создание актива</a>
+            <a href="/trading">Торги</a>
+            <a href="/news">Новости</a>
+            <a href="/agents">Агенты</a>
+            <a class="active" href="/profile">Профиль</a>
+        </div>
+
+        <div class="nav-actions">
+            <span class="market-status"><span aria-hidden="true"></span>Профиль активен</span>
+            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
+            <span class="date-chip">@Clock.Date</span>
+            <button class="icon-button" type="button" aria-label="Уведомления">
+                <i class="bi bi-bell" aria-hidden="true"></i>
+                <span class="notification-badge">3</span>
+            </button>
+            <button class="icon-button" type="button" aria-label="Настройки">
+                <i class="bi bi-gear" aria-hidden="true"></i>
+            </button>
+            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">АК</a>
+        </div>
+    </nav>
+
+    <main class="profile-main">
+        <header class="page-heading">
+            <div>
+                <p class="breadcrumbs">
+                    <a href="/create-asset">Создание актива</a>
+                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                    <span>Профиль</span>
+                </p>
+                <h1>Профиль пользователя</h1>
+                <p>Демо-настройки рабочего места, торговые предпочтения и статистика текущей сессии.</p>
+            </div>
+        </header>
+
+        <section class="profile-grid" aria-label="Профиль ABStock">
+            <aside class="profile-sidebar">
+                <section class="glass-card identity-card" aria-labelledby="identity-title">
+                    <span class="profile-avatar" aria-hidden="true">АК</span>
+                    <h2 id="identity-title">Алексей Ковалёв</h2>
+                    <p>Оператор симуляции · ABStock</p>
+                    <div class="identity-tags">
+                        <span>V2 workspace</span>
+                        <span>Demo mode</span>
+                    </div>
+                </section>
+
+                <section class="glass-card security-card" aria-labelledby="security-title">
+                    <div class="panel-heading">
+                        <h2 id="security-title">Безопасность</h2>
+                        <span>локально</span>
+                    </div>
+                    @foreach (var item in SecurityItems)
+                    {
+                        <div class="security-row">
+                            <i class="bi @item.Icon" aria-hidden="true"></i>
+                            <span>@item.Label</span>
+                            <strong class="@item.ClassName">@item.Value</strong>
+                        </div>
+                    }
+                </section>
+            </aside>
+
+            <section class="profile-content">
+                <section class="profile-metrics" aria-label="Статистика профиля">
+                    @foreach (var metric in ProfileMetrics)
+                    {
+                        <article class="glass-card profile-metric @metric.ClassName">
+                            <span>@metric.Label</span>
+                            <strong>@metric.Value</strong>
+                            <small>@metric.Detail</small>
+                        </article>
+                    }
+                </section>
+
+                <section class="glass-card preferences-card" aria-labelledby="preferences-title">
+                    <div class="panel-heading">
+                        <h2 id="preferences-title">Торговые предпочтения</h2>
+                        <span>демо-набор</span>
+                    </div>
+                    <div class="preference-grid">
+                        @foreach (var preference in TradingPreferences)
+                        {
+                            <article>
+                                <i class="bi @preference.Icon" aria-hidden="true"></i>
+                                <span>@preference.Label</span>
+                                <strong>@preference.Value</strong>
+                            </article>
+                        }
+                    </div>
+                </section>
+
+                <section class="glass-card settings-card" aria-labelledby="settings-title">
+                    <div class="panel-heading">
+                        <h2 id="settings-title">Настройки интерфейса</h2>
+                        <span>без сохранения</span>
+                    </div>
+                    <div class="settings-list">
+                        @foreach (var setting in InterfaceSettings)
+                        {
+                            <div>
+                                <span>
+                                    <i class="bi @setting.Icon" aria-hidden="true"></i>
+                                    @setting.Label
+                                </span>
+                                <strong>@setting.Value</strong>
+                            </div>
+                        }
+                    </div>
+                </section>
+            </section>
+
+            <aside class="profile-activity">
+                <section class="glass-card activity-card" aria-labelledby="activity-title">
+                    <div class="panel-heading">
+                        <h2 id="activity-title">Активность</h2>
+                        <span>сегодня</span>
+                    </div>
+                    <div class="activity-list">
+                        @foreach (var item in ActivityItems)
+                        {
+                            <article>
+                                <time>@item.Time</time>
+                                <div>
+                                    <strong>@item.Title</strong>
+                                    <span>@item.Detail</span>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </section>
+
+                <section class="glass-card notification-card" aria-labelledby="notifications-title">
+                    <div class="panel-heading">
+                        <h2 id="notifications-title">Уведомления</h2>
+                        <span>3 канала</span>
+                    </div>
+                    @foreach (var item in NotificationItems)
+                    {
+                        <div class="notification-row">
+                            <span>@item.Label</span>
+                            <strong class="@item.ClassName">@item.Value</strong>
+                        </div>
+                    }
+                </section>
+            </aside>
+        </section>
+    </main>
+</div>
+
+@code {
+    private ClockData Clock => BuildClockData();
+
+    private static ProfileMetric[] ProfileMetrics =>
+    [
+        new("Сессий", "18", "за учебный стенд", "positive"),
+        new("Активов создано", "6", "последний: KZEN", ""),
+        new("Тестовых сделок", "3 214", "симуляция", "positive"),
+        new("Агентов", "4", "активный набор", "")
+    ];
+
+    private static ProfilePreference[] TradingPreferences =>
+    [
+        new("bi-currency-exchange", "Валюта", "RUB"),
+        new("bi-clock-history", "Горизонт", "интрадей"),
+        new("bi-bar-chart", "График", "свечи"),
+        new("bi-list-columns", "Стакан", "6 уровней"),
+        new("bi-robot", "Агенты", "4 стратегии"),
+        new("bi-newspaper", "Новости", "AI-сигналы")
+    ];
+
+    private static ProfilePreference[] InterfaceSettings =>
+    [
+        new("bi-moon-stars", "Тема", "тёмная"),
+        new("bi-speedometer2", "Плотность данных", "компактная"),
+        new("bi-arrow-repeat", "Обновление", "real-time"),
+        new("bi-grid-3x3-gap", "Рабочий экран", "торги")
+    ];
+
+    private static SecurityItem[] SecurityItems =>
+    [
+        new("bi-hdd-network", "Среда", "локальная", "positive"),
+        new("bi-shield-check", "Сохранение", "отключено", ""),
+        new("bi-person-lock", "Авторизация", "демо", "")
+    ];
+
+    private static ActivityItem[] ActivityItems =>
+    [
+        new("15:42", "Открыт экран торгов", "проверка свечного графика"),
+        new("15:38", "Запущена симуляция", "актив KZEN"),
+        new("15:31", "Создан профиль актива", "энергетика, акция"),
+        new("15:24", "Проверены агенты", "Trend, Counter, Maker, News")
+    ];
+
+    private static NotificationItem[] NotificationItems =>
+    [
+        new("Сделки и исполнение", "включено", "positive"),
+        new("Новости по активу", "включено", "positive"),
+        new("Системные события", "тихо", "")
+    ];
+
+    private static ClockData BuildClockData()
+    {
+        var now = DateTimeOffset.Now;
+        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
+    }
+
+    private static string GetRussianMonthName(int month) => month switch
+    {
+        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
+        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
+        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
+        _ => ""
+    };
+
+    private sealed record ClockData(string Time, string Date);
+    private sealed record ProfileMetric(string Label, string Value, string Detail, string ClassName);
+    private sealed record ProfilePreference(string Icon, string Label, string Value);
+    private sealed record SecurityItem(string Icon, string Label, string Value, string ClassName);
+    private sealed record ActivityItem(string Time, string Title, string Detail);
+    private sealed record NotificationItem(string Label, string Value, string ClassName);
+}
