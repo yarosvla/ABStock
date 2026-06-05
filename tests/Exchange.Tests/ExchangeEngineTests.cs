@@ -275,6 +275,7 @@ public sealed class ExchangeEngineTests
 
         var snapshot = exchange.GetSnapshot();
 
+        Assert.Equal(3m, snapshot.Volume);
         Assert.Equal([103m, 102m, 101m], snapshot.RecentPrices);
         Assert.Equal(2, snapshot.RecentTrades.Count);
         Assert.All(snapshot.RecentTrades, trade => Assert.Equal(1m, trade.Quantity));

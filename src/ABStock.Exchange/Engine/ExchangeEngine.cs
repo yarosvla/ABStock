@@ -14,6 +14,7 @@ public sealed class ExchangeEngine : IExchangeEngine
     private readonly int _maxRecentPrices;
     private readonly int _maxRecentTrades;
     private decimal _lastPrice;
+    private decimal _totalVolume;
 
     public ExchangeEngine(
         decimal startPrice = 100m,
@@ -113,7 +114,7 @@ public sealed class ExchangeEngine : IExchangeEngine
             LastPrice: _lastPrice,
             BestBid: _orderBook.BestBid?.Price,
             BestAsk: _orderBook.BestAsk?.Price,
-            Volume: _trades.Sum(trade => trade.Quantity),
+            Volume: _totalVolume,
             RecentPrices: _prices.ToArray(),
             RecentTrades: _trades.ToArray()
         );
@@ -219,6 +220,7 @@ public sealed class ExchangeEngine : IExchangeEngine
         );
 
         _trades.Add(trade);
+        _totalVolume += quantity;
         _lastPrice = price;
         _prices.Add(price);
         TrimHistory();
