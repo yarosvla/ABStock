@@ -1,0 +1,158 @@
+@using ABStock.Application.Simulation
+@using ABStock.Shared
+@inject ISimulationRunner SimulationRunner
+@inject NavigationManager NavigationManager
+
+<nav class="top-navigation" aria-label="Основная навигация">
+    <a class="brand" href="/" aria-label="ABStock">
+        <span class="brand-mark" aria-hidden="true">
+            <img src="images/abstock-logo.png" alt="" />
+        </span>
+        <span class="brand-name">ABStock</span>
+    </a>
+
+    <div class="nav-links" aria-label="Разделы">
+        <a class="@(ActivePage == "CreateAsset" ? "active" : "")" href="/create-asset">Создание актива</a>
+        <a class="@(ActivePage == "Trading" ? "active" : "")" href="/trading">Торги</a>
+        <a class="@(ActivePage == "News" ? "active" : "")" href="/news">Новости</a>
+        <a class="@(ActivePage == "Agents" ? "active" : "")" href="/agents">Агенты</a>
+        <a class="@(ActivePage == "Profile" ? "active" : "")" href="/profile">Профиль</a>
+    </div>
+
+    <div class="nav-actions">
+        <span class="market-status"><span aria-hidden="true"></span>@(MarketStatusText)</span>
+        @if (ShowClock)
+        {
+            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
+            <span class="date-chip">@Clock.Date</span>
+        }
+
+        @if (ShowThemeToggle)
+        {
+            <button class="icon-button theme-toggle-button" type="button" aria-label="@(IsLightTheme ? "Включить тёмную тему" : "Включить светлую тему")" @onclick="ToggleThemeAsync">
+                <i class="bi @(IsLightTheme ? "bi-sun" : "bi-moon-stars")" aria-hidden="true"></i>
+            </button>
+        }
+
+        <div class="notification-wrapper">
+            <button class="icon-button" type="button" aria-label="Уведомления" @onclick="ToggleNotifications">
+                <i class="bi bi-bell" aria-hidden="true"></i>
+                @if (UnreadNotificationsCount > 0)
+                {
+                    <span class="notification-badge">@UnreadNotificationsCount</span>
+                }
+            </button>
+            @if (IsNotificationsOpen)
+            {
+                <div class="notification-dropdown glass-card">
+                    <div class="notification-header">
+                        <h3>Уведомления</h3>
+                        @if (UnreadNotificationsCount > 0)
+                        {
+                            <button class="mark-all-read" @onclick="ClearNotifications">Очистить все</button>
+                        }
+                    </div>
+                    <div class="notification-list">
+                        @if (Notifications.Any())
+                        {
+                            @foreach (var notification in Notifications)
+                            {
+                                <div class="notification-item @(notification.IsRead ? "read" : "unread")">
+                                    <i class="bi @notification.Icon" aria-hidden="true"></i>
+                                    <div class="notification-content">
+                                        <strong>@notification.Title</strong>
+                                        <p>@notification.Message</p>
+                                        <small>@notification.Time</small>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="notification-empty">Нет новых уведомлений</div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <a class="icon-button" href="/profile" aria-label="Настройки">
+            <i class="bi bi-gear" aria-hidden="true"></i>
+        </a>
+        <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">
+            <span>@AvatarInitials</span>
+            @if (ActivePage == "CreateAsset")
+            {
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            }
+        </a>
+    </div>
+</nav>
+
+@code {
+    [Parameter] public string ActivePage { get; set; } = "CreateAsset";
+    [Parameter] public string MarketStatusText { get; set; } = "Рынок: открыт";
+    [Parameter] public bool ShowClock { get; set; } = false;
+    [Parameter] public bool ShowThemeToggle { get; set; } = false;
+    [Parameter] public bool IsLightTheme { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsLightThemeChanged { get; set; }
+    [Parameter] public string AvatarInitials { get; set; } = "АК";
+
+    private bool IsNotificationsOpen { get; set; } = false;
+
+    private void ToggleNotifications()
+    {
+        IsNotificationsOpen = !IsNotificationsOpen;
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        IsLightTheme = !IsLightTheme;
+        if (IsLightThemeChanged.HasDelegate)
+        {
+            await IsLightThemeChanged.InvokeAsync(IsLightTheme);
+        }
+    }
+
+    // Dummy notifications for demo
+    private int UnreadNotificationsCount => Notifications.Count(n => !n.IsRead);
+
+    private void ClearNotifications()
+    {
+        Notifications.Clear();
+    }
+
+    private List<NotificationModel> Notifications = new()
+    {
+        new NotificationModel { Title = "Рынок запущен", Message = "Торговая сессия успешно начата.", Time = "10:00", Icon = "bi-play-circle", IsRead = false },
+        new NotificationModel { Title = "Агент MarketMaker", Message = "Агент начал выставлять заявки.", Time = "10:05", Icon = "bi-robot", IsRead = false },
+        new NotificationModel { Title = "Риск-менеджмент", Message = "Превышен лимит позиций для CounterTrend.", Time = "12:30", Icon = "bi-exclamation-triangle", IsRead = true }
+    };
+
+    public class NotificationModel
+    {
+        public string Title { get; set; } = "";
+        public string Message { get; set; } = "";
+        public string Time { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public bool IsRead { get; set; } = false;
+    }
+
+    private ClockData Clock => BuildClockData();
+
+    private static ClockData BuildClockData()
+    {
+        var now = DateTimeOffset.Now;
+        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
+    }
+
+    private static string GetRussianMonthName(int month) => month switch
+    {
+        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
+        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
+        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
+        _ => ""
+    };
+
+    private sealed record ClockData(string Time, string Date);
+}

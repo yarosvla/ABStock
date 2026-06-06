@@ -1,0 +1,312 @@
+.top-navigation {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    height: 56px;
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 20px;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--bg-sidebar);
+    box-shadow: var(--shadow-top);
+}
+
+.brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    width: fit-content;
+    text-decoration: none;
+    color: var(--text);
+}
+
+.brand-mark {
+    width: 34px;
+    height: 34px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid var(--border-soft);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .06);
+    backdrop-filter: blur(14px);
+    overflow: hidden;
+}
+
+.brand-mark img {
+    width: 28px;
+    height: 24px;
+    display: block;
+    object-fit: contain;
+    object-position: center;
+    filter: saturate(.86) brightness(.98);
+}
+
+.brand-name {
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 650;
+}
+
+.nav-links {
+    min-width: 0;
+    display: flex;
+    justify-content: center;
+    gap: clamp(10px, 1.25vw, 22px);
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.nav-links a {
+    min-height: 32px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+    text-decoration: none;
+    color: var(--text-soft);
+}
+
+.nav-links a:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, .07);
+}
+
+.nav-links a.active {
+    color: var(--text);
+    background: rgba(255, 255, 255, .09);
+    border-color: rgba(163, 239, 201, .24);
+}
+
+.nav-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.market-status {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border: 1px solid rgba(54, 217, 138, .18);
+    border-radius: 999px;
+    color: var(--text-success);
+    background: rgba(54, 217, 138, .1);
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 560;
+}
+
+.market-status span {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--success);
+}
+
+.clock-chip,
+.date-chip {
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    font-size: 12px;
+}
+
+.icon-button,
+.avatar-button {
+    border: 1px solid var(--border-soft);
+    color: var(--text-soft);
+    background: rgba(255, 255, 255, .06);
+    backdrop-filter: blur(14px);
+    cursor: pointer;
+    transition: color 140ms ease, background 140ms ease, border-color 140ms ease, transform 80ms ease;
+    text-decoration: none;
+}
+
+.icon-button:hover,
+.avatar-button:hover {
+    color: var(--text);
+    background: rgba(255, 255, 255, .09);
+    border-color: var(--border-strong);
+}
+
+.icon-button:active,
+.avatar-button:active {
+    transform: translateY(1px);
+}
+
+.icon-button {
+    width: 32px;
+    height: 32px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 7px;
+    position: relative;
+}
+
+.icon-button .bi {
+    font-size: 17px;
+}
+
+.avatar-button {
+    min-width: 62px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 7px;
+    padding: 0 9px;
+}
+
+.avatar-button span {
+    width: 24px;
+    height: 24px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--text);
+    background: var(--bg-card-hover);
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.avatar-button .bi {
+    font-size: 12px;
+}
+
+/* Notifications Dropdown */
+.notification-wrapper {
+    position: relative;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--accent-red);
+    color: white;
+    font-size: 9px;
+    font-weight: bold;
+    border-radius: 10px;
+    padding: 2px 5px;
+    line-height: 1;
+}
+
+.notification-dropdown {
+    position: absolute;
+    top: 44px;
+    right: 0;
+    width: 340px;
+    background: rgba(18, 23, 33, 0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.notification-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.mark-all-read {
+    background: none;
+    border: none;
+    color: var(--accent-purple);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.mark-all-read:hover {
+    color: var(--accent-purple-hover);
+    text-decoration: underline;
+}
+
+.notification-list {
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    display: flex;
+    gap: 14px;
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background 0.2s;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.notification-item.unread {
+    background: rgba(163, 239, 201, 0.06);
+}
+
+.notification-item .bi {
+    font-size: 18px;
+    color: var(--text-success);
+    margin-top: 2px;
+}
+
+.notification-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.notification-content strong {
+    font-size: 13px;
+    color: var(--text);
+}
+
+.notification-content p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.notification-content small {
+    font-size: 11px;
+    color: var(--text-soft);
+}
+
+.notification-empty {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+}

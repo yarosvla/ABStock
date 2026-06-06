@@ -1,39 +1,13 @@
 @page "/profile"
 @layout CreateAssetLayout
+@rendermode InteractiveServer
 
 <PageTitle>Профиль</PageTitle>
 
 <div class="profile-shell">
-    <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/" aria-label="ABStock">
-            <span class="brand-mark" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span class="brand-name">ABStock</span>
-        </a>
-
-        <div class="nav-links" aria-label="Разделы">
-            <a href="/create-asset">Создание актива</a>
-            <a href="/trading">Торги</a>
-            <a href="/news">Новости</a>
-            <a href="/agents">Агенты</a>
-            <a class="active" href="/profile">Профиль</a>
-        </div>
-
-        <div class="nav-actions">
-            <span class="market-status"><span aria-hidden="true"></span>Профиль активен</span>
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
-            <span class="date-chip">@Clock.Date</span>
-            <button class="icon-button" type="button" aria-label="Уведомления">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-                <span class="notification-badge">3</span>
-            </button>
-            <button class="icon-button" type="button" aria-label="Настройки">
-                <i class="bi bi-gear" aria-hidden="true"></i>
-            </button>
-            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">АК</a>
-        </div>
-    </nav>
+    <TopNavigation ActivePage="Profile" 
+                   MarketStatusText="Профиль активен" 
+                   ShowClock="true" />
 
     <main class="profile-main">
         <header class="page-heading">
@@ -43,16 +17,24 @@
                     <i class="bi bi-arrow-right" aria-hidden="true"></i>
                     <span>Профиль</span>
                 </p>
-                <h1>Профиль пользователя</h1>
-                <p>Демо-настройки рабочего места, торговые предпочтения и статистика текущей сессии.</p>
             </div>
         </header>
 
         <section class="profile-grid" aria-label="Профиль ABStock">
             <aside class="profile-sidebar">
                 <section class="glass-card identity-card" aria-labelledby="identity-title">
-                    <span class="profile-avatar" aria-hidden="true">АК</span>
-                    <h2 id="identity-title">Алексей Ковалёв</h2>
+                    <span class="profile-avatar" aria-hidden="true">@AvatarInitials</span>
+                    @if (isEditingName)
+                    {
+                        <div class="name-edit">
+                            <input type="text" @bind="userName" @bind:event="oninput" @onkeyup="HandleNameKey" autofocus />
+                            <button @onclick="SaveName"><i class="bi bi-check2"></i></button>
+                        </div>
+                    }
+                    else
+                    {
+                        <h2 id="identity-title">@userName <button class="edit-name-btn" @onclick="EditName" aria-label="Редактировать имя"><i class="bi bi-pencil"></i></button></h2>
+                    }
                     <p>Оператор симуляции · ABStock</p>
                     <div class="identity-tags">
                         <span>V2 workspace</span>
@@ -110,17 +92,34 @@
                         <h2 id="settings-title">Настройки интерфейса</h2>
                         <span>без сохранения</span>
                     </div>
-                    <div class="settings-list">
-                        @foreach (var setting in InterfaceSettings)
-                        {
-                            <div>
-                                <span>
-                                    <i class="bi @setting.Icon" aria-hidden="true"></i>
-                                    @setting.Label
-                                </span>
-                                <strong>@setting.Value</strong>
+                    <div class="settings-list interactive-settings">
+                        <label class="setting-toggle">
+                            <span>
+                                <i class="bi bi-moon-stars" aria-hidden="true"></i> Тёмная тема
+                            </span>
+                            <div class="toggle-switch @(IsDarkTheme ? "active" : "")">
+                                <input type="checkbox" @bind="IsDarkTheme" />
+                                <i></i>
                             </div>
-                        }
+                        </label>
+                        <label class="setting-toggle">
+                            <span>
+                                <i class="bi bi-speedometer2" aria-hidden="true"></i> Компактный режим
+                            </span>
+                            <div class="toggle-switch @(IsCompactMode ? "active" : "")">
+                                <input type="checkbox" @bind="IsCompactMode" />
+                                <i></i>
+                            </div>
+                        </label>
+                        <label class="setting-toggle">
+                            <span>
+                                <i class="bi bi-bell-fill" aria-hidden="true"></i> Звуковые уведомления
+                            </span>
+                            <div class="toggle-switch @(SoundEnabled ? "active" : "")">
+                                <input type="checkbox" @bind="SoundEnabled" />
+                                <i></i>
+                            </div>
+                        </label>
                     </div>
                 </section>
             </section>
@@ -184,13 +183,31 @@
         new("bi-newspaper", "Новости", "AI-сигналы")
     ];
 
-    private static ProfilePreference[] InterfaceSettings =>
-    [
-        new("bi-moon-stars", "Тема", "тёмная"),
-        new("bi-speedometer2", "Плотность данных", "компактная"),
-        new("bi-arrow-repeat", "Обновление", "real-time"),
-        new("bi-grid-3x3-gap", "Рабочий экран", "торги")
-    ];
+    private bool IsDarkTheme { get; set; } = true;
+    private bool IsCompactMode { get; set; } = true;
+    private bool SoundEnabled { get; set; } = false;
+
+    private string userName = "Алексей Ковалёв";
+    private bool isEditingName = false;
+
+    private string AvatarInitials
+    {
+        get
+        {
+            var parts = userName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return "АК";
+            if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
+            return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+        }
+    }
+
+    private void EditName() => isEditingName = true;
+    private void SaveName() => isEditingName = false;
+    private void HandleNameKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            SaveName();
+    }
 
     private static SecurityItem[] SecurityItems =>
     [

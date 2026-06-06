@@ -5,48 +5,14 @@
 <PageTitle>Создание актива</PageTitle>
 
 <div class="create-asset-shell @(isLightTheme ? "light-theme" : null)">
-    <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/" aria-label="ABStock">
-            <span class="brand-mark" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span class="brand-name">ABStock</span>
-        </a>
-
-        <div class="nav-links" aria-label="Разделы">
-            <a class="active" href="/create-asset">Создание актива</a>
-            <a href="/trading">Торги</a>
-            <a href="/news">Новости</a>
-            <a href="/agents">Агенты</a>
-            <a href="/profile">Профиль</a>
-        </div>
-
-        <div class="nav-actions">
-            <span class="market-status"><span aria-hidden="true"></span>Рынок: открыт</span>
-            <button class="icon-button theme-toggle-button" type="button" aria-label="@(isLightTheme ? "Включить тёмную тему" : "Включить светлую тему")" @onclick="ToggleTheme">
-                <i class="bi @(isLightTheme ? "bi-sun" : "bi-moon-stars")" aria-hidden="true"></i>
-            </button>
-            <button class="icon-button" type="button" aria-label="Уведомления">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-            </button>
-            <button class="icon-button" type="button" aria-label="Помощь">
-                <i class="bi bi-question-circle" aria-hidden="true"></i>
-            </button>
-            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">
-                <span>АК</span>
-                <i class="bi bi-chevron-down" aria-hidden="true"></i>
-            </a>
-        </div>
-    </nav>
+    <TopNavigation ActivePage="CreateAsset" 
+                   MarketStatusText="Рынок: открыт" 
+                   ShowThemeToggle="true" 
+                   @bind-IsLightTheme="isLightTheme" />
 
     <main class="create-asset-main @(isProfileGenerated ? "generated" : isGenerating ? "generating" : "draft")">
         <section class="work-stage">
             <header class="stage-header">
-                <div class="page-header">
-                    <span class="page-kicker">AI asset workbench</span>
-                    <h1>@(isProfileGenerated ? "AI-профиль готов" : isGenerating ? "Формируем AI-профиль" : "Создание актива")</h1>
-                    <p>@(isProfileGenerated ? "Проверьте сгенерированные параметры и переходите к торговым сценариям." : "Опишите актив, уточните параметры и получите профиль с факторами роста, рисками и чувствительностью к новостям.")</p>
-                </div>
 
                 <section class="workflow-progress" aria-label="Статус создания актива">
                     <div class="workflow-step @(isProfileGenerated || isGenerating ? "done" : "active")">

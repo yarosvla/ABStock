@@ -298,7 +298,7 @@
     grid-template-columns: 280px minmax(0, 1fr);
     gap: 24px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 8px 24px 24px;
     align-items: start;
 }
 
