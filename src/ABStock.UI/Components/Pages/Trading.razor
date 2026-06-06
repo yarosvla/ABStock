@@ -15,36 +15,9 @@
 <PageTitle>Торги</PageTitle>
 
 <div class="trading-shell">
-    <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/" aria-label="ABStock">
-            <span class="brand-mark" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span class="brand-name">ABStock</span>
-        </a>
-
-        <div class="nav-links" aria-label="Разделы">
-            <a href="/create-asset">Создание актива</a>
-            <a class="active" href="/trading">Торги</a>
-            <a href="/news">Новости</a>
-            <a href="/agents">Агенты</a>
-            <a href="/profile">Профиль</a>
-        </div>
-
-        <div class="nav-actions">
-            <span class="market-status"><span aria-hidden="true"></span>Торги запущены</span>
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
-            <span class="date-chip">@Clock.Date</span>
-            <button class="icon-button" type="button" aria-label="Уведомления">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-                <span class="notification-badge">3</span>
-            </button>
-            <button class="icon-button" type="button" aria-label="Настройки">
-                <i class="bi bi-gear" aria-hidden="true"></i>
-            </button>
-            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">АК</a>
-        </div>
-    </nav>
+    <TopNavigation ActivePage="Trading" 
+                   MarketStatusText="Торги запущены" 
+                   ShowClock="true" />
 
     <main class="trading-main">
         <header class="page-heading">
@@ -54,8 +27,6 @@
                     <i class="bi bi-arrow-right" aria-hidden="true"></i>
                     <span>Торги</span>
                 </p>
-                <h1>Экран торгов</h1>
-                <p>Торги по активу запущены. Следите за ценой, ликвидностью и последними сделками</p>
             </div>
         </header>
 
@@ -1011,14 +982,15 @@ maxY)
         }
 
         var width = ChartPlotRight - ChartPlotLeft;
-        var step = width / buckets.Count;
+        var step = width / (double)targetCount;
         var bodyWidth = Math.Clamp(step * 0.56, 7, 22);
         var candles = new CandleData[buckets.Count];
+        var emptySlots = targetCount - buckets.Count;
 
         for (var index = 0; index < buckets.Count; index++)
         {
             var bucket = buckets[index];
-            var centerX = ChartPlotLeft + step * index + step / 2;
+            var centerX = ChartPlotLeft + step * (emptySlots + index) + step / 2;
             var openY = ScalePrice(bucket.Open, minPrice, maxPrice);
             var closeY = ScalePrice(bucket.Close, minPrice, maxPrice);
             var highY = ScalePrice(bucket.High, minPrice, maxPrice);

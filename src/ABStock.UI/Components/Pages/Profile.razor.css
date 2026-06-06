@@ -243,7 +243,7 @@
     display: grid;
     gap: 14px;
     margin: 0 auto;
-    padding: 18px clamp(18px, 2.5vw, 34px) 32px;
+    padding: 8px clamp(18px, 2.5vw, 34px) 32px;
 }
 
 .page-heading {
@@ -297,15 +297,22 @@
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr) 340px;
     gap: 14px;
-    align-items: start;
+    align-items: stretch;
 }
 
 .profile-sidebar,
 .profile-content,
 .profile-activity {
     min-width: 0;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+}
+
+.profile-sidebar > :last-child,
+.profile-content > :last-child,
+.profile-activity > :last-child {
+    flex-grow: 1;
 }
 
 .identity-card,
@@ -608,4 +615,134 @@
     .activity-list article {
         grid-template-columns: 1fr;
     }
+}
+
+/* ── Interactive Profile ── */
+.edit-name-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.2s, color 0.2s;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+#identity-title:hover .edit-name-btn {
+    opacity: 1;
+}
+
+.edit-name-btn:hover {
+    color: var(--accent-purple);
+}
+
+.name-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.name-edit input {
+    background: var(--bg-input);
+    border: 1px solid var(--accent-purple);
+    color: var(--text-primary);
+    font-size: 20px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    outline: none;
+    width: 200px;
+}
+
+.name-edit button {
+    background: var(--accent-green);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s;
+}
+
+.name-edit button:hover {
+    background: #2cb370;
+}
+
+.interactive-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.setting-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--bg-input);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.setting-toggle:hover {
+    background: var(--bg-card-hover);
+}
+
+.setting-toggle span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.setting-toggle span .bi {
+    color: var(--accent-purple);
+    font-size: 15px;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--border-default);
+    border-radius: 24px;
+    transition: background 0.3s;
+}
+
+.toggle-switch.active {
+    background: var(--accent-green);
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.toggle-switch i {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.toggle-switch.active i {
+    transform: translateX(20px);
 }

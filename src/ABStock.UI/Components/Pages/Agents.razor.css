@@ -290,7 +290,7 @@
     display: grid;
     gap: 14px;
     margin: 0 auto;
-    padding: 18px clamp(18px, 2.5vw, 34px) 32px;
+    padding: 8px clamp(18px, 2.5vw, 34px) 32px;
 }
 
 /* ── Page heading ── */
@@ -510,10 +510,21 @@
 .agents-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    flex: 1 1 auto;
 }
 
-/* ── Agent card ── */
+.decision-flow-wrapper {
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+}
+
+.decision-flow-wrapper .decision-flow {
+    width: 100%;
+    max-width: 800px;
+}
+
+/* ── Panel commons ── */
 
 .agent-card {
     padding: 0;
@@ -901,17 +912,24 @@
 
 .agent-dashboard {
     display: grid;
-    grid-template-columns: 260px minmax(0, 1fr) 340px;
+    grid-template-columns: 240px minmax(0, 1fr) 280px;
     gap: 14px;
-    align-items: start;
+    align-items: stretch;
 }
 
 .dashboard-left,
 .dashboard-center,
 .dashboard-right {
     min-width: 0;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+}
+
+.dashboard-left > :last-child,
+.dashboard-center > :last-child,
+.dashboard-right > :last-child {
+    flex-grow: 1;
 }
 
 .agent-asset-card,

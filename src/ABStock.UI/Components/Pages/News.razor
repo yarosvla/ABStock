@@ -12,36 +12,9 @@
 <PageTitle>Новости</PageTitle>
 
 <div class="news-shell">
-    <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/" aria-label="ABStock">
-            <span class="brand-mark" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span class="brand-name">ABStock</span>
-        </a>
-
-        <div class="nav-links" aria-label="Разделы">
-            <a href="/create-asset">Создание актива</a>
-            <a href="/trading">Торги</a>
-            <a class="active" href="/news">Новости</a>
-            <a href="/agents">Агенты</a>
-            <a href="/profile">Профиль</a>
-        </div>
-
-        <div class="nav-actions">
-            <span class="market-status"><span aria-hidden="true"></span>Торги запущены</span>
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>15:42:18</span>
-            <span class="date-chip">23 мая 2025</span>
-            <button class="icon-button" type="button" aria-label="Уведомления">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-                <span class="notification-badge">3</span>
-            </button>
-            <button class="icon-button" type="button" aria-label="Настройки анализа">
-                <i class="bi bi-gear" aria-hidden="true"></i>
-            </button>
-            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">АК</a>
-        </div>
-    </nav>
+    <TopNavigation ActivePage="News" 
+                   MarketStatusText="Торги запущены" 
+                   ShowClock="true" />
 
     <main class="trading-main">
         <header class="page-heading">
@@ -53,8 +26,6 @@
                     <i class="bi bi-arrow-right" aria-hidden="true"></i>
                     <span>Новости</span>
                 </p>
-                <h1>Экран новостей</h1>
-                <p>Введите событие по активу, получите AI-оценку влияния и отправьте сигнал новостному агенту.</p>
             </div>
         </header>
 

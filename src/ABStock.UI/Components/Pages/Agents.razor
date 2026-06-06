@@ -110,6 +110,24 @@
                             </div>
                         }
                     </section>
+                    <section class="glass-card leaders-card" aria-labelledby="leaders-title">
+                        <div class="panel-heading">
+                            <h2 id="leaders-title">Лидеры P/L</h2>
+                            <span>@latestTick.Agents.Count агентов</span>
+                        </div>
+                        <div class="leader-list">
+                            @{ var rank = 1; }
+                            @foreach (var leader in LeaderRows)
+                            {
+                                <div>
+                                    <span>@rank</span>
+                                    <strong>@leader.Name</strong>
+                                    <em class="@leader.ClassName">@leader.Pnl</em>
+                                </div>
+                                rank++;
+                            }
+                        </div>
+                    </section>
                 </aside>
 
                 <section class="dashboard-center">
@@ -195,24 +213,6 @@
                         </div>
                     </section>
 
-                    <section class="glass-card leaders-card" aria-labelledby="leaders-title">
-                        <div class="panel-heading">
-                            <h2 id="leaders-title">Лидеры P/L</h2>
-                            <span>@latestTick.Agents.Count агентов</span>
-                        </div>
-                        <div class="leader-list">
-                            @{ var rank = 1; }
-                            @foreach (var leader in LeaderRows)
-                            {
-                                <div>
-                                    <span>@rank</span>
-                                    <strong>@leader.Name</strong>
-                                    <em class="@leader.ClassName">@leader.Pnl</em>
-                                </div>
-                                rank++;
-                            }
-                        </div>
-                    </section>
                 </aside>
             </section>
         }
