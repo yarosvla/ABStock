@@ -78,6 +78,7 @@ public sealed class ExchangeEngine : IExchangeEngine
     {
         ArgumentNullException.ThrowIfNull(orders);
 
+        var candidateOrders = new List<Order>();
         var acceptedOrders = new List<Order>();
         var rejectedOrders = new List<RejectedOrder>();
 
@@ -86,7 +87,7 @@ public sealed class ExchangeEngine : IExchangeEngine
             try
             {
                 _orderValidator.Validate(order);
-                acceptedOrders.Add(order);
+                candidateOrders.Add(order);
             }
             catch (Exception exception)
             {
@@ -95,9 +96,17 @@ public sealed class ExchangeEngine : IExchangeEngine
         }
 
         var trades = new List<Trade>();
-        foreach (var order in acceptedOrders)
+        foreach (var order in candidateOrders)
         {
-            trades.AddRange(ProcessAcceptedOrder(order));
+            try
+            {
+                trades.AddRange(ProcessAcceptedOrder(order));
+                acceptedOrders.Add(order);
+            }
+            catch (Exception exception)
+            {
+                rejectedOrders.Add(new RejectedOrder(order, exception.Message));
+            }
         }
 
         return new SubmitResult(
@@ -132,9 +141,18 @@ public sealed class ExchangeEngine : IExchangeEngine
             return ExecuteMarketOrder(order);
         }
 
+        EnsureLimitOrderDoesNotSelfTrade(order);
         _orderBook.Add(order);
 
         return MatchOrders();
+    }
+
+    private void EnsureLimitOrderDoesNotSelfTrade(Order order)
+    {
+        if (_orderBook.WouldSelfTrade(order))
+        {
+            throw new InvalidOperationException("Order would match another order from the same agent.");
+        }
     }
 
     private IReadOnlyList<Trade> ExecuteMarketOrder(Order marketOrder)

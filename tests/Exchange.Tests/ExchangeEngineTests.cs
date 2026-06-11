@@ -187,40 +187,61 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
-    public void SubmitMany_DoesNotMatchOrdersFromSameAgent()
+    public void SubmitManyWithResult_RejectsLimitOrderThatWouldSelfTrade()
     {
         var exchange = new ExchangeEngine(startPrice: 100m);
 
-        var snapshot = exchange.SubmitMany(
+        var result = exchange.SubmitManyWithResult(
         [
             CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 2m, agentName: "agent-a"),
             CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 2m, agentName: "agent-a")
         ]);
 
+        var snapshot = result.Snapshot;
+
+        var acceptedOrder = Assert.Single(result.AcceptedOrders);
+        Assert.Equal(CreateId(1), acceptedOrder.Id);
+
+        var rejectedOrder = Assert.Single(result.RejectedOrders);
+        Assert.Equal(CreateId(2), rejectedOrder.Order?.Id);
+        Assert.Contains("same agent", rejectedOrder.Reason, StringComparison.OrdinalIgnoreCase);
+
         Assert.Equal(100m, snapshot.LastPrice);
         Assert.Equal(0m, snapshot.Volume);
         Assert.Equal(101m, snapshot.BestBid);
-        Assert.Equal(99m, snapshot.BestAsk);
+        Assert.Null(snapshot.BestAsk);
         Assert.Empty(snapshot.RecentTrades);
         Assert.Equal([100m], snapshot.RecentPrices);
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(101m, bid.Price);
+        Assert.Empty(orderBook.Asks);
     }
 
     [Fact]
-    public void SubmitMany_SkipsSelfTradeAndMatchesCompatibleOtherAgentOrder()
+    public void SubmitManyWithResult_RejectsSelfTradeAndMatchesCompatibleOtherAgentOrder()
     {
         var exchange = new ExchangeEngine(startPrice: 100m);
 
-        var snapshot = exchange.SubmitMany(
+        var result = exchange.SubmitManyWithResult(
         [
             CreateOrder(CreateId(1), OrderSide.Buy, 105m, quantity: 1m, agentName: "agent-a"),
             CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 1m, agentName: "agent-a"),
             CreateOrder(CreateId(3), OrderSide.Sell, 101m, quantity: 1m, agentName: "agent-b")
         ]);
 
+        var snapshot = result.Snapshot;
+
+        Assert.Equal(2, result.AcceptedOrders.Count);
+        var rejectedOrder = Assert.Single(result.RejectedOrders);
+        Assert.Equal(CreateId(2), rejectedOrder.Order?.Id);
+        Assert.Contains("same agent", rejectedOrder.Reason, StringComparison.OrdinalIgnoreCase);
+
         Assert.Equal(103m, snapshot.LastPrice);
         Assert.Equal(1m, snapshot.Volume);
         Assert.Null(snapshot.BestBid);
-        Assert.Equal(99m, snapshot.BestAsk);
+        Assert.Null(snapshot.BestAsk);
 
         var trade = Assert.Single(snapshot.RecentTrades);
         Assert.Equal(CreateId(1), trade.BuyOrderId);

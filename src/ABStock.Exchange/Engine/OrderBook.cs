@@ -75,6 +75,20 @@ public sealed class OrderBook
             !IsSameAgent(buyOrder, sellOrder));
     }
 
+    public bool WouldSelfTrade(Order order)
+    {
+        if (order.Price is null)
+        {
+            return false;
+        }
+
+        var oppositeOrders = order.Side == OrderSide.Buy ? _sellOrders : _buyOrders;
+        return oppositeOrders.Any(oppositeOrder =>
+            oppositeOrder.Price is not null &&
+            IsSameAgent(order, oppositeOrder) &&
+            PricesCross(order, oppositeOrder));
+    }
+
     public void Reduce(Order order, decimal quantity)
     {
         if (order.Side == OrderSide.Buy)
@@ -185,5 +199,17 @@ public sealed class OrderBook
     private static bool IsSameAgent(Order left, Order right)
     {
         return string.Equals(left.AgentName, right.AgentName, StringComparison.Ordinal);
+    }
+
+    private static bool PricesCross(Order incomingOrder, Order restingOrder)
+    {
+        if (incomingOrder.Price is null || restingOrder.Price is null)
+        {
+            return false;
+        }
+
+        return incomingOrder.Side == OrderSide.Buy
+            ? incomingOrder.Price >= restingOrder.Price
+            : restingOrder.Price >= incomingOrder.Price;
     }
 }

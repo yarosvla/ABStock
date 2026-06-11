@@ -20,12 +20,6 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddABStockSimulationDiagnostics(this IServiceCollection services)
     {
-        services.TryAddSingleton<ISimulationDebugControl>(provider => provider.GetRequiredService<SimulationRunner>());
-        return services;
-    }
-
-    public static IServiceCollection AddABStockSimulationDiagnostics(this IServiceCollection services)
-    {
         services.RemoveAll<ISimulationRunner>();
         services.TryAddSingleton<DebugSimulationRunner>();
         services.TryAddSingleton<ISimulationRunner>(provider => provider.GetRequiredService<DebugSimulationRunner>());
