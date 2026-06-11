@@ -135,7 +135,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
                 request.Quantity,
                 DateTimeOffset.UtcNow);
 
-            submitResult = _exchange.SubmitWithResult(order);
+            var snapshot = _exchange.GetSnapshot();
+            submitResult = FinancialOrderSubmission.Submit(_exchange, _agents, [order], snapshot);
             ApplyTradesToAgents(_agents, submitResult.Trades);
             tickResult = CreateTickResultLocked(submitResult.Snapshot);
         }
@@ -251,7 +252,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
         var newSnapshot = snapshot;
         if (allOrders.Count > 0)
         {
-            var submitResult = _exchange.SubmitManyWithResult(allOrders);
+            var submitResult = FinancialOrderSubmission.Submit(_exchange, _agents, allOrders, snapshot);
             ApplyTradesToAgents(_agents, submitResult.Trades);
             newSnapshot = submitResult.Snapshot;
         }
