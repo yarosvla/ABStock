@@ -1,5 +1,6 @@
 using ABStock.AI.Extensions;
 using ABStock.Application.Extensions;
+using ABStock.Persistence.Extensions;
 using ABStock.UI.Components;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 
@@ -9,6 +10,8 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 // Add services to the container.
 builder.Services.AddABStockApplication();
 builder.Services.AddABStockAI();
+builder.Services.AddABStockPersistence(
+    builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
 
 if (builder.Environment.IsDevelopment())
 {
