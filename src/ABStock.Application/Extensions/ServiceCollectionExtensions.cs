@@ -1,5 +1,6 @@
 using ABStock.Application.Simulation;
 using ABStock.Application.Simulation.Diagnostics;
+using ABStock.Application.MarketHistory;
 using ABStock.Agents;
 using ABStock.Exchange.Extensions;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +14,8 @@ public static class ServiceCollectionExtensions
     {
         services.AddABStockExchange();
         services.TryAddSingleton<IAgentFactory, AgentFactory>();
+        services.TryAddSingleton<IMarketHistoryStore, NullMarketHistoryStore>();
+        services.TryAddSingleton<IMarketCandleReader, NullMarketCandleReader>();
         services.TryAddSingleton<SimulationRunner>();
         services.TryAddSingleton<ISimulationRunner>(provider => provider.GetRequiredService<SimulationRunner>());
         return services;
