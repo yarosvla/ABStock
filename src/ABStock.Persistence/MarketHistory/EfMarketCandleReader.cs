@@ -23,7 +23,6 @@ internal sealed class EfMarketCandleReader(IDbContextFactory<AbStockDbContext> c
         }
 
         using var db = contextFactory.CreateDbContext();
-        db.Database.EnsureCreated();
 
         var ticks = db.MarketTicks
             .AsNoTracking()
