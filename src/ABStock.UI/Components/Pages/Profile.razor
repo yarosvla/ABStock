@@ -5,9 +5,7 @@
 <PageTitle>Профиль</PageTitle>
 
 <div class="profile-shell">
-    <TopNavigation ActivePage="Profile" 
-                   MarketStatusText="Профиль активен" 
-                   ShowClock="true" />
+    <TopNavigation ActivePage="Profile" ShowClock="true" />
 
     <main class="profile-main">
         <header class="page-heading">
@@ -17,6 +15,8 @@
                     <i class="bi bi-arrow-right" aria-hidden="true"></i>
                     <span>Профиль</span>
                 </p>
+                <h1>Профиль</h1>
+                <p>Рабочие настройки, демо-предпочтения и локальная активность оператора</p>
             </div>
         </header>
 
@@ -95,15 +95,6 @@
                     <div class="settings-list interactive-settings">
                         <label class="setting-toggle">
                             <span>
-                                <i class="bi bi-moon-stars" aria-hidden="true"></i> Тёмная тема
-                            </span>
-                            <div class="toggle-switch @(IsDarkTheme ? "active" : "")">
-                                <input type="checkbox" @bind="IsDarkTheme" />
-                                <i></i>
-                            </div>
-                        </label>
-                        <label class="setting-toggle">
-                            <span>
                                 <i class="bi bi-speedometer2" aria-hidden="true"></i> Компактный режим
                             </span>
                             <div class="toggle-switch @(IsCompactMode ? "active" : "")">
@@ -163,8 +154,6 @@
 </div>
 
 @code {
-    private ClockData Clock => BuildClockData();
-
     private static ProfileMetric[] ProfileMetrics =>
     [
         new("Сессий", "18", "за учебный стенд", "positive"),
@@ -183,7 +172,6 @@
         new("bi-newspaper", "Новости", "AI-сигналы")
     ];
 
-    private bool IsDarkTheme { get; set; } = true;
     private bool IsCompactMode { get; set; } = true;
     private bool SoundEnabled { get; set; } = false;
 
@@ -230,22 +218,6 @@
         new("Новости по активу", "включено", "positive"),
         new("Системные события", "тихо", "")
     ];
-
-    private static ClockData BuildClockData()
-    {
-        var now = DateTimeOffset.Now;
-        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
-    }
-
-    private static string GetRussianMonthName(int month) => month switch
-    {
-        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
-        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
-        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
-        _ => ""
-    };
-
-    private sealed record ClockData(string Time, string Date);
     private sealed record ProfileMetric(string Label, string Value, string Detail, string ClassName);
     private sealed record ProfilePreference(string Icon, string Label, string Value);
     private sealed record SecurityItem(string Icon, string Label, string Value, string ClassName);

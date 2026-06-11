@@ -746,3 +746,123 @@
 .toggle-switch.active i {
     transform: translateX(20px);
 }
+
+/* Final profile alignment */
+
+.profile-shell {
+    padding-top: 56px;
+    background:
+        linear-gradient(180deg, rgba(9, 17, 31, .98), rgba(7, 11, 20, .98)),
+        radial-gradient(circle at 78% 18%, rgba(54, 217, 138, .04), transparent 24rem);
+}
+
+.profile-shell::before {
+    opacity: .18;
+}
+
+.profile-shell::after {
+    opacity: .16;
+}
+
+.profile-main {
+    max-width: 1480px;
+    min-height: calc(100svh - 56px);
+    gap: 12px;
+    padding: 10px clamp(18px, 2.2vw, 28px) 28px;
+}
+
+.page-heading {
+    min-height: auto;
+    padding-top: 4px;
+}
+
+.breadcrumbs {
+    min-height: auto;
+    margin: 0 0 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 560;
+}
+
+.page-heading h1 {
+    font-size: clamp(24px, 2vw, 30px);
+    line-height: 1.08;
+    font-weight: 700;
+}
+
+.page-heading p:last-child {
+    max-width: 660px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.glass-card {
+    background: rgba(13, 21, 36, .92);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
+    backdrop-filter: blur(16px);
+}
+
+.interactive-settings {
+    gap: 10px;
+}
+
+.setting-toggle {
+    min-height: 46px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .04);
+}
+
+.setting-toggle span {
+    font-size: 12.5px;
+}
+
+.toggle-switch {
+    width: 38px;
+    height: 20px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .14);
+}
+
+.toggle-switch.active {
+    background: rgba(54, 217, 138, .92);
+}
+
+.toggle-switch i {
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .28);
+}
+
+.toggle-switch.active i {
+    transform: translateX(18px);
+}
+
+.settings-card .setting-toggle {
+    align-items: center;
+}
+
+.settings-card .toggle-switch {
+    width: 38px !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    display: inline-flex !important;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 0 !important;
+    border: 0;
+    border-radius: 999px;
+}
+
+.settings-card .toggle-switch i {
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+}
