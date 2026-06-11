@@ -243,7 +243,7 @@
     display: grid;
     gap: 14px;
     margin: 0 auto;
-    padding: 18px clamp(18px, 2.5vw, 34px) 32px;
+    padding: 8px clamp(18px, 2.5vw, 34px) 32px;
 }
 
 .page-heading {
@@ -297,15 +297,22 @@
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr) 340px;
     gap: 14px;
-    align-items: start;
+    align-items: stretch;
 }
 
 .profile-sidebar,
 .profile-content,
 .profile-activity {
     min-width: 0;
-    display: grid;
+    display: flex;
+    flex-direction: column;
     gap: 12px;
+}
+
+.profile-sidebar > :last-child,
+.profile-content > :last-child,
+.profile-activity > :last-child {
+    flex-grow: 1;
 }
 
 .identity-card,
@@ -608,4 +615,254 @@
     .activity-list article {
         grid-template-columns: 1fr;
     }
+}
+
+/* ── Interactive Profile ── */
+.edit-name-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0.4;
+    transition: opacity 0.2s, color 0.2s;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+#identity-title:hover .edit-name-btn {
+    opacity: 1;
+}
+
+.edit-name-btn:hover {
+    color: var(--accent-purple);
+}
+
+.name-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.name-edit input {
+    background: var(--bg-input);
+    border: 1px solid var(--accent-purple);
+    color: var(--text-primary);
+    font-size: 20px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    outline: none;
+    width: 200px;
+}
+
+.name-edit button {
+    background: var(--accent-green);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.2s;
+}
+
+.name-edit button:hover {
+    background: #2cb370;
+}
+
+.interactive-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.setting-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    background: var(--bg-input);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.setting-toggle:hover {
+    background: var(--bg-card-hover);
+}
+
+.setting-toggle span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.setting-toggle span .bi {
+    color: var(--accent-purple);
+    font-size: 15px;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--border-default);
+    border-radius: 24px;
+    transition: background 0.3s;
+}
+
+.toggle-switch.active {
+    background: var(--accent-green);
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.toggle-switch i {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+.toggle-switch.active i {
+    transform: translateX(20px);
+}
+
+/* Final profile alignment */
+
+.profile-shell {
+    padding-top: 56px;
+    background:
+        linear-gradient(180deg, rgba(9, 17, 31, .98), rgba(7, 11, 20, .98)),
+        radial-gradient(circle at 78% 18%, rgba(54, 217, 138, .04), transparent 24rem);
+}
+
+.profile-shell::before {
+    opacity: .18;
+}
+
+.profile-shell::after {
+    opacity: .16;
+}
+
+.profile-main {
+    max-width: 1480px;
+    min-height: calc(100svh - 56px);
+    gap: 12px;
+    padding: 10px clamp(18px, 2.2vw, 28px) 28px;
+}
+
+.page-heading {
+    min-height: auto;
+    padding-top: 4px;
+}
+
+.breadcrumbs {
+    min-height: auto;
+    margin: 0 0 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 560;
+}
+
+.page-heading h1 {
+    font-size: clamp(24px, 2vw, 30px);
+    line-height: 1.08;
+    font-weight: 700;
+}
+
+.page-heading p:last-child {
+    max-width: 660px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+.glass-card {
+    background: rgba(13, 21, 36, .92);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
+    backdrop-filter: blur(16px);
+}
+
+.interactive-settings {
+    gap: 10px;
+}
+
+.setting-toggle {
+    min-height: 46px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .04);
+}
+
+.setting-toggle span {
+    font-size: 12.5px;
+}
+
+.toggle-switch {
+    width: 38px;
+    height: 20px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .14);
+}
+
+.toggle-switch.active {
+    background: rgba(54, 217, 138, .92);
+}
+
+.toggle-switch i {
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .28);
+}
+
+.toggle-switch.active i {
+    transform: translateX(18px);
+}
+
+.settings-card .setting-toggle {
+    align-items: center;
+}
+
+.settings-card .toggle-switch {
+    width: 38px !important;
+    height: 20px !important;
+    min-height: 20px !important;
+    display: inline-flex !important;
+    align-items: center;
+    flex: 0 0 auto;
+    padding: 0 !important;
+    border: 0;
+    border-radius: 999px;
+}
+
+.settings-card .toggle-switch i {
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
 }

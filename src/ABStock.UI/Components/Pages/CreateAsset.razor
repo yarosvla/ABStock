@@ -4,48 +4,16 @@
 
 <PageTitle>Создание актива</PageTitle>
 
-<div class="create-asset-shell @(isLightTheme ? "light-theme" : null)">
-    <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/" aria-label="ABStock">
-            <span class="brand-mark" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span class="brand-name">ABStock</span>
-        </a>
-
-        <div class="nav-links" aria-label="Разделы">
-            <a class="active" href="/create-asset">Создание актива</a>
-            <a href="/trading">Торги</a>
-            <a href="/news">Новости</a>
-            <a href="/agents">Агенты</a>
-            <a href="/profile">Профиль</a>
-        </div>
-
-        <div class="nav-actions">
-            <span class="market-status"><span aria-hidden="true"></span>Рынок: открыт</span>
-            <button class="icon-button theme-toggle-button" type="button" aria-label="@(isLightTheme ? "Включить тёмную тему" : "Включить светлую тему")" @onclick="ToggleTheme">
-                <i class="bi @(isLightTheme ? "bi-sun" : "bi-moon-stars")" aria-hidden="true"></i>
-            </button>
-            <button class="icon-button" type="button" aria-label="Уведомления">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-            </button>
-            <button class="icon-button" type="button" aria-label="Помощь">
-                <i class="bi bi-question-circle" aria-hidden="true"></i>
-            </button>
-            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">
-                <span>АК</span>
-                <i class="bi bi-chevron-down" aria-hidden="true"></i>
-            </a>
-        </div>
-    </nav>
+<div class="create-asset-shell">
+    <TopNavigation ActivePage="CreateAsset" />
 
     <main class="create-asset-main @(isProfileGenerated ? "generated" : isGenerating ? "generating" : "draft")">
         <section class="work-stage">
             <header class="stage-header">
                 <div class="page-header">
-                    <span class="page-kicker">AI asset workbench</span>
-                    <h1>@(isProfileGenerated ? "AI-профиль готов" : isGenerating ? "Формируем AI-профиль" : "Создание актива")</h1>
-                    <p>@(isProfileGenerated ? "Проверьте сгенерированные параметры и переходите к торговым сценариям." : "Опишите актив, уточните параметры и получите профиль с факторами роста, рисками и чувствительностью к новостям.")</p>
+                    <span class="page-kicker">ABStock AI</span>
+                    <h1>@PageTitleText</h1>
+                    <p>@PageDescriptionText</p>
                 </div>
 
                 <section class="workflow-progress" aria-label="Статус создания актива">
@@ -594,7 +562,6 @@
     private bool isOptionalOpen;
     private bool isProfileGenerated;
     private bool isGenerating;
-    private bool isLightTheme;
     private bool includeGovernmentSupport = true;
     private int growthPotential = 85;
     private int generationStep = -1;
@@ -613,6 +580,18 @@
     private string DisplayAssetName => string.IsNullOrWhiteSpace(assetName) ? "Новый актив" : assetName.Trim();
     private int GenerationProgress => isGenerating ? Math.Clamp((generationStep + 1) * 100 / AnalysisStages.Length, 8, 100) : 0;
     private string GeneratedAtLabel => generatedAt?.ToString("dd.MM.yyyy HH:mm") ?? "не сформировано";
+    private string PageTitleText => isProfileGenerated
+        ? "AI-профиль готов"
+        : isGenerating
+            ? "Формируем AI-профиль"
+            : "Создание актива";
+
+    private string PageDescriptionText => isProfileGenerated
+        ? "Проверьте сгенерированные параметры и переходите к торговым сценариям."
+        : isGenerating
+            ? "Модель последовательно оценивает описание, риски и чувствительность к новостям."
+            : "Опишите актив, уточните параметры и получите профиль с факторами роста, рисками и чувствительностью к новостям.";
+
     private string DescriptionPreview
     {
         get
@@ -639,11 +618,6 @@
         isOptionalOpen = !isOptionalOpen;
         isAssetTypeOpen = false;
         isIndustryOpen = false;
-    }
-
-    private void ToggleTheme()
-    {
-        isLightTheme = !isLightTheme;
     }
 
     private void ToggleIndustry()

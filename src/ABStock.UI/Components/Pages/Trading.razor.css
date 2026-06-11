@@ -251,7 +251,7 @@
     display: grid;
     gap: 12px;
     margin: 0 auto;
-    padding: 14px 22px 22px;
+    padding: 8px 22px 22px;
 }
 
 .page-heading {
@@ -790,10 +790,27 @@
     gap: 2px;
     margin-top: 6px;
     padding: 6px;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: 280px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
     border: 1px solid rgba(255, 255, 255, .055);
     border-radius: 8px;
     background: rgba(7, 12, 22, .3);
+}
+
+.book-side::-webkit-scrollbar {
+    width: 4px;
+}
+
+.book-side::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.book-side::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
 }
 
 .book-row {
@@ -2031,5 +2048,359 @@
     .debug-agents-head,
     .debug-agent-row {
         min-width: 640px;
+    }
+}
+
+/* Final screen alignment and trading chart behavior */
+
+.trading-shell {
+    padding-top: 56px;
+}
+
+.trading-main {
+    min-height: calc(100svh - 56px);
+    gap: 14px;
+    padding: 10px clamp(18px, 2.2vw, 28px) 26px;
+}
+
+.page-heading {
+    min-height: auto;
+    padding-top: 4px;
+}
+
+.page-heading h1 {
+    font-size: clamp(24px, 2vw, 30px);
+    font-weight: 700;
+}
+
+.page-heading p:last-child {
+    max-width: 660px;
+    line-height: 1.45;
+}
+
+.chart-card {
+    overflow: hidden;
+}
+
+.chart-stage-shell {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.chart-stage-shell::before,
+.chart-stage-shell::after {
+    content: "";
+    position: absolute;
+    top: 10px;
+    bottom: 8px;
+    width: 38px;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.chart-stage-shell::before {
+    left: 0;
+    background: linear-gradient(90deg, rgba(9, 17, 31, .86), transparent);
+}
+
+.chart-stage-shell::after {
+    right: 0;
+    background: linear-gradient(270deg, rgba(9, 17, 31, .9), transparent);
+}
+
+.chart-stage {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    height: 332px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px 0 0;
+    cursor: grab;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(85, 199, 255, .36) transparent;
+    scroll-behavior: smooth;
+    background:
+        radial-gradient(circle at 50% 0%, rgba(85, 199, 255, .1), transparent 46%),
+        radial-gradient(circle at 0% 100%, rgba(124, 92, 255, .12), transparent 34%);
+}
+
+.chart-stage:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 1px rgba(85, 199, 255, .24);
+}
+
+.chart-stage.is-dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
+}
+
+.chart-stage::-webkit-scrollbar {
+    height: 8px;
+}
+
+.chart-stage::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chart-stage::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(85, 199, 255, .32);
+}
+
+.price-chart {
+    display: block;
+    max-width: none;
+    min-width: 100%;
+    height: 322px;
+    border-radius: 10px;
+    filter: drop-shadow(0 14px 22px rgba(0, 0, 0, .18));
+}
+
+.book-side {
+    gap: 3px;
+    background: rgba(7, 12, 22, .36);
+}
+
+.book-row-depth {
+    top: 4px;
+    bottom: 4px;
+    opacity: .22;
+    transition: width 260ms ease, opacity 200ms ease;
+}
+
+.sells .book-row-depth {
+    background: linear-gradient(90deg, rgba(255, 107, 95, 0), rgba(255, 107, 95, .78));
+    background-size: 220% 100%;
+    animation: order-book-sheen 5.4s linear infinite;
+}
+
+.buys .book-row-depth {
+    background: linear-gradient(90deg, rgba(54, 217, 138, .82), rgba(54, 217, 138, 0));
+    background-size: 220% 100%;
+    animation: order-book-sheen 5.4s linear infinite reverse;
+}
+
+.book-depth-shape {
+    position: absolute;
+    inset: 8px;
+    z-index: 0;
+    width: auto;
+    height: auto;
+    opacity: .62;
+    pointer-events: none;
+}
+
+.book-depth-shape path {
+    opacity: .18;
+}
+
+.book-depth-shape .depth-line {
+    fill: none;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 5 4;
+    animation: depth-line-drift 8s linear infinite;
+}
+
+.ask-depth path {
+    fill: var(--accent-red);
+}
+
+.ask-depth .depth-line {
+    stroke: var(--accent-red);
+}
+
+.bid-depth path {
+    fill: var(--accent-green);
+}
+
+.bid-depth .depth-line {
+    stroke: var(--accent-green);
+}
+
+.spread-row {
+    background: linear-gradient(90deg, rgba(124, 92, 255, .12), rgba(85, 199, 255, .07));
+}
+
+.portfolio-button {
+    width: auto;
+    min-width: 150px;
+    min-height: 40px;
+    gap: 8px;
+    align-self: center;
+    border: 1px solid rgba(255, 255, 255, .08);
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, .04);
+    font-size: 12px;
+    font-weight: 580;
+    margin-left: 18px;
+    padding: 0 14px;
+}
+
+.portfolio-button:hover {
+    color: var(--text-primary);
+    border-color: rgba(85, 199, 255, .2);
+    background: rgba(255, 255, 255, .06);
+}
+
+@keyframes order-book-sheen {
+    0% {
+        background-position: 0 0;
+    }
+
+    100% {
+        background-position: 220% 0;
+    }
+}
+
+@keyframes depth-line-drift {
+    0% {
+        stroke-dashoffset: 0;
+    }
+
+    100% {
+        stroke-dashoffset: 72;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chart-stage {
+        scroll-behavior: auto;
+    }
+
+    .book-row-depth,
+    .book-depth-shape .depth-line {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* Final trading polish */
+
+.book-side {
+    position: relative;
+    overflow: hidden auto;
+}
+
+.book-side::before {
+    content: "";
+    position: absolute;
+    inset: 8px 10px;
+    z-index: 0;
+    border-radius: 8px;
+    background:
+        repeating-linear-gradient(
+            180deg,
+            rgba(255, 255, 255, .08) 0 1px,
+            transparent 1px 21px
+        );
+    opacity: .14;
+    transform: translateY(0);
+    animation: order-book-lines-shift 7s linear infinite;
+    pointer-events: none;
+}
+
+.book-row {
+    min-height: 32px;
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+
+.book-row:hover {
+    transform: translateX(1px);
+    border-color: rgba(85, 199, 255, .14);
+    background: rgba(14, 22, 39, .84);
+}
+
+.book-row-depth,
+.book-depth-shape,
+.book-depth-shape .depth-line {
+    will-change: transform, width, opacity, stroke-dashoffset;
+}
+
+.trades-card {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr);
+    min-height: 0;
+}
+
+.trade-list {
+    min-height: 0;
+    max-height: 292px;
+    display: grid;
+    gap: 6px;
+    padding-right: 4px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(85, 199, 255, .24) transparent;
+}
+
+.trade-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.trade-list::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(85, 199, 255, .24);
+}
+
+.status-strip .portfolio-button {
+    width: auto;
+    max-width: 176px;
+    min-width: 0;
+    min-height: 40px;
+    align-self: center;
+    justify-self: end;
+    border-radius: 10px;
+    border-color: rgba(255, 255, 255, .08);
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, .035);
+    box-shadow: none;
+    margin: 0;
+    padding: 0 12px;
+}
+
+.status-strip .portfolio-button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-strip .portfolio-button:hover {
+    color: var(--text-primary);
+    border-color: rgba(85, 199, 255, .2);
+    background: rgba(255, 255, 255, .06);
+}
+
+@keyframes order-book-lines-shift {
+    0% {
+        transform: translateY(0);
+    }
+
+    100% {
+        transform: translateY(21px);
+    }
+}
+
+@media (max-width: 1360px) {
+    .status-strip .portfolio-button {
+        justify-self: stretch;
+        max-width: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .book-side::before {
+        animation: none;
+    }
+
+    .book-row {
+        transition: none;
     }
 }
