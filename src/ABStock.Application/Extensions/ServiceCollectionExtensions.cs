@@ -13,7 +13,14 @@ public static class ServiceCollectionExtensions
     {
         services.AddABStockExchange();
         services.TryAddSingleton<IAgentFactory, AgentFactory>();
-        services.TryAddSingleton<ISimulationRunner, SimulationRunner>();
+        services.TryAddSingleton<SimulationRunner>();
+        services.TryAddSingleton<ISimulationRunner>(provider => provider.GetRequiredService<SimulationRunner>());
+        return services;
+    }
+
+    public static IServiceCollection AddABStockSimulationDiagnostics(this IServiceCollection services)
+    {
+        services.TryAddSingleton<ISimulationDebugControl>(provider => provider.GetRequiredService<SimulationRunner>());
         return services;
     }
 
