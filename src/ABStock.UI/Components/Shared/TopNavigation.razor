@@ -36,47 +36,6 @@
                     <span class="notification-badge">@UnreadNotificationsCount</span>
                 }
             </button>
-            @if (IsNotificationsOpen)
-            {
-                <div class="notification-layer" @onclick="CloseNotifications">
-                    <div class="notification-dropdown glass-card" @onclick:stopPropagation="true">
-                        <div class="notification-header">
-                            <div>
-                                <h3>Уведомления</h3>
-                                <span>@NotificationSummaryText</span>
-                            </div>
-                            <button class="mark-all-read" @onclick="ClearNotifications">Очистить</button>
-                        </div>
-                        <div class="notification-list">
-                            @if (Notifications.Any())
-                            {
-                                @foreach (var notification in Notifications)
-                                {
-                                    <div class="notification-item @(notification.IsRead ? "read" : "unread")">
-                                        <span class="notification-accent" aria-hidden="true"></span>
-                                        <i class="bi @notification.Icon" aria-hidden="true"></i>
-                                        <div class="notification-content">
-                                            <div class="notification-title-row">
-                                                <strong>@notification.Title</strong>
-                                                @if (!notification.IsRead)
-                                                {
-                                                    <span class="notification-pill">Новое</span>
-                                                }
-                                            </div>
-                                            <p>@notification.Message</p>
-                                            <small>@notification.Time</small>
-                                        </div>
-                                    </div>
-                                }
-                            }
-                            else
-                            {
-                                <div class="notification-empty">Нет новых уведомлений</div>
-                            }
-                        </div>
-                    </div>
-                </div>
-            }
         </div>
 
         <a class="icon-button" href="/profile" aria-label="Настройки">
@@ -91,6 +50,48 @@
         </a>
     </div>
 </nav>
+
+@if (IsNotificationsOpen)
+{
+    <div class="notification-layer" @onclick="CloseNotifications">
+        <div class="notification-dropdown glass-card" @onclick:stopPropagation="true">
+            <div class="notification-header">
+                <div>
+                    <h3>Уведомления</h3>
+                    <span>@NotificationSummaryText</span>
+                </div>
+                <button class="mark-all-read" @onclick="ClearNotifications">Очистить</button>
+            </div>
+            <div class="notification-list">
+                @if (Notifications.Any())
+                {
+                    @foreach (var notification in Notifications)
+                    {
+                        <div class="notification-item @(notification.IsRead ? "read" : "unread")">
+                            <span class="notification-accent" aria-hidden="true"></span>
+                            <i class="bi @notification.Icon" aria-hidden="true"></i>
+                            <div class="notification-content">
+                                <div class="notification-title-row">
+                                    <strong>@notification.Title</strong>
+                                    @if (!notification.IsRead)
+                                    {
+                                        <span class="notification-pill">Новое</span>
+                                    }
+                                </div>
+                                <p>@notification.Message</p>
+                                <small>@notification.Time</small>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="notification-empty">Нет новых уведомлений</div>
+                }
+            </div>
+        </div>
+    </div>
+}
 
 @code {
     [Parameter] public string ActivePage { get; set; } = "CreateAsset";

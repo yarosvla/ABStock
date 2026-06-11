@@ -866,3 +866,27 @@
     height: 16px;
     border-radius: 999px;
 }
+
+.settings-card .toggle-switch {
+    width: 34px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .12);
+}
+
+.settings-card .toggle-switch.active {
+    background: rgba(54, 217, 138, .88);
+}
+
+.settings-card .toggle-switch i {
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .24);
+}
+
+.settings-card .toggle-switch.active i {
+    transform: translateX(16px);
+}
