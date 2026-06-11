@@ -187,40 +187,61 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
-    public void SubmitMany_DoesNotMatchOrdersFromSameAgent()
+    public void SubmitManyWithResult_RejectsLimitOrderThatWouldSelfTrade()
     {
         var exchange = new ExchangeEngine(startPrice: 100m);
 
-        var snapshot = exchange.SubmitMany(
+        var result = exchange.SubmitManyWithResult(
         [
             CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 2m, agentName: "agent-a"),
             CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 2m, agentName: "agent-a")
         ]);
 
+        var snapshot = result.Snapshot;
+
+        var acceptedOrder = Assert.Single(result.AcceptedOrders);
+        Assert.Equal(CreateId(1), acceptedOrder.Id);
+
+        var rejectedOrder = Assert.Single(result.RejectedOrders);
+        Assert.Equal(CreateId(2), rejectedOrder.Order?.Id);
+        Assert.Contains("same agent", rejectedOrder.Reason, StringComparison.OrdinalIgnoreCase);
+
         Assert.Equal(100m, snapshot.LastPrice);
         Assert.Equal(0m, snapshot.Volume);
         Assert.Equal(101m, snapshot.BestBid);
-        Assert.Equal(99m, snapshot.BestAsk);
+        Assert.Null(snapshot.BestAsk);
         Assert.Empty(snapshot.RecentTrades);
         Assert.Equal([100m], snapshot.RecentPrices);
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(101m, bid.Price);
+        Assert.Empty(orderBook.Asks);
     }
 
     [Fact]
-    public void SubmitMany_SkipsSelfTradeAndMatchesCompatibleOtherAgentOrder()
+    public void SubmitManyWithResult_RejectsSelfTradeAndMatchesCompatibleOtherAgentOrder()
     {
         var exchange = new ExchangeEngine(startPrice: 100m);
 
-        var snapshot = exchange.SubmitMany(
+        var result = exchange.SubmitManyWithResult(
         [
             CreateOrder(CreateId(1), OrderSide.Buy, 105m, quantity: 1m, agentName: "agent-a"),
             CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 1m, agentName: "agent-a"),
             CreateOrder(CreateId(3), OrderSide.Sell, 101m, quantity: 1m, agentName: "agent-b")
         ]);
 
+        var snapshot = result.Snapshot;
+
+        Assert.Equal(2, result.AcceptedOrders.Count);
+        var rejectedOrder = Assert.Single(result.RejectedOrders);
+        Assert.Equal(CreateId(2), rejectedOrder.Order?.Id);
+        Assert.Contains("same agent", rejectedOrder.Reason, StringComparison.OrdinalIgnoreCase);
+
         Assert.Equal(103m, snapshot.LastPrice);
         Assert.Equal(1m, snapshot.Volume);
         Assert.Null(snapshot.BestBid);
-        Assert.Equal(99m, snapshot.BestAsk);
+        Assert.Null(snapshot.BestAsk);
 
         var trade = Assert.Single(snapshot.RecentTrades);
         Assert.Equal(CreateId(1), trade.BuyOrderId);
@@ -256,6 +277,85 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
+    public void CancelOrder_RemovesRestingOrderFromOrderBook()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 98m, quantity: 2m, agentName: "agent-a"),
+            CreateOrder(CreateId(2), OrderSide.Buy, 97m, quantity: 3m, agentName: "agent-b"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 102m, quantity: 4m, agentName: "agent-c")
+        ]);
+
+        var wasCancelled = exchange.CancelOrder(CreateId(1));
+        var snapshot = exchange.GetSnapshot();
+
+        Assert.True(wasCancelled);
+        Assert.Equal(97m, snapshot.BestBid);
+        Assert.Equal(102m, snapshot.BestAsk);
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(97m, bid.Price);
+        Assert.Equal(3m, bid.Quantity);
+    }
+
+    [Fact]
+    public void CancelOrder_ReturnsFalseWhenOrderIsNotInBook()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var wasCancelled = exchange.CancelOrder(CreateId(999));
+
+        Assert.False(wasCancelled);
+    }
+
+    [Fact]
+    public void CancelOrdersByAgent_RemovesAllRestingOrdersForAgent()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 98m, quantity: 2m, agentName: "agent-a"),
+            CreateOrder(CreateId(2), OrderSide.Buy, 97m, quantity: 3m, agentName: "agent-b"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 102m, quantity: 4m, agentName: "agent-a"),
+            CreateOrder(CreateId(4), OrderSide.Sell, 103m, quantity: 5m, agentName: "agent-c")
+        ]);
+
+        var cancelledCount = exchange.CancelOrdersByAgent("agent-a");
+        var snapshot = exchange.GetSnapshot();
+
+        Assert.Equal(2, cancelledCount);
+        Assert.Equal(97m, snapshot.BestBid);
+        Assert.Equal(103m, snapshot.BestAsk);
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        var ask = Assert.Single(orderBook.Asks);
+
+        Assert.Equal(97m, bid.Price);
+        Assert.Equal(103m, ask.Price);
+    }
+
+    [Fact]
+    public void CancelOrder_RejectsEmptyOrderId()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        Assert.Throws<ArgumentException>(() => exchange.CancelOrder(Guid.Empty));
+    }
+
+    [Fact]
+    public void CancelOrdersByAgent_RejectsEmptyAgentName()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        Assert.Throws<ArgumentException>(() => exchange.CancelOrdersByAgent(""));
+    }
+
+    [Fact]
     public void Submit_TrimsRecentPricesAndTradesToConfiguredLimits()
     {
         var exchange = new ExchangeEngine(
@@ -275,6 +375,7 @@ public sealed class ExchangeEngineTests
 
         var snapshot = exchange.GetSnapshot();
 
+        Assert.Equal(3m, snapshot.Volume);
         Assert.Equal([103m, 102m, 101m], snapshot.RecentPrices);
         Assert.Equal(2, snapshot.RecentTrades.Count);
         Assert.All(snapshot.RecentTrades, trade => Assert.Equal(1m, trade.Quantity));

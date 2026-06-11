@@ -179,6 +179,68 @@ public sealed class SimulationRunnerIntegrationTests
         Assert.False(runner.IsRunning);
     }
 
+    [Fact]
+    public async Task StartAsync_DoesNotSubmitOrdersThatExceedAgentCashOrPosition()
+    {
+        var exchangeFactory = new RecordingExchangeEngineFactory();
+        var agentFactory = new FixedDecisionAgentFactory(
+        [
+            new FixedDecisionAgent(
+                "PoorBuyer",
+                AgentType.TrendFollowing,
+                cash: 10m,
+                position: 0m,
+                orders:
+                [
+                    CreateLimitOrder(CreateId(1), "PoorBuyer", OrderSide.Buy, price: 100m, quantity: 1m)
+                ]),
+            new FixedDecisionAgent(
+                "EmptySeller",
+                AgentType.CounterTrend,
+                cash: 0m,
+                position: 0m,
+                orders:
+                [
+                    CreateLimitOrder(CreateId(2), "EmptySeller", OrderSide.Sell, price: 100m, quantity: 1m)
+                ])
+        ]);
+
+        var serviceProvider = new ServiceCollection()
+            .AddSingleton<IExchangeEngineFactory>(exchangeFactory)
+            .AddSingleton<IAgentFactory>(agentFactory)
+            .AddABStockApplication()
+            .BuildServiceProvider();
+
+        var runner = serviceProvider.GetRequiredService<ISimulationRunner>();
+        using var cancellationTokenSource = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        var tickSource = new TaskCompletionSource<SimulationTickResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void HandleTick(SimulationTickResult result)
+        {
+            tickSource.TrySetResult(result);
+            cancellationTokenSource.Cancel();
+        }
+
+        runner.OnTick += HandleTick;
+
+        await runner.StartAsync(CreateConfig(), cancellationTokenSource.Token);
+
+        try
+        {
+            var completedTask = await Task.WhenAny(tickSource.Task, Task.Delay(TimeSpan.FromSeconds(3)));
+
+            Assert.Same(tickSource.Task, completedTask);
+            Assert.NotNull(exchangeFactory.CreatedEngine);
+            Assert.Empty(exchangeFactory.CreatedEngine.SubmittedOrders);
+        }
+        finally
+        {
+            runner.OnTick -= HandleTick;
+            cancellationTokenSource.Cancel();
+            await runner.StopAsync();
+        }
+    }
+
     private static SimulationConfig CreateConfig() =>
         new(
             "Integration Test Asset",
@@ -197,10 +259,13 @@ public sealed class SimulationRunnerIntegrationTests
     {
         public bool CreateWasCalled { get; private set; }
 
+        public RecordingExchangeEngine? CreatedEngine { get; private set; }
+
         public IExchangeEngine Create(decimal startPrice)
         {
             CreateWasCalled = true;
-            return new RecordingExchangeEngine(startPrice);
+            CreatedEngine = new RecordingExchangeEngine(startPrice);
+            return CreatedEngine;
         }
     }
 
@@ -208,19 +273,37 @@ public sealed class SimulationRunnerIntegrationTests
     {
         private readonly MarketSnapshot _snapshot;
 
+        public List<Order> SubmittedOrders { get; } = [];
+
         public RecordingExchangeEngine(decimal startPrice)
         {
             _snapshot = new MarketSnapshot(startPrice, null, null, 0m, [startPrice], []);
         }
 
-        public MarketSnapshot Submit(Order order) => _snapshot;
+        public MarketSnapshot Submit(Order order)
+        {
+            SubmittedOrders.Add(order);
+            return _snapshot;
+        }
 
-        public MarketSnapshot SubmitMany(IEnumerable<Order> orders) => _snapshot;
+        public MarketSnapshot SubmitMany(IEnumerable<Order> orders)
+        {
+            SubmittedOrders.AddRange(orders);
+            return _snapshot;
+        }
 
         public SubmitResult SubmitWithResult(Order order) => SubmitManyWithResult([order]);
 
-        public SubmitResult SubmitManyWithResult(IEnumerable<Order> orders) =>
-            new(_snapshot, [], orders.ToArray(), []);
+        public SubmitResult SubmitManyWithResult(IEnumerable<Order> orders)
+        {
+            var orderArray = orders.ToArray();
+            SubmittedOrders.AddRange(orderArray);
+            return new SubmitResult(_snapshot, [], orderArray, []);
+        }
+
+        public bool CancelOrder(Guid orderId) => false;
+
+        public int CancelOrdersByAgent(string agentName) => 0;
 
         public MarketSnapshot GetSnapshot() => _snapshot;
 
@@ -251,4 +334,55 @@ public sealed class SimulationRunnerIntegrationTests
         public AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal) =>
             new(State.AgentName, TradeAction.Hold, "Test agent holds.", []);
     }
+
+    private sealed class FixedDecisionAgentFactory(IReadOnlyList<ITradeAgent> agents) : IAgentFactory
+    {
+        public IReadOnlyList<ITradeAgent> Create(IReadOnlyList<AgentSpec> specs) => agents;
+    }
+
+    private sealed class FixedDecisionAgent : ITradeAgent
+    {
+        private readonly IReadOnlyList<Order> _orders;
+
+        public AgentState State { get; }
+
+        public FixedDecisionAgent(
+            string agentName,
+            AgentType agentType,
+            decimal cash,
+            decimal position,
+            IReadOnlyList<Order> orders)
+        {
+            State = new AgentState
+            {
+                AgentName = agentName,
+                AgentType = agentType,
+                Cash = cash,
+                Position = position
+            };
+            _orders = orders;
+        }
+
+        public AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal) =>
+            new(State.AgentName, TradeAction.Hold, "Fixed test decision.", _orders);
+    }
+
+    private static Order CreateLimitOrder(
+        Guid id,
+        string agentName,
+        OrderSide side,
+        decimal price,
+        decimal quantity) =>
+        new(
+            id,
+            agentName,
+            side,
+            OrderType.Limit,
+            price,
+            quantity,
+            DateTimeOffset.UtcNow
+        );
+
+    private static Guid CreateId(int id) =>
+        Guid.Parse($"00000000-0000-0000-0000-{id:000000000000}");
 }

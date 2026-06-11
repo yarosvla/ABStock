@@ -75,6 +75,20 @@ public sealed class OrderBook
             !IsSameAgent(buyOrder, sellOrder));
     }
 
+    public bool WouldSelfTrade(Order order)
+    {
+        if (order.Price is null)
+        {
+            return false;
+        }
+
+        var oppositeOrders = order.Side == OrderSide.Buy ? _sellOrders : _buyOrders;
+        return oppositeOrders.Any(oppositeOrder =>
+            oppositeOrder.Price is not null &&
+            IsSameAgent(order, oppositeOrder) &&
+            PricesCross(order, oppositeOrder));
+    }
+
     public void Reduce(Order order, decimal quantity)
     {
         if (order.Side == OrderSide.Buy)
@@ -84,6 +98,17 @@ public sealed class OrderBook
         }
 
         ReduceOrderBy(_sellOrders, order, quantity);
+    }
+
+    public bool Remove(Guid orderId)
+    {
+        return RemoveById(_buyOrders, orderId) || RemoveById(_sellOrders, orderId);
+    }
+
+    public int RemoveByAgent(string agentName)
+    {
+        return RemoveMatching(_buyOrders, order => IsSameAgent(order.AgentName, agentName)) +
+            RemoveMatching(_sellOrders, order => IsSameAgent(order.AgentName, agentName));
     }
 
     public OrderBookSnapshot GetSnapshot(int depth = 5)
@@ -156,6 +181,35 @@ public sealed class OrderBook
         orders[orderIndex] = currentOrder with { Quantity = remainingQuantity };
     }
 
+    private static bool RemoveById(List<Order> orders, Guid orderId)
+    {
+        var orderIndex = orders.FindIndex(order => order.Id == orderId);
+        if (orderIndex < 0)
+        {
+            return false;
+        }
+
+        orders.RemoveAt(orderIndex);
+        return true;
+    }
+
+    private static int RemoveMatching(List<Order> orders, Predicate<Order> predicate)
+    {
+        var removedCount = 0;
+        for (var index = orders.Count - 1; index >= 0; index--)
+        {
+            if (!predicate(orders[index]))
+            {
+                continue;
+            }
+
+            orders.RemoveAt(index);
+            removedCount++;
+        }
+
+        return removedCount;
+    }
+
     private static IReadOnlyList<OrderBookLevel> BuildLevels(IReadOnlyList<Order> orders, int depth)
     {
         return orders
@@ -185,5 +239,22 @@ public sealed class OrderBook
     private static bool IsSameAgent(Order left, Order right)
     {
         return string.Equals(left.AgentName, right.AgentName, StringComparison.Ordinal);
+    }
+
+    private static bool IsSameAgent(string leftAgentName, string rightAgentName)
+    {
+        return string.Equals(leftAgentName, rightAgentName, StringComparison.Ordinal);
+    }
+
+    private static bool PricesCross(Order incomingOrder, Order restingOrder)
+    {
+        if (incomingOrder.Price is null || restingOrder.Price is null)
+        {
+            return false;
+        }
+
+        return incomingOrder.Side == OrderSide.Buy
+            ? incomingOrder.Price >= restingOrder.Price
+            : restingOrder.Price >= incomingOrder.Price;
     }
 }
