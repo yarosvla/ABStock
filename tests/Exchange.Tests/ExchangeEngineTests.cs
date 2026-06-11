@@ -277,6 +277,85 @@ public sealed class ExchangeEngineTests
     }
 
     [Fact]
+    public void CancelOrder_RemovesRestingOrderFromOrderBook()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 98m, quantity: 2m, agentName: "agent-a"),
+            CreateOrder(CreateId(2), OrderSide.Buy, 97m, quantity: 3m, agentName: "agent-b"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 102m, quantity: 4m, agentName: "agent-c")
+        ]);
+
+        var wasCancelled = exchange.CancelOrder(CreateId(1));
+        var snapshot = exchange.GetSnapshot();
+
+        Assert.True(wasCancelled);
+        Assert.Equal(97m, snapshot.BestBid);
+        Assert.Equal(102m, snapshot.BestAsk);
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        Assert.Equal(97m, bid.Price);
+        Assert.Equal(3m, bid.Quantity);
+    }
+
+    [Fact]
+    public void CancelOrder_ReturnsFalseWhenOrderIsNotInBook()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var wasCancelled = exchange.CancelOrder(CreateId(999));
+
+        Assert.False(wasCancelled);
+    }
+
+    [Fact]
+    public void CancelOrdersByAgent_RemovesAllRestingOrdersForAgent()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 98m, quantity: 2m, agentName: "agent-a"),
+            CreateOrder(CreateId(2), OrderSide.Buy, 97m, quantity: 3m, agentName: "agent-b"),
+            CreateOrder(CreateId(3), OrderSide.Sell, 102m, quantity: 4m, agentName: "agent-a"),
+            CreateOrder(CreateId(4), OrderSide.Sell, 103m, quantity: 5m, agentName: "agent-c")
+        ]);
+
+        var cancelledCount = exchange.CancelOrdersByAgent("agent-a");
+        var snapshot = exchange.GetSnapshot();
+
+        Assert.Equal(2, cancelledCount);
+        Assert.Equal(97m, snapshot.BestBid);
+        Assert.Equal(103m, snapshot.BestAsk);
+
+        var orderBook = exchange.GetOrderBookSnapshot();
+        var bid = Assert.Single(orderBook.Bids);
+        var ask = Assert.Single(orderBook.Asks);
+
+        Assert.Equal(97m, bid.Price);
+        Assert.Equal(103m, ask.Price);
+    }
+
+    [Fact]
+    public void CancelOrder_RejectsEmptyOrderId()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        Assert.Throws<ArgumentException>(() => exchange.CancelOrder(Guid.Empty));
+    }
+
+    [Fact]
+    public void CancelOrdersByAgent_RejectsEmptyAgentName()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        Assert.Throws<ArgumentException>(() => exchange.CancelOrdersByAgent(""));
+    }
+
+    [Fact]
     public void Submit_TrimsRecentPricesAndTradesToConfiguredLimits()
     {
         var exchange = new ExchangeEngine(

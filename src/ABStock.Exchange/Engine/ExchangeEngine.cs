@@ -117,6 +117,26 @@ public sealed class ExchangeEngine : IExchangeEngine
         );
     }
 
+    public bool CancelOrder(Guid orderId)
+    {
+        if (orderId == Guid.Empty)
+        {
+            throw new ArgumentException("Order id is required.", nameof(orderId));
+        }
+
+        return _orderBook.Remove(orderId);
+    }
+
+    public int CancelOrdersByAgent(string agentName)
+    {
+        if (string.IsNullOrWhiteSpace(agentName))
+        {
+            throw new ArgumentException("Agent name is required.", nameof(agentName));
+        }
+
+        return _orderBook.RemoveByAgent(agentName);
+    }
+
     public MarketSnapshot GetSnapshot()
     {
         return new MarketSnapshot(
