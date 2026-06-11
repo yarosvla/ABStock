@@ -27,8 +27,8 @@
             <a href="/create-asset">Создание актива</a>
             <a class="active" href="/trading">Торги</a>
             <a href="/news">Новости</a>
-            <a href="#agents-screen">Агенты</a>
-            <a href="#profile-screen">Профиль</a>
+            <a href="/agents">Агенты</a>
+            <a href="/profile">Профиль</a>
         </div>
 
         <div class="nav-actions">
@@ -42,7 +42,7 @@
             <button class="icon-button" type="button" aria-label="Настройки">
                 <i class="bi bi-gear" aria-hidden="true"></i>
             </button>
-            <button class="avatar-button" type="button" aria-label="Профиль пользователя">АК</button>
+            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">АК</a>
         </div>
     </nav>
 
@@ -169,7 +169,7 @@
 
                                 <div class="chart-stage">
                                     <svg class="price-chart" viewBox="0 0 960 430" role="img"
-                                         aria-label="Линейный график цены КвантЭнерго">
+                                         aria-label="Свечной график цены КвантЭнерго">
                                         <defs>
                                             <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
                                                 <stop offset="0" stop-color="#122842" />
@@ -198,15 +198,25 @@
                                         }
 
                                         <line class="price-marker-line" x1="@ChartPlotLeft" y1="@chartData.LastPriceY"
-                                              x2="@chartData.PlotRight" y2="@chartData.LastPriceY" />
+                                              x2="@ChartPlotRight" y2="@chartData.LastPriceY" />
 
-                                        <path class="price-area" d="@chartData.AreaPath" />
-                                        <path class="price-line" d="@chartData.LinePath" />
-                                        @foreach (var point in chartData.Points)
+                                        <g class="candle-layer" aria-hidden="true">
+                                            @foreach (var candle in chartData.Candles)
+                                            {
+                                                <g class="candle @candle.ClassName">
+                                                    <line class="candle-wick" x1="@candle.CenterX" y1="@candle.HighY"
+                                                          x2="@candle.CenterX" y2="@candle.LowY" />
+                                                    <rect class="candle-body" x="@candle.BodyX" y="@candle.BodyY"
+                                                          width="@candle.BodyWidth" height="@candle.BodyHeight" rx="2" />
+                                                </g>
+                                            }
+                                        </g>
+
+                                        @if (chartData.Candles.Count > 0)
                                         {
-                                            <circle class="price-point" cx="@point.X" cy="@point.Y" r="2.8" />
+                                            var latest = chartData.Candles[^1];
+                                            <circle class="latest-candle-dot" cx="@latest.CenterX" cy="@chartData.LastPriceY" r="4" />
                                         }
-                                        <circle class="price-point latest" cx="@chartData.LastPointX" cy="@chartData.LastPriceY" r="5" />
 
                                         <g class="axis-labels">
                                             @foreach (var label in chartData.PriceLabels)
@@ -246,11 +256,6 @@
                                 </div>
 
                                 <div class="book-side sells">
-                                    <svg class="book-depth-shape ask-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
-                                         aria-hidden="true">
-                                        <path d="@orderBook.AskFillPath" />
-                                        <path class="depth-line" d="@orderBook.AskLinePath" />
-                                    </svg>
                                     @foreach (var row in orderBook.Asks)
                                     {
                                         <div class="book-row">
@@ -269,11 +274,6 @@
                                 </div>
 
                                 <div class="book-side buys">
-                                    <svg class="book-depth-shape bid-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
-                                         aria-hidden="true">
-                                        <path d="@orderBook.BidFillPath" />
-                                        <path class="depth-line" d="@orderBook.BidLinePath" />
-                                    </svg>
                                     @foreach (var row in orderBook.Bids)
                                     {
                                         <div class="book-row">
@@ -411,7 +411,7 @@
                                         <span>Position</span>
                                         <span>Value</span>
                                     </div>
-                                    @foreach (var agent in latestTick?.Agents ?? Array.Empty<AgentSnapshot>())
+                                    @foreach (var agent in latestTick?.Agents ?? [])
                                     {
                                         <div class="debug-agent-row">
                                             <strong>@agent.Name</strong>
@@ -643,34 +643,36 @@ BuildVolumeBars(volumeMetricHistory))
         var bids = orderBook?.Bids ?? [];
 
         return new OrderBookViewData(
-            BuildOrderBookRows(asks),
-            BuildOrderBookRows(bids),
-            BuildDepthFillPath(asks, false),
-            BuildDepthLinePath(asks, false),
-            BuildDepthFillPath(bids, true),
-            BuildDepthLinePath(bids, true));
+            BuildOrderBookRows(asks, reverse: true),
+            BuildOrderBookRows(bids, reverse: false));
     }
 
-    private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels)
+    private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels, bool reverse)
     {
-        var maxQuantity = levels.Count == 0 ? 0m : levels.Max(level => level.Quantity);
+        var visibleLevels = levels.Take(6).ToArray();
+        var maxQuantity = visibleLevels.Length == 0 ? 0m : visibleLevels.Max(level => level.Quantity);
         var total = 0m;
+        var rows = new List<OrderBookRow>(visibleLevels.Length);
 
-        return levels
-            .Take(5)
-            .Select(level =>
-            {
-                total += level.Quantity;
-                var depth = CalculateDepth(level.Quantity, maxQuantity);
+        foreach (var level in visibleLevels)
+        {
+            total += level.Quantity;
+            var depth = CalculateDepth(level.Quantity, maxQuantity);
 
-                return new OrderBookRow(
-                    FormatPrice(level.Price),
-                    FormatQuantity(level.Quantity),
-                    FormatQuantity(total),
-                    depth,
-                    $"width: {depth}%");
-            })
-            .ToArray();
+            rows.Add(new OrderBookRow(
+                FormatPrice(level.Price),
+                FormatQuantity(level.Quantity),
+                FormatQuantity(total),
+                depth,
+                $"width: {depth}%"));
+        }
+
+        if (reverse)
+        {
+            rows.Reverse();
+        }
+
+        return rows.ToArray();
     }
 
     private static TradeRow[] BuildTradeRows(IReadOnlyList<Trade> trades) =>
@@ -775,7 +777,7 @@ BuildVolumeBars(volumeMetricHistory))
             return "";
         }
 
-        return string.Join(" ", BuildChartPoints(values, 6, 94, 5, 36)
+        return string.Join(" ", BuildChartPoints(values, 6, 94, 12, 30)
             .Select(point => $"{FormatSvgNumber(point.X)},{FormatSvgNumber(point.Y)}"));
     }
 
@@ -816,9 +818,9 @@ BuildVolumeBars(volumeMetricHistory))
 maxY)
     {
         var source = values.Count == 0 ? [0m] : values.ToArray();
-        var minValue = source.Min();
-        var maxValue = source.Max();
-        var range = maxValue - minValue;
+        var average = source.Average(value => value);
+        var maxDeviation = source.Max(value => Math.Abs(value - average));
+        var range = maxDeviation * 2m;
         var width = maxX - minX;
         var height = maxY - minY;
 
@@ -831,52 +833,12 @@ maxY)
             .Select((value, index) =>
             {
                 var x = minX + width * index / (source.Length - 1);
-                var ratio = range == 0m ? 0.5 : (double)((value - minValue) / range);
+                var ratio = range == 0m ? 0.5 : 0.5 + (double)((value - average) / range);
+                ratio = Math.Clamp(ratio, 0.18, 0.82);
                 var y = maxY - height * ratio;
                 return new Point(x, y);
             })
             .ToArray();
-    }
-
-    private static string BuildDepthFillPath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
-    {
-        var linePath = BuildDepthLinePath(levels, isBid);
-        return isBid
-            ? $"{linePath} V125 H300 Z"
-            : $"{linePath} V125 H0 Z";
-    }
-
-    private static string BuildDepthLinePath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
-    {
-        if (levels.Count == 0)
-        {
-            return isBid ? "M300 0 H300" : "M0 0 H0";
-        }
-
-        var rows = levels.Take(5).ToArray();
-        var rowHeight = 125d / rows.Length;
-        var maxTotal = rows.Sum(level => level.Quantity);
-        var cumulative = 0m;
-        var segments = new List<string>();
-
-        for (var index = 0; index < rows.Length; index++)
-        {
-            cumulative += rows[index].Quantity;
-            var ratio = maxTotal == 0m ? 0d : (double)(cumulative / maxTotal);
-            var x = isBid ? 286 - ratio * 226 : 14 + ratio * 226;
-            var y = index * rowHeight + rowHeight / 2;
-
-            if (index == 0)
-            {
-                segments.Add($"M{FormatSvgNumber(isBid ? 286 : 14)} {FormatSvgNumber(y)} L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
-            }
-            else
-            {
-                segments.Add($"L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
-            }
-        }
-
-        return string.Join(" ", segments);
     }
 
     private static string GetTradeClass(Trade trade)
@@ -998,8 +960,7 @@ maxY)
             maxPrice += 0.05m;
         }
 
-        var points = BuildLinePoints(visiblePrices, minPrice, maxPrice);
-        var plotRight = points[^1].X;
+        var candles = BuildCandles(visiblePrices, minPrice, maxPrice, GetTimeframeCandleCount(timeframe));
         var firstPrice = visiblePrices[0];
         var lastPrice = tickResult?.Snapshot.LastPrice ?? visiblePrices[^1];
         var change = lastPrice - firstPrice;
@@ -1007,16 +968,14 @@ maxY)
         var changeClass = change >= 0m ? "positive" : "negative";
         var sign = change >= 0m ? "+" : "";
         var lastPriceY = ScalePrice(lastPrice, minPrice, maxPrice);
-        var priceTagX = Math.Clamp(plotRight - 66, ChartPlotLeft + 8, ChartPlotRight - 66);
+        var latestX = candles.Count == 0 ? ChartPlotRight : candles[^1].CenterXValue;
+        var priceTagX = Math.Clamp(latestX + 8, ChartPlotLeft + 8, ChartPlotRight - 66);
 
         return new PriceChartData(
-            points,
-            BuildLinePath(points),
-            BuildAreaPath(points),
+            candles,
             BuildPriceLabels(minPrice, maxPrice),
-            BuildTickLabels(points, tickResult?.Tick ?? 0),
+            BuildTickLabels(candles, tickResult?.Tick ?? 0),
             BuildGridX(timeframe),
-            plotRight,
             FormatPrice(firstPrice),
             FormatPrice(rangeHigh),
             FormatPrice(rangeLow),
@@ -1025,7 +984,6 @@ maxY)
             changeClass,
             FormatPrice(lastPrice),
             lastPriceY,
-            points[^1].X,
             priceTagX,
             Math.Clamp(lastPriceY - 11, ChartPlotTop, ChartPlotBottom - 22),
             priceTagX + 10,
@@ -1040,54 +998,73 @@ maxY)
         return prices.Skip(start).ToArray();
     }
 
-    private static Point[] BuildLinePoints(
+    private static IReadOnlyList<CandleData> BuildCandles(
         IReadOnlyList<decimal> prices,
         decimal minPrice,
-        decimal maxPrice)
+        decimal maxPrice,
+        int targetCount)
     {
-        if (prices.Count == 1)
+        var buckets = BuildOhlcBuckets(prices, targetCount);
+        if (buckets.Count == 0)
         {
-            return [new Point(ChartPlotRight, ScalePrice(prices[0], minPrice, maxPrice))];
+            return [];
         }
 
         var width = ChartPlotRight - ChartPlotLeft;
-        return prices
-            .Select((price, index) =>
+        var step = width / buckets.Count;
+        var bodyWidth = Math.Clamp(step * 0.56, 7, 22);
+        var candles = new CandleData[buckets.Count];
+
+        for (var index = 0; index < buckets.Count; index++)
+        {
+            var bucket = buckets[index];
+            var centerX = ChartPlotLeft + step * index + step / 2;
+            var openY = ScalePrice(bucket.Open, minPrice, maxPrice);
+            var closeY = ScalePrice(bucket.Close, minPrice, maxPrice);
+            var highY = ScalePrice(bucket.High, minPrice, maxPrice);
+            var lowY = ScalePrice(bucket.Low, minPrice, maxPrice);
+            var bodyY = Math.Min(openY, closeY);
+            var bodyHeight = Math.Max(Math.Abs(openY - closeY), 3);
+
+            candles[index] = new CandleData(
+                FormatSvgNumber(centerX),
+                FormatSvgNumber(centerX - bodyWidth / 2),
+                FormatSvgNumber(bodyWidth),
+                FormatSvgNumber(bodyY),
+                FormatSvgNumber(bodyHeight),
+                FormatSvgNumber(highY),
+                FormatSvgNumber(lowY),
+                bucket.Close >= bucket.Open ? "up" : "down",
+                centerX);
+        }
+
+        return candles;
+    }
+
+    private static IReadOnlyList<OhlcBucket> BuildOhlcBuckets(IReadOnlyList<decimal> prices, int targetCount)
+    {
+        if (prices.Count == 0)
+        {
+            return [];
+        }
+
+        var candleCount = Math.Clamp(Math.Min(targetCount, prices.Count), 1, 34);
+        var buckets = new List<OhlcBucket>(candleCount);
+
+        for (var index = 0; index < candleCount; index++)
+        {
+            var start = index * prices.Count / candleCount;
+            var end = (index + 1) * prices.Count / candleCount;
+            if (end <= start)
             {
-                var ratio = (double)index / (prices.Count - 1);
-                return new Point(
-                    ChartPlotLeft + width * ratio,
-                    ScalePrice(price, minPrice, maxPrice));
-            })
-            .ToArray();
-    }
+                end = start + 1;
+            }
 
-    private static string BuildLinePath(IReadOnlyList<Point> points)
-    {
-        if (points.Count == 0)
-        {
-            return "";
+            var slice = prices.Skip(start).Take(end - start).ToArray();
+            buckets.Add(new OhlcBucket(slice[0], slice.Max(), slice.Min(), slice[^1]));
         }
 
-        if (points.Count == 1)
-        {
-            var y = FormatSvgNumber(points[0].Y);
-            return $"M{FormatSvgNumber(ChartPlotLeft)} {y} L{FormatSvgNumber(ChartPlotRight)} {y}";
-        }
-
-        return string.Join(" ", points.Select((point, index) =>
-            $"{(index == 0 ? "M" : "L")}{FormatSvgNumber(point.X)} {FormatSvgNumber(point.Y)}"));
-    }
-
-    private static string BuildAreaPath(IReadOnlyList<Point> points)
-    {
-        if (points.Count == 0)
-        {
-            return "";
-        }
-
-        var linePath = BuildLinePath(points);
-        return $"{linePath} L{FormatSvgNumber(points[^1].X)} {FormatSvgNumber(ChartPlotBottom)} L{FormatSvgNumber(ChartPlotLeft)} {FormatSvgNumber(ChartPlotBottom)} Z";
+        return buckets;
     }
 
     private static AxisLabel[] BuildPriceLabels(decimal minPrice, decimal maxPrice)
@@ -1106,20 +1083,20 @@ maxY)
         return labels;
     }
 
-    private static AxisLabel[] BuildTickLabels(IReadOnlyList<Point> points, int latestTick)
+    private static AxisLabel[] BuildTickLabels(IReadOnlyList<CandleData> candles, int latestTick)
     {
-        if (points.Count == 0)
+        if (candles.Count == 0)
         {
             return [];
         }
 
-        var labelCount = Math.Min(6, points.Count);
+        var labelCount = Math.Min(6, candles.Count);
         var indexes = new List<int>(labelCount);
 
         for (var index = 0; index < labelCount; index++)
         {
             var ratio = labelCount == 1 ? 0 : (double)index / (labelCount - 1);
-            var pointIndex = (int)Math.Round((points.Count - 1) * ratio);
+            var pointIndex = (int)Math.Round((candles.Count - 1) * ratio);
             if (!indexes.Contains(pointIndex))
             {
                 indexes.Add(pointIndex);
@@ -1129,8 +1106,8 @@ maxY)
         return indexes
             .Select(index =>
             {
-                var relativeTick = Math.Max(0, points.Count - 1 - index);
-                return new AxisLabel(points[index].X, 0, $"t-{relativeTick}");
+                var relativeTick = Math.Max(0, candles.Count - 1 - index);
+                return new AxisLabel(candles[index].CenterXValue, 0, $"t-{relativeTick}");
             })
             .ToArray();
     }
@@ -1179,6 +1156,18 @@ maxY)
             _ => 8
         };
 
+    private static int GetTimeframeCandleCount(string timeframe) =>
+        timeframe switch
+        {
+            "10с" => 10,
+            "30с" => 16,
+            "1м" => 20,
+            "5м" => 24,
+            "15м" => 28,
+            "1ч" => 32,
+            _ => 18
+        };
+
     private static Microsoft.AspNetCore.Components.MarkupString SvgText(double x, double y, string text, string anchor =
 "start")
     {
@@ -1203,11 +1192,7 @@ Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
     private sealed record OrderBookViewData(
         IReadOnlyList<OrderBookRow> Asks,
-        IReadOnlyList<OrderBookRow> Bids,
-        string AskFillPath,
-        string AskLinePath,
-        string BidFillPath,
-        string BidLinePath);
+        IReadOnlyList<OrderBookRow> Bids);
     private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle);
     private sealed record SpreadData(string Icon, string Value, string Detail);
     private sealed record StatusStripData(
@@ -1222,13 +1207,10 @@ Projection, IReadOnlyList<BarRect> Bars);
     private sealed record ClockData(string Time, string Date);
     private sealed record TradeRow(string Time, string Price, string Volume, string Side, string SideClass);
     private sealed record PriceChartData(
-        IReadOnlyList<Point> Points,
-        string LinePath,
-        string AreaPath,
+        IReadOnlyList<CandleData> Candles,
         IReadOnlyList<AxisLabel> PriceLabels,
         IReadOnlyList<AxisLabel> TickLabels,
         IReadOnlyList<double> GridX,
-        double PlotRight,
         string Open,
         string High,
         string Low,
@@ -1237,13 +1219,23 @@ Projection, IReadOnlyList<BarRect> Bars);
         string ChangeClass,
         string LastPrice,
         double LastPriceY,
-        double LastPointX,
         double PriceTagX,
         double PriceTagY,
         double PriceTagTextX,
         double PriceTagTextY,
         string MarketState,
         string UpdatedAt);
+    private sealed record CandleData(
+        string CenterX,
+        string BodyX,
+        string BodyWidth,
+        string BodyY,
+        string BodyHeight,
+        string HighY,
+        string LowY,
+        string ClassName,
+        double CenterXValue);
+    private sealed record OhlcBucket(decimal Open, decimal High, decimal Low, decimal Close);
     private sealed record AxisLabel(double X, double Y, string Text);
     private sealed record BarRect(double X, double Y, double Width, double Height);
     private sealed record Point(double X, double Y);
