@@ -31,7 +31,6 @@ internal sealed class EfMarketHistoryStore(IDbContextFactory<AbStockDbContext> c
     public void SaveTick(Guid runId, SimulationTickResult tickResult, DateTimeOffset capturedAt)
     {
         using var db = contextFactory.CreateDbContext();
-        db.Database.EnsureCreated();
 
         db.MarketTicks.Add(new MarketTickEntity
         {
