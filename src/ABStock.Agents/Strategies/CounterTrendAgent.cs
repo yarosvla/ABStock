@@ -22,7 +22,7 @@ public class CounterTrendAgent : AgentBase
         {
             if (CanBuy(buyPrice, _orderQuantity))
             {
-                var order = CreateOrder(OrderSide.Buy, buyPrice, _orderQuantity);
+                var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
                 return new AgentDecision(State.AgentName, TradeAction.Buy,
                     "No price history, placing initial buy", [order]);
             }
@@ -34,14 +34,14 @@ public class CounterTrendAgent : AgentBase
 
         if (lastPrice < prevPrice && CanBuy(buyPrice, _orderQuantity))
         {
-            var order = CreateOrder(OrderSide.Buy, buyPrice, _orderQuantity);
+            var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
                 $"Price dropped {prevPrice:F2} -> {lastPrice:F2}, buying dip", [order]);
         }
 
         if (lastPrice >= prevPrice && CanSell(_orderQuantity))
         {
-            var order = CreateOrder(OrderSide.Sell, sellPrice, _orderQuantity);
+            var order = CreateLimitOrder(OrderSide.Sell, sellPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
                 $"Price rose {prevPrice:F2} -> {lastPrice:F2}, selling peak", [order]);
         }

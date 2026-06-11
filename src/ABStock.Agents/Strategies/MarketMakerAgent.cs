@@ -22,10 +22,10 @@ public class MarketMakerAgent : AgentBase
         var orders = new List<Order>();
 
         if (CanBuy(bidPrice, _orderQuantity))
-            orders.Add(CreateOrder(OrderSide.Buy, bidPrice, _orderQuantity));
+            orders.Add(CreateLimitOrder(OrderSide.Buy, bidPrice, _orderQuantity));
 
         if (CanSell(_orderQuantity))
-            orders.Add(CreateOrder(OrderSide.Sell, askPrice, _orderQuantity));
+            orders.Add(CreateLimitOrder(OrderSide.Sell, askPrice, _orderQuantity));
 
         if (orders.Count == 0)
             return HoldDecision($"Cannot place orders: cash={State.Cash}, position={State.Position}");

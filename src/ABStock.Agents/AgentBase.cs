@@ -24,8 +24,11 @@ public abstract class AgentBase : ITradeAgent
 
     protected bool CanSell(decimal quantity) => State.Position >= quantity;
 
-    protected Order CreateOrder(OrderSide side, decimal price, decimal quantity) =>
+    protected Order CreateLimitOrder(OrderSide side, decimal price, decimal quantity) =>
         new(Guid.NewGuid(), State.AgentName, side, OrderType.Limit, price, quantity, DateTimeOffset.UtcNow);
+
+    protected Order CreateMarketOrder(OrderSide side, decimal quantity) =>
+        new(Guid.NewGuid(), State.AgentName, side, OrderType.Market, Price: null, quantity, DateTimeOffset.UtcNow);
 
     protected AgentDecision HoldDecision(string explanation) =>
         new(State.AgentName, TradeAction.Hold, explanation, []);

@@ -18,23 +18,32 @@ public class NewsDrivenAgent : AgentBase
         if (newsSignal is null)
             return HoldDecision("No news");
 
-        var buyPrice = snapshot.BestAsk ?? snapshot.LastPrice;
-        var sellPrice = snapshot.BestBid ?? snapshot.LastPrice;
-
-        if (newsSignal.Polarity == SignalPolarity.Positive && CanBuy(buyPrice, _orderQuantity))
+        if (newsSignal.Polarity == SignalPolarity.Positive)
         {
-            var order = CreateOrder(OrderSide.Buy, buyPrice, _orderQuantity);
+            if (snapshot.BestAsk is null)
+                return HoldDecision("Positive news, but no asks to buy from");
+
+            if (!CanBuy(snapshot.BestAsk.Value, _orderQuantity))
+                return HoldDecision("Positive news, but insufficient funds");
+
+            var order = CreateMarketOrder(OrderSide.Buy, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
-                $"Positive news (confidence={newsSignal.Confidence:F2}), buying", [order]);
+                $"Positive news (confidence={newsSignal.Confidence:F2}), market buy", [order]);
         }
 
-        if (newsSignal.Polarity == SignalPolarity.Negative && CanSell(_orderQuantity))
+        if (newsSignal.Polarity == SignalPolarity.Negative)
         {
-            var order = CreateOrder(OrderSide.Sell, sellPrice, _orderQuantity);
+            if (snapshot.BestBid is null)
+                return HoldDecision("Negative news, but no bids to sell into");
+
+            if (!CanSell(_orderQuantity))
+                return HoldDecision("Negative news, but insufficient position");
+
+            var order = CreateMarketOrder(OrderSide.Sell, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
-                $"Negative news (confidence={newsSignal.Confidence:F2}), selling", [order]);
+                $"Negative news (confidence={newsSignal.Confidence:F2}), market sell", [order]);
         }
 
-        return HoldDecision($"News is {newsSignal.Polarity}, but insufficient funds/position");
+        return HoldDecision($"News is {newsSignal.Polarity}, holding");
     }
 }
