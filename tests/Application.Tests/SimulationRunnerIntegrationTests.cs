@@ -301,6 +301,10 @@ public sealed class SimulationRunnerIntegrationTests
             return new SubmitResult(_snapshot, [], orderArray, []);
         }
 
+        public bool CancelOrder(Guid orderId) => false;
+
+        public int CancelOrdersByAgent(string agentName) => 0;
+
         public MarketSnapshot GetSnapshot() => _snapshot;
 
         public OrderBookSnapshot GetOrderBookSnapshot(int depth = 5) => new([], []);
