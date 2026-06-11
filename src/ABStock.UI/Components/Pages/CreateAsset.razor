@@ -1,4 +1,4 @@
-﻿@page "/create-asset"
+@page "/create-asset"
 @layout CreateAssetLayout
 @rendermode InteractiveServer
 
@@ -17,8 +17,8 @@
             <a class="active" href="/create-asset">Создание актива</a>
             <a href="/trading">Торги</a>
             <a href="/news">Новости</a>
-            <a href="#agents-screen">Агенты</a>
-            <a href="#profile-screen">Профиль</a>
+            <a href="/agents">Агенты</a>
+            <a href="/profile">Профиль</a>
         </div>
 
         <div class="nav-actions">
@@ -32,10 +32,10 @@
             <button class="icon-button" type="button" aria-label="Помощь">
                 <i class="bi bi-question-circle" aria-hidden="true"></i>
             </button>
-            <button class="avatar-button" type="button" aria-label="Профиль пользователя">
+            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">
                 <span>АК</span>
                 <i class="bi bi-chevron-down" aria-hidden="true"></i>
-            </button>
+            </a>
         </div>
     </nav>
 
