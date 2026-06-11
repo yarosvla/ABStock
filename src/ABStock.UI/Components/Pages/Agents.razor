@@ -9,36 +9,7 @@
 <PageTitle>Агенты</PageTitle>
 
 <div class="agents-shell">
-    <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/" aria-label="ABStock">
-            <span class="brand-mark" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span class="brand-name">ABStock</span>
-        </a>
-
-        <div class="nav-links" aria-label="Разделы">
-            <a href="/create-asset">Создание актива</a>
-            <a href="/trading">Торги</a>
-            <a href="/news">Новости</a>
-            <a class="active" href="/agents">Агенты</a>
-            <a href="/profile">Профиль</a>
-        </div>
-
-        <div class="nav-actions">
-            <span class="market-status"><span aria-hidden="true"></span>@MarketStatusText</span>
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
-            <span class="date-chip">@Clock.Date</span>
-            <button class="icon-button" type="button" aria-label="Уведомления">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-                <span class="notification-badge">3</span>
-            </button>
-            <button class="icon-button" type="button" aria-label="Настройки">
-                <i class="bi bi-gear" aria-hidden="true"></i>
-            </button>
-            <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">АК</a>
-        </div>
-    </nav>
+    <TopNavigation ActivePage="Agents" ShowClock="true" />
 
     <main class="agents-main">
         <header class="page-heading">
@@ -223,10 +194,6 @@
     private SimulationTickResult? latestTick;
     private readonly Dictionary<string, decimal> initialPortfolios = new();
 
-    private string MarketStatusText => latestTick is not null ? "Торги запущены" : "Ожидание";
-
-    private ClockData Clock => BuildClockData();
-
     protected override void OnInitialized()
     {
         SimulationRunner.OnTick += HandleTick;
@@ -347,7 +314,7 @@
             return latestTick.Agents
                 .Take(4)
                 .Select(agent => new DecisionFeedItem(
-                    Clock.Time,
+                    DateTimeOffset.Now.ToString("HH:mm:ss"),
                     agent.Name,
                     "Наблюдение",
                     GetStrategyDescription(agent.Type),
@@ -373,7 +340,7 @@
     [
         new("bi-activity", "Активных агентов", FormatQuantity(latestTick?.Agents.Count ?? 0), "positive"),
         new("bi-arrow-repeat", "Обновление", "в реальном времени", "positive"),
-        new("bi-clock-history", "Последний цикл", Clock.Time, null),
+        new("bi-clock-history", "Последний цикл", DateTimeOffset.Now.ToString("HH:mm:ss"), null),
         new("bi-diagram-3", "Источник данных", "снапшот рынка", null)
     ];
 
@@ -491,22 +458,6 @@
             _ => agentName
         };
     }
-
-    private static ClockData BuildClockData()
-    {
-        var now = DateTimeOffset.Now;
-        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
-    }
-
-    private static string GetRussianMonthName(int month) => month switch
-    {
-        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
-        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
-        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
-        _ => ""
-    };
-
-    private sealed record ClockData(string Time, string Date);
     private sealed record SummaryMetric(string Label, string Value, string Detail, string Accent);
     private sealed record AgentTableRow(
         string Name,

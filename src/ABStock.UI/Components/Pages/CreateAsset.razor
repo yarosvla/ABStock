@@ -4,15 +4,17 @@
 
 <PageTitle>Создание актива</PageTitle>
 
-<div class="create-asset-shell @(isLightTheme ? "light-theme" : null)">
-    <TopNavigation ActivePage="CreateAsset" 
-                   MarketStatusText="Рынок: открыт" 
-                   ShowThemeToggle="true" 
-                   @bind-IsLightTheme="isLightTheme" />
+<div class="create-asset-shell">
+    <TopNavigation ActivePage="CreateAsset" />
 
     <main class="create-asset-main @(isProfileGenerated ? "generated" : isGenerating ? "generating" : "draft")">
         <section class="work-stage">
             <header class="stage-header">
+                <div class="page-header">
+                    <span class="page-kicker">ABStock AI</span>
+                    <h1>@PageTitleText</h1>
+                    <p>@PageDescriptionText</p>
+                </div>
 
                 <section class="workflow-progress" aria-label="Статус создания актива">
                     <div class="workflow-step @(isProfileGenerated || isGenerating ? "done" : "active")">
@@ -560,7 +562,6 @@
     private bool isOptionalOpen;
     private bool isProfileGenerated;
     private bool isGenerating;
-    private bool isLightTheme;
     private bool includeGovernmentSupport = true;
     private int growthPotential = 85;
     private int generationStep = -1;
@@ -579,6 +580,18 @@
     private string DisplayAssetName => string.IsNullOrWhiteSpace(assetName) ? "Новый актив" : assetName.Trim();
     private int GenerationProgress => isGenerating ? Math.Clamp((generationStep + 1) * 100 / AnalysisStages.Length, 8, 100) : 0;
     private string GeneratedAtLabel => generatedAt?.ToString("dd.MM.yyyy HH:mm") ?? "не сформировано";
+    private string PageTitleText => isProfileGenerated
+        ? "AI-профиль готов"
+        : isGenerating
+            ? "Формируем AI-профиль"
+            : "Создание актива";
+
+    private string PageDescriptionText => isProfileGenerated
+        ? "Проверьте сгенерированные параметры и переходите к торговым сценариям."
+        : isGenerating
+            ? "Модель последовательно оценивает описание, риски и чувствительность к новостям."
+            : "Опишите актив, уточните параметры и получите профиль с факторами роста, рисками и чувствительностью к новостям.";
+
     private string DescriptionPreview
     {
         get
@@ -605,11 +618,6 @@
         isOptionalOpen = !isOptionalOpen;
         isAssetTypeOpen = false;
         isIndustryOpen = false;
-    }
-
-    private void ToggleTheme()
-    {
-        isLightTheme = !isLightTheme;
     }
 
     private void ToggleIndustry()

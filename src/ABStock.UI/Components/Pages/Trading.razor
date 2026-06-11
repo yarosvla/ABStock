@@ -8,16 +8,16 @@
 @using Microsoft.Extensions.DependencyInjection
 @using Microsoft.Extensions.Hosting
 @implements IDisposable
+@implements IAsyncDisposable
 @inject ISimulationRunner SimulationRunner
 @inject IServiceProvider Services
 @inject IWebHostEnvironment Environment
+@inject IJSRuntime JS
 
 <PageTitle>Торги</PageTitle>
 
 <div class="trading-shell">
-    <TopNavigation ActivePage="Trading" 
-                   MarketStatusText="Торги запущены" 
-                   ShowClock="true" />
+    <TopNavigation ActivePage="Trading" ShowClock="true" />
 
     <main class="trading-main">
         <header class="page-heading">
@@ -27,6 +27,8 @@
                     <i class="bi bi-arrow-right" aria-hidden="true"></i>
                     <span>Торги</span>
                 </p>
+                <h1>Экран торгов</h1>
+                <p>Торги по активу запущены. Следите за ценой, ликвидностью и последними сделками</p>
             </div>
         </header>
 
@@ -138,9 +140,16 @@
                                     </div>
                                 </div>
 
-                                <div class="chart-stage">
-                                    <svg class="price-chart" viewBox="0 0 960 430" role="img"
-                                         aria-label="Свечной график цены КвантЭнерго">
+                                <div class="chart-stage-shell">
+                                    <div class="chart-stage"
+                                         @ref="chartViewport"
+                                         tabindex="0"
+                                         aria-label="Прокручиваемый свечной график">
+                                        <svg class="price-chart"
+                                             viewBox="@chartData.ViewBox"
+                                             style="width: @chartData.CanvasWidthCss;"
+                                             role="img"
+                                             aria-label="Свечной график цены КвантЭнерго">
                                         <defs>
                                             <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
                                                 <stop offset="0" stop-color="#122842" />
@@ -153,8 +162,8 @@
                                                 <stop offset="1" stop-color="#36D98A" stop-opacity="0.12" />
                                             </linearGradient>
                                         </defs>
-                                        <rect width="960" height="430" fill="url(#chartFill)" />
-                                        <rect x="@ChartPanelLeft" y="18" width="@ChartPanelWidth" height="332" rx="10"
+                                        <rect width="@chartData.CanvasWidth" height="430" fill="url(#chartFill)" />
+                                        <rect x="@ChartPanelLeft" y="18" width="@chartData.PanelWidth" height="332" rx="10"
                                               fill="url(#chartGlow)" />
 
                                         @foreach (var x in chartData.GridX)
@@ -165,11 +174,11 @@
                                         @foreach (var label in chartData.PriceLabels)
                                         {
                                             <line class="grid-line horizontal-grid-line" x1="@ChartPlotLeft" y1="@label.Y"
-                                                  x2="@ChartPlotRight" y2="@label.Y" />
+                                                  x2="@chartData.PlotRight" y2="@label.Y" />
                                         }
 
                                         <line class="price-marker-line" x1="@ChartPlotLeft" y1="@chartData.LastPriceY"
-                                              x2="@ChartPlotRight" y2="@chartData.LastPriceY" />
+                                              x2="@chartData.PlotRight" y2="@chartData.LastPriceY" />
 
                                         <g class="candle-layer" aria-hidden="true">
                                             @foreach (var candle in chartData.Candles)
@@ -192,7 +201,7 @@
                                         <g class="axis-labels">
                                             @foreach (var label in chartData.PriceLabels)
                                             {
-                                                @SvgText(ChartAxisLabelX, label.Y, label.Text, "end")
+                                                @SvgText(chartData.AxisLabelX, label.Y, label.Text, "end")
                                             }
                                             @foreach (var label in chartData.TickLabels)
                                             {
@@ -207,6 +216,7 @@
                                         </g>
                                     </svg>
                                 </div>
+                                </div>
 
                                 <footer class="chart-footer">
                                     <span>@chartData.UpdatedAt</span>
@@ -219,7 +229,7 @@
                                 var orderBook = OrderBookData;
                             }
                             <section class="glass-card order-book" aria-labelledby="book-title">
-                                <h2 id="book-title">Книга заявок</h2>
+                                <h2 id="book-title">Стакан</h2>
                                 <div class="book-head">
                                     <span class="book-cell-price">Цена (₽)</span>
                                     <span class="book-cell-volume">Объём (шт.)</span>
@@ -227,6 +237,11 @@
                                 </div>
 
                                 <div class="book-side sells">
+                                    <svg class="book-depth-shape ask-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
+                                         aria-hidden="true">
+                                        <path d="@orderBook.AskFillPath" />
+                                        <path class="depth-line" d="@orderBook.AskLinePath" />
+                                    </svg>
                                     @foreach (var row in orderBook.Asks)
                                     {
                                         <div class="book-row">
@@ -245,6 +260,11 @@
                                 </div>
 
                                 <div class="book-side buys">
+                                    <svg class="book-depth-shape bid-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
+                                         aria-hidden="true">
+                                        <path d="@orderBook.BidFillPath" />
+                                        <path class="depth-line" d="@orderBook.BidLinePath" />
+                                    </svg>
                                     @foreach (var row in orderBook.Bids)
                                     {
                                         <div class="book-row">
@@ -265,15 +285,17 @@
                                     <span>Объём (шт.)</span>
                                     <span>Участники</span>
                                 </div>
-                                @foreach (var trade in RecentTrades)
-                                {
-                                    <div class="trade-row @trade.SideClass">
-                                        <span>@trade.Time</span>
-                                        <strong>@trade.Price</strong>
-                                        <span>@trade.Volume</span>
-                                        <em>@trade.Side</em>
-                                    </div>
-                                }
+                                <div class="trade-list">
+                                    @foreach (var trade in RecentTrades)
+                                    {
+                                        <div class="trade-row @trade.SideClass">
+                                            <span>@trade.Time</span>
+                                            <strong>@trade.Price</strong>
+                                            <span>@trade.Volume</span>
+                                            <em>@trade.Side</em>
+                                        </div>
+                                    }
+                                </div>
                             </section>
                         </aside>
 
@@ -405,12 +427,12 @@
     private const double ChartPanelLeft = 18;
     private const double ChartPanelWidth = 906;
     private const double ChartPlotLeft = 34;
-    private const double ChartPlotRight = 884;
-    private const double ChartAxisLabelX = 914;
     private const double ChartPlotTop = 28;
     private const double ChartPlotBottom = 336;
     private const double ChartPlotHeight = ChartPlotBottom - ChartPlotTop;
-    private const int MetricHistoryLimit = 24;
+    private const double ChartRightPadding = 76;
+    private const double MinChartCanvasWidth = 1240;
+    private const int MetricHistoryLimit = 72;
 
     private MarketMetric[] MarketMetrics => BuildMarketMetrics(latestTick);
 
@@ -419,8 +441,6 @@
     private SpreadData Spread => BuildSpreadData(latestTick);
 
     private StatusStripData Status => BuildStatusStripData(latestTick);
-
-    private ClockData Clock => BuildClockData();
 
     private TradeRow[] RecentTrades => BuildTradeRows(latestTick?.Snapshot.RecentTrades ?? []);
 
@@ -445,12 +465,17 @@
     private SimulationTickResult? latestTick;
     private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
     private DateTimeOffset startedAt = DateTimeOffset.Now;
+    private ElementReference chartViewport;
+    private IJSObjectReference? tradingChartModule;
+    private bool isChartRegistered;
+    private bool chartSyncPending = true;
+    private bool forceChartSync = true;
     private decimal previousVolume;
     private readonly HashSet<Guid> seenTradeIds = [];
-    private readonly List<decimal> priceMetricHistory = [DemoStartPrice];
-    private readonly List<decimal> bidMetricHistory = [DemoStartPrice];
-    private readonly List<decimal> askMetricHistory = [DemoStartPrice];
-    private readonly List<decimal> volumeMetricHistory = [0m];
+    private readonly List<decimal> priceMetricHistory = CreateSeedPriceHistory();
+    private readonly List<decimal> bidMetricHistory = CreateSeedPriceHistory(-0.18m);
+    private readonly List<decimal> askMetricHistory = CreateSeedPriceHistory(0.18m);
+    private readonly List<decimal> volumeMetricHistory = CreateSeedVolumeHistory();
     private string debugAgentName = "Manual";
     private OrderSide debugOrderSide = OrderSide.Buy;
     private OrderType debugOrderType = OrderType.Limit;
@@ -461,11 +486,12 @@
     private decimal debugAgentPosition = 10m;
     private string? debugMessage;
 
-    private PriceChartData ChartData => BuildPriceChartData(latestTick, selectedTimeframe, lastChartUpdate);
+    private PriceChartData ChartData => BuildPriceChartData(priceMetricHistory, latestTick, selectedTimeframe, lastChartUpdate);
 
     private void SelectTimeframe(string timeframe)
     {
         selectedTimeframe = timeframe;
+        RequestChartSync(force: true);
     }
 
     protected override void OnInitialized()
@@ -486,7 +512,42 @@
         latestTick = tickResult;
         lastChartUpdate = DateTimeOffset.Now;
         UpdateMetricHistory(tickResult);
+        RequestChartSync();
         _ = InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var modulePath = Assets["Components/Pages/Trading.razor.js"];
+        if (!modulePath.StartsWith("./", StringComparison.Ordinal) &&
+            !modulePath.StartsWith("/", StringComparison.Ordinal) &&
+            !modulePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            modulePath = $"./{modulePath}";
+        }
+
+        tradingChartModule ??= await JS.InvokeAsync<IJSObjectReference>(
+            "import",
+            modulePath);
+
+        if (!isChartRegistered)
+        {
+            await tradingChartModule.InvokeVoidAsync("register", chartViewport);
+            isChartRegistered = true;
+        }
+
+        if (chartSyncPending)
+        {
+            await tradingChartModule.InvokeVoidAsync("sync", chartViewport, forceChartSync);
+            chartSyncPending = false;
+            forceChartSync = false;
+        }
+    }
+
+    private void RequestChartSync(bool force = false)
+    {
+        chartSyncPending = true;
+        forceChartSync |= force;
     }
 
     private void SubmitDebugOrder()
@@ -581,6 +642,34 @@
         }
     }
 
+    private static List<decimal> CreateSeedPriceHistory(decimal offset = 0m)
+    {
+        var values = new List<decimal>(MetricHistoryLimit);
+
+        for (var index = 0; index < MetricHistoryLimit; index++)
+        {
+            var progress = index - MetricHistoryLimit + 1;
+            var wave = (decimal)Math.Sin(index / 4.2d) * 0.54m;
+            var ripple = (decimal)Math.Cos(index / 2.3d) * 0.18m;
+            var drift = progress * 0.012m;
+            values.Add(decimal.Round(DemoStartPrice + drift + wave + ripple + offset, 2));
+        }
+
+        return values;
+    }
+
+    private static List<decimal> CreateSeedVolumeHistory()
+    {
+        var values = new List<decimal>(MetricHistoryLimit);
+
+        for (var index = 0; index < MetricHistoryLimit; index++)
+        {
+            values.Add(18m + (index % 7) * 5m + (index % 3) * 2m);
+        }
+
+        return values;
+    }
+
     private MarketMetric[] BuildMarketMetrics(SimulationTickResult? tickResult)
     {
         var snapshot = tickResult?.Snapshot;
@@ -610,46 +699,93 @@ BuildVolumeBars(volumeMetricHistory))
 
     private static OrderBookViewData BuildOrderBookData(OrderBookSnapshot? orderBook)
     {
-        var asks = orderBook?.Asks ?? [];
-        var bids = orderBook?.Bids ?? [];
+        var asks = GetVisibleOrderBookLevels(orderBook?.Asks ?? [], reverse: true);
+        var bids = GetVisibleOrderBookLevels(orderBook?.Bids ?? [], reverse: false);
 
         return new OrderBookViewData(
-            BuildOrderBookRows(asks, reverse: true),
-            BuildOrderBookRows(bids, reverse: false));
+            BuildOrderBookRows(asks),
+            BuildOrderBookRows(bids),
+            BuildDepthFillPath(asks, isBid: false),
+            BuildDepthLinePath(asks, isBid: false),
+            BuildDepthFillPath(bids, isBid: true),
+            BuildDepthLinePath(bids, isBid: true));
     }
 
-    private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels, bool reverse)
+    private static OrderBookLevel[] GetVisibleOrderBookLevels(IReadOnlyList<OrderBookLevel> levels, bool reverse)
     {
         var visibleLevels = levels.Take(6).ToArray();
-        var maxQuantity = visibleLevels.Length == 0 ? 0m : visibleLevels.Max(level => level.Quantity);
-        var total = 0m;
-        var rows = new List<OrderBookRow>(visibleLevels.Length);
-
-        foreach (var level in visibleLevels)
-        {
-            total += level.Quantity;
-            var depth = CalculateDepth(level.Quantity, maxQuantity);
-
-            rows.Add(new OrderBookRow(
-                FormatPrice(level.Price),
-                FormatQuantity(level.Quantity),
-                FormatQuantity(total),
-                depth,
-                $"width: {depth}%"));
-        }
-
         if (reverse)
         {
-            rows.Reverse();
+            Array.Reverse(visibleLevels);
         }
 
-        return rows.ToArray();
+        return visibleLevels;
+    }
+
+    private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels)
+    {
+        var maxQuantity = levels.Count == 0 ? 0m : levels.Max(level => level.Quantity);
+        var total = 0m;
+
+        return levels
+            .Select(level =>
+            {
+                total += level.Quantity;
+                var depth = CalculateDepth(level.Quantity, maxQuantity);
+
+                return new OrderBookRow(
+                    FormatPrice(level.Price),
+                    FormatQuantity(level.Quantity),
+                    FormatQuantity(total),
+                    depth,
+                    $"width: {depth}%");
+            })
+            .ToArray();
+    }
+
+    private static string BuildDepthFillPath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
+    {
+        var linePath = BuildDepthLinePath(levels, isBid);
+        return isBid
+            ? $"{linePath} V125 H300 Z"
+            : $"{linePath} V125 H0 Z";
+    }
+
+    private static string BuildDepthLinePath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
+    {
+        if (levels.Count == 0)
+        {
+            return isBid ? "M300 0 H300" : "M0 0 H0";
+        }
+
+        var rowHeight = 125d / levels.Count;
+        var maxTotal = levels.Sum(level => level.Quantity);
+        var cumulative = 0m;
+        var segments = new List<string>(levels.Count);
+
+        for (var index = 0; index < levels.Count; index++)
+        {
+            cumulative += levels[index].Quantity;
+            var ratio = maxTotal == 0m ? 0d : (double)(cumulative / maxTotal);
+            var x = isBid ? 286 - ratio * 226 : 14 + ratio * 226;
+            var y = index * rowHeight + rowHeight / 2;
+
+            if (index == 0)
+            {
+                segments.Add($"M{FormatSvgNumber(isBid ? 286 : 14)} {FormatSvgNumber(y)} L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
+            }
+            else
+            {
+                segments.Add($"L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
+            }
+        }
+
+        return string.Join(" ", segments);
     }
 
     private static TradeRow[] BuildTradeRows(IReadOnlyList<Trade> trades) =>
         trades
             .OrderByDescending(trade => trade.ExecutedAt)
-            .Take(8)
             .Select(trade => new TradeRow(
                 trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
                 FormatPrice(trade.Price),
@@ -702,12 +838,6 @@ BuildVolumeBars(volumeMetricHistory))
             liquidity.Label,
             liquidity.ClassName,
             $"{spread.Detail}; глубина {FormatQuantity(totalDepth)} шт.");
-    }
-
-    private static ClockData BuildClockData()
-    {
-        var now = DateTimeOffset.Now;
-        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
     }
 
     private static string FormatNullableMoney(decimal? value) => value is null ? "-" : FormatMoney(value.Value);
@@ -888,37 +1018,16 @@ maxY)
         return ("Низкая", "negative");
     }
 
-    private static string GetRussianMonthName(int month) =>
-        month switch
-        {
-            1 => "января",
-            2 => "февраля",
-            3 => "марта",
-            4 => "апреля",
-            5 => "мая",
-            6 => "июня",
-            7 => "июля",
-            8 => "августа",
-            9 => "сентября",
-            10 => "октября",
-            11 => "ноября",
-            12 => "декабря",
-            _ => ""
-        };
-
     private static string FormatSvgNumber(double value) =>
         value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     private static PriceChartData BuildPriceChartData(
+        IReadOnlyList<decimal> priceHistory,
         SimulationTickResult? tickResult,
         string timeframe,
         DateTimeOffset updatedAt)
     {
-        var prices = tickResult?.Snapshot.RecentPrices.Count > 0
-            ? tickResult.Snapshot.RecentPrices.ToArray()
-            : [DemoStartPrice];
-
-        var visiblePrices = TakeLatestPrices(prices, GetTimeframePointLimit(timeframe));
+        var visiblePrices = TakeLatestPrices(priceHistory, GetTimeframePointLimit(timeframe));
         var rangeLow = visiblePrices.Min();
         var rangeHigh = visiblePrices.Max();
         var padding = Math.Max((rangeHigh - rangeLow) * 0.12m, 0.05m);
@@ -931,7 +1040,10 @@ maxY)
             maxPrice += 0.05m;
         }
 
-        var candles = BuildCandles(visiblePrices, minPrice, maxPrice, GetTimeframeCandleCount(timeframe));
+        var candleStep = GetTimeframeCandleStep(timeframe);
+        var targetCount = GetTimeframeCandleCount(timeframe);
+        var slotCount = Math.Max(targetCount, visiblePrices.Length);
+        var candles = BuildCandles(visiblePrices, minPrice, maxPrice, targetCount, slotCount, candleStep);
         var firstPrice = visiblePrices[0];
         var lastPrice = tickResult?.Snapshot.LastPrice ?? visiblePrices[^1];
         var change = lastPrice - firstPrice;
@@ -939,14 +1051,22 @@ maxY)
         var changeClass = change >= 0m ? "positive" : "negative";
         var sign = change >= 0m ? "+" : "";
         var lastPriceY = ScalePrice(lastPrice, minPrice, maxPrice);
-        var latestX = candles.Count == 0 ? ChartPlotRight : candles[^1].CenterXValue;
-        var priceTagX = Math.Clamp(latestX + 8, ChartPlotLeft + 8, ChartPlotRight - 66);
+        var plotRight = Math.Max(ChartPlotLeft + 116, ChartPlotLeft + candleStep * slotCount);
+        var latestX = candles.Count == 0 ? plotRight - candleStep / 2 : candles[^1].CenterXValue;
+        var canvasWidth = Math.Max(MinChartCanvasWidth, plotRight + ChartRightPadding);
+        var priceTagX = Math.Clamp(latestX + 8, ChartPlotLeft + 8, canvasWidth - 74);
 
         return new PriceChartData(
             candles,
             BuildPriceLabels(minPrice, maxPrice),
             BuildTickLabels(candles, tickResult?.Tick ?? 0),
-            BuildGridX(timeframe),
+            BuildGridX(timeframe, plotRight),
+            plotRight,
+            Math.Max(ChartPanelWidth, canvasWidth - ChartPanelLeft - 18),
+            canvasWidth - 12,
+            canvasWidth,
+            $"{FormatSvgNumber(canvasWidth)}px",
+            $"0 0 {FormatSvgNumber(canvasWidth)} 430",
             FormatPrice(firstPrice),
             FormatPrice(rangeHigh),
             FormatPrice(rangeLow),
@@ -973,7 +1093,9 @@ maxY)
         IReadOnlyList<decimal> prices,
         decimal minPrice,
         decimal maxPrice,
-        int targetCount)
+        int targetCount,
+        int slotCount,
+        double candleStep)
     {
         var buckets = BuildOhlcBuckets(prices, targetCount);
         if (buckets.Count == 0)
@@ -981,16 +1103,14 @@ maxY)
             return [];
         }
 
-        var width = ChartPlotRight - ChartPlotLeft;
-        var step = width / (double)targetCount;
-        var bodyWidth = Math.Clamp(step * 0.56, 7, 22);
+        var bodyWidth = Math.Clamp(candleStep * 0.56, 7, 22);
         var candles = new CandleData[buckets.Count];
-        var emptySlots = targetCount - buckets.Count;
+        var emptySlots = Math.Max(0, slotCount - buckets.Count);
 
         for (var index = 0; index < buckets.Count; index++)
         {
             var bucket = buckets[index];
-            var centerX = ChartPlotLeft + step * (emptySlots + index) + step / 2;
+            var centerX = ChartPlotLeft + candleStep * (emptySlots + index) + candleStep / 2;
             var openY = ScalePrice(bucket.Open, minPrice, maxPrice);
             var closeY = ScalePrice(bucket.Close, minPrice, maxPrice);
             var highY = ScalePrice(bucket.High, minPrice, maxPrice);
@@ -1020,7 +1140,7 @@ maxY)
             return [];
         }
 
-        var candleCount = Math.Clamp(Math.Min(targetCount, prices.Count), 1, 34);
+        var candleCount = Math.Clamp(Math.Min(targetCount, prices.Count), 1, 40);
         var buckets = new List<OhlcBucket>(candleCount);
 
         for (var index = 0; index < candleCount; index++)
@@ -1084,7 +1204,7 @@ maxY)
             .ToArray();
     }
 
-    private static double[] BuildGridX(string timeframe)
+    private static double[] BuildGridX(string timeframe, double plotRight)
     {
         var lineCount = GetTimeframeGridLineCount(timeframe);
         var lines = new double[lineCount];
@@ -1092,7 +1212,7 @@ maxY)
         for (var index = 0; index < lineCount; index++)
         {
             var ratio = lineCount == 1 ? 0 : (double)index / (lineCount - 1);
-            lines[index] = ChartPlotLeft + (ChartPlotRight - ChartPlotLeft) * ratio;
+            lines[index] = ChartPlotLeft + (plotRight - ChartPlotLeft) * ratio;
         }
 
         return lines;
@@ -1107,13 +1227,13 @@ maxY)
     private static int GetTimeframePointLimit(string timeframe) =>
         timeframe switch
         {
-            "10с" => 10,
-            "30с" => 30,
-            "1м" => 60,
-            "5м" => 100,
-            "15м" => 100,
-            "1ч" => 100,
-            _ => 30
+            "10с" => 24,
+            "30с" => 42,
+            "1м" => 72,
+            "5м" => 108,
+            "15м" => 132,
+            "1ч" => 168,
+            _ => 42
         };
 
     private static int GetTimeframeGridLineCount(string timeframe) =>
@@ -1131,13 +1251,25 @@ maxY)
     private static int GetTimeframeCandleCount(string timeframe) =>
         timeframe switch
         {
-            "10с" => 10,
-            "30с" => 16,
-            "1м" => 20,
-            "5м" => 24,
-            "15м" => 28,
-            "1ч" => 32,
+            "10с" => 14,
+            "30с" => 18,
+            "1м" => 24,
+            "5м" => 28,
+            "15м" => 32,
+            "1ч" => 36,
             _ => 18
+        };
+
+    private static double GetTimeframeCandleStep(string timeframe) =>
+        timeframe switch
+        {
+            "10с" => 34,
+            "30с" => 36,
+            "1м" => 38,
+            "5м" => 42,
+            "15м" => 46,
+            "1ч" => 52,
+            _ => 36
         };
 
     private static Microsoft.AspNetCore.Components.MarkupString SvgText(double x, double y, string text, string anchor =
@@ -1159,12 +1291,34 @@ maxY)
         SimulationRunner.OnTick -= HandleTick;
     }
 
+    public async ValueTask DisposeAsync()
+    {
+        SimulationRunner.OnTick -= HandleTick;
+
+        if (tradingChartModule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await tradingChartModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
     private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string
 Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
     private sealed record OrderBookViewData(
         IReadOnlyList<OrderBookRow> Asks,
-        IReadOnlyList<OrderBookRow> Bids);
+        IReadOnlyList<OrderBookRow> Bids,
+        string AskFillPath,
+        string AskLinePath,
+        string BidFillPath,
+        string BidLinePath);
     private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle);
     private sealed record SpreadData(string Icon, string Value, string Detail);
     private sealed record StatusStripData(
@@ -1176,13 +1330,18 @@ Projection, IReadOnlyList<BarRect> Bars);
         string Liquidity,
         string LiquidityClass,
         string LiquidityDetail);
-    private sealed record ClockData(string Time, string Date);
     private sealed record TradeRow(string Time, string Price, string Volume, string Side, string SideClass);
     private sealed record PriceChartData(
         IReadOnlyList<CandleData> Candles,
         IReadOnlyList<AxisLabel> PriceLabels,
         IReadOnlyList<AxisLabel> TickLabels,
         IReadOnlyList<double> GridX,
+        double PlotRight,
+        double PanelWidth,
+        double AxisLabelX,
+        double CanvasWidth,
+        string CanvasWidthCss,
+        string ViewBox,
         string Open,
         string High,
         string Low,

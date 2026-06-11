@@ -1427,3 +1427,60 @@
         text-align: left;
     }
 }
+
+/* Final agent screen alignment */
+
+.agents-shell {
+    padding-top: 56px;
+}
+
+.agents-shell::before {
+    opacity: .22;
+}
+
+.agents-shell::after {
+    opacity: .2;
+}
+
+.agents-main {
+    max-width: 1480px;
+    min-height: calc(100svh - 56px);
+    gap: 12px;
+    padding: 10px clamp(18px, 2.2vw, 28px) 28px;
+}
+
+.page-heading {
+    min-height: auto;
+    gap: 12px;
+    padding-top: 4px;
+}
+
+.breadcrumbs {
+    min-height: auto;
+    margin: 0 0 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 560;
+    letter-spacing: 0;
+}
+
+.page-heading h1 {
+    font-size: clamp(24px, 2vw, 30px);
+    line-height: 1.08;
+    font-weight: 700;
+}
+
+.page-heading p:last-child {
+    max-width: 660px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+}
+
+@media (max-width: 700px) {
+    .agents-shell {
+        padding-top: 56px;
+    }
+}
