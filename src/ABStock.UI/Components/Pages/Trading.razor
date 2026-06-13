@@ -1,6 +1,7 @@
 @page "/trading"
 @layout CreateAssetLayout
 @rendermode InteractiveServer
+@using ABStock.Application.MarketHistory
 @using ABStock.Application.Simulation.Diagnostics
 @using ABStock.Application.Simulation
 @using ABStock.Shared
@@ -10,6 +11,7 @@
 @implements IDisposable
 @implements IAsyncDisposable
 @inject ISimulationRunner SimulationRunner
+@inject IMarketCandleReader CandleReader
 @inject IServiceProvider Services
 @inject IWebHostEnvironment Environment
 @inject IJSRuntime JS
@@ -486,6 +488,7 @@
     private readonly List<decimal> volumeMetricHistory = [];
     private readonly List<Trade> tradeHistory = [];
     private readonly HashSet<string> activeScenarioSupportAgentKeys = [];
+    private readonly HashSet<string> loadedHistoryTimeframes = [];
     private string debugAgentName = "Manual";
     private OrderSide debugOrderSide = OrderSide.Buy;
     private OrderType debugOrderType = OrderType.Limit;
@@ -503,6 +506,7 @@
     private void SelectTimeframe(string timeframe)
     {
         selectedTimeframe = timeframe;
+        LoadPersistedCandles(timeframe, forceScrollToRealtime: true);
         pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime: true);
     }
 
@@ -513,6 +517,7 @@
         if (latestTick is not null)
         {
             PrimeFromSnapshot(latestTick, DateTimeOffset.Now);
+            LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
         }
 
         _ = RunSimulationAsync();
@@ -535,6 +540,7 @@
         lastChartUpdate = receivedAt;
         UpdateMetricHistory(tickResult);
         UpdateChartSeries(tickResult, receivedAt);
+        LoadPersistedCandles(selectedTimeframe);
         _ = InvokeAsync(StateHasChanged);
     }
 
@@ -1220,6 +1226,55 @@
             isUp ? "#36D98A" : isDown ? "#FF6B5F" : "#A1B2CC",
             isUp ? "#65F1AB" : isDown ? "#FF8A80" : "#D0D9E6");
     }
+
+    private void LoadPersistedCandles(string timeframeKey, bool forceScrollToRealtime = false)
+    {
+        if (!TimeframesByKey.TryGetValue(timeframeKey, out var timeframe))
+        {
+            return;
+        }
+
+        var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty)
+        {
+            return;
+        }
+
+        if (!forceScrollToRealtime && loadedHistoryTimeframes.Contains(timeframeKey))
+        {
+            return;
+        }
+
+        var persistedCandles = CandleReader
+            .GetCandles(runId, timeframe.Duration, GetPersistedCandleLimit(timeframeKey))
+            .Select(candle => new AggregatedCandle(
+                candle.StartedAt,
+                candle.Open,
+                candle.High,
+                candle.Low,
+                candle.Close))
+            .ToArray();
+
+        if (persistedCandles.Length == 0)
+        {
+            return;
+        }
+
+        loadedHistoryTimeframes.Add(timeframeKey);
+        MergeExternalCandles(timeframeKey, persistedCandles, forceScrollToRealtime);
+    }
+
+    private static int GetPersistedCandleLimit(string timeframeKey) =>
+        timeframeKey switch
+        {
+            "10s" => 180,
+            "30s" => 180,
+            "1m" => 180,
+            "5m" => 144,
+            "15m" => 96,
+            "1h" => 72,
+            _ => 180
+        };
 
     private void MergeExternalCandles(string timeframeKey, IEnumerable<AggregatedCandle> candles, bool forceScrollToRealtime = false)
     {
