@@ -48,7 +48,7 @@ internal static class OrderFinancialGuard
     {
         var budgets = agents.ToDictionary(
             agent => agent.State.AgentName,
-            agent => new AgentBudget(agent.State.Cash, agent.State.Position),
+            agent => new AgentBudget(agent.State.AvailableCash, agent.State.AvailablePosition),
             StringComparer.Ordinal);
 
         var acceptedOrders = new List<Order>();
