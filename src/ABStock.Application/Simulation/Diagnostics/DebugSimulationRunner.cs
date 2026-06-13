@@ -150,6 +150,7 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
                 DateTimeOffset.UtcNow);
 
             var snapshot = _exchange.GetSnapshot();
+            AgentReservations.Refresh(_exchange, _agents);
             submitResult = FinancialOrderSubmission.Submit(_exchange, _agents, [order], snapshot);
             ApplyTradesToAgents(_agents, submitResult.Trades);
             tickResult = CreateTickResultLocked(submitResult.Snapshot);
@@ -240,6 +241,8 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
         var snapshot = _exchange.GetSnapshot();
         var news = _pendingNews;
         _pendingNews = null;
+
+        AgentReservations.Refresh(_exchange, _agents);
 
         var allOrders = _agents
             .SelectMany(agent => agent.Decide(snapshot, news).Orders)

@@ -8,6 +8,12 @@ public class AgentState
     public AgentType AgentType { get; set; }
     public decimal Cash { get; set; }
     public decimal Position { get; set; }
+
+    public decimal ReservedCash { get; set; }
+    public decimal ReservedPosition { get; set; }
+
+    public decimal AvailableCash => Cash - ReservedCash;
+    public decimal AvailablePosition => Position - ReservedPosition;
     
     public decimal GetPortfolioValue(decimal currentPrice) => Cash + Position * currentPrice;
 }
