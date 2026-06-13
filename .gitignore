@@ -296,6 +296,11 @@ ServiceFabricBackup/
 *.ldf
 *.ndf
 
+# Local SQLite databases
+**/abstock*.db
+**/abstock*.db-shm
+**/abstock*.db-wal
+
 # Business Intelligence projects
 *.rdl.data
 *.bim.layout

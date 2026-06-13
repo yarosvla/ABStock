@@ -1,4 +1,5 @@
 using ABStock.Agents;
+using ABStock.Application.MarketHistory;
 using ABStock.Exchange.Engine;
 using ABStock.Shared;
 
@@ -9,11 +10,13 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
     private readonly object _sync = new();
     private readonly IExchangeEngineFactory _exchangeEngineFactory;
     private readonly IAgentFactory _agentFactory;
+    private readonly IMarketHistoryStore _marketHistoryStore;
     private CancellationTokenSource? _runCts;
     private Task? _runTask;
     private IExchangeEngine? _exchange;
     private List<ITradeAgent> _agents = [];
     private SimulationTickResult? _current;
+    private Guid _currentRunId = Guid.Empty;
     private volatile NewsSignal? _pendingNews;
     private int _tick;
 
@@ -41,12 +44,25 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
         }
     }
 
+    public Guid CurrentRunId
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _currentRunId;
+            }
+        }
+    }
+
     public DebugSimulationRunner(
         IExchangeEngineFactory exchangeEngineFactory,
-        IAgentFactory agentFactory)
+        IAgentFactory agentFactory,
+        IMarketHistoryStore marketHistoryStore)
     {
         _exchangeEngineFactory = exchangeEngineFactory;
         _agentFactory = agentFactory;
+        _marketHistoryStore = marketHistoryStore;
     }
 
     public void SubmitNews(NewsSignal signal)
@@ -70,6 +86,8 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
 
             _exchange = _exchangeEngineFactory.Create(config.StartPrice);
             _agents = _agentFactory.Create(config.Agents).ToList();
+            var startedAt = DateTimeOffset.UtcNow;
+            _currentRunId = _marketHistoryStore.StartRun(config, startedAt);
             _tick = 0;
             _current = null;
             _runCts?.Dispose();
@@ -207,6 +225,7 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
                 _runTask = null;
                 _exchange = null;
                 _agents = [];
+                _currentRunId = Guid.Empty;
             }
         }
     }
@@ -252,6 +271,10 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
         );
 
         _current = tickResult;
+        if (_currentRunId != Guid.Empty)
+        {
+            _marketHistoryStore.SaveTick(_currentRunId, tickResult, DateTimeOffset.UtcNow);
+        }
 
         return tickResult;
     }
