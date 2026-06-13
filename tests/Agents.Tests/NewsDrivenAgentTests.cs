@@ -112,4 +112,30 @@ public sealed class NewsDrivenAgentTests
         Assert.Equal(TradeAction.Hold, decision.Action);
         Assert.Empty(decision.Orders);
     }
+
+    [Fact]
+    public void Decide_Hold_OnPositiveNews_WhenReservedCashLeavesInsufficientAvailable()
+    {
+        var agent = new NewsDrivenAgent(100m);
+        agent.State.ReservedCash = 60m;
+        var snapshot = CreateSnapshot(bestBid: 99m, bestAsk: 50m);
+
+        var decision = agent.Decide(snapshot, News(SignalPolarity.Positive));
+
+        Assert.Equal(TradeAction.Hold, decision.Action);
+        Assert.Empty(decision.Orders);
+    }
+
+    [Fact]
+    public void Decide_Hold_OnNegativeNews_WhenReservedPositionLeavesInsufficientAvailable()
+    {
+        var agent = new NewsDrivenAgent(10000m, initialPosition: 1m);
+        agent.State.ReservedPosition = 1m;
+        var snapshot = CreateSnapshot(bestBid: 99m, bestAsk: 101m);
+
+        var decision = agent.Decide(snapshot, News(SignalPolarity.Negative));
+
+        Assert.Equal(TradeAction.Hold, decision.Action);
+        Assert.Empty(decision.Orders);
+    }
 }
