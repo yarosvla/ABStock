@@ -154,6 +154,11 @@ public sealed class ExchangeEngine : IExchangeEngine
         return _orderBook.GetSnapshot(depth);
     }
 
+    public IReadOnlyList<Order> GetOpenOrders()
+    {
+        return [.._orderBook.BuyOrders, .._orderBook.SellOrders];
+    }
+
     private IReadOnlyList<Trade> ProcessAcceptedOrder(Order order)
     {
         if (order.Type == OrderType.Market)
