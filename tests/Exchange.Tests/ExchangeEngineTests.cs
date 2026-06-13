@@ -540,6 +540,64 @@ public sealed class ExchangeEngineTests
         Assert.Contains("market order price", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void GetOpenOrders_ReturnsRestingLimitOrdersForBothSides()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.SubmitMany(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 98m, quantity: 2m, agentName: "agent-a"),
+            CreateOrder(CreateId(2), OrderSide.Sell, 102m, quantity: 3m, agentName: "agent-b")
+        ]);
+
+        var openOrders = exchange.GetOpenOrders();
+
+        Assert.Equal(2, openOrders.Count);
+        Assert.Contains(openOrders, order => order.Id == CreateId(1) && order.Side == OrderSide.Buy && order.Quantity == 2m);
+        Assert.Contains(openOrders, order => order.Id == CreateId(2) && order.Side == OrderSide.Sell && order.Quantity == 3m);
+    }
+
+    [Fact]
+    public void GetOpenOrders_ExcludesFullyMatchedOrders()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.Submit(CreateOrder(CreateId(1), OrderSide.Sell, 99m, quantity: 2m, agentName: "seller-agent"));
+        exchange.Submit(CreateOrder(CreateId(2), OrderSide.Buy, 101m, quantity: 2m, agentName: "buyer-agent"));
+
+        Assert.Empty(exchange.GetOpenOrders());
+    }
+
+    [Fact]
+    public void GetOpenOrders_ReflectsRemainingQuantityAfterPartialFill()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.Submit(CreateOrder(CreateId(1), OrderSide.Buy, 101m, quantity: 10m, agentName: "buyer-agent"));
+        exchange.Submit(CreateOrder(CreateId(2), OrderSide.Sell, 99m, quantity: 4m, agentName: "seller-agent"));
+
+        var restingOrder = Assert.Single(exchange.GetOpenOrders());
+        Assert.Equal(CreateId(1), restingOrder.Id);
+        Assert.Equal(OrderSide.Buy, restingOrder.Side);
+        Assert.Equal(6m, restingOrder.Quantity);
+    }
+
+    [Fact]
+    public void GetOpenOrders_ExcludesMarketOrdersAndKeepsUnmatchedResting()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.Submit(CreateOrder(CreateId(1), OrderSide.Sell, 101m, quantity: 1m, agentName: "seller-a"));
+        exchange.Submit(CreateOrder(CreateId(2), OrderSide.Sell, 102m, quantity: 3m, agentName: "seller-b"));
+        exchange.Submit(CreateMarketOrder(CreateId(3), OrderSide.Buy, quantity: 3m, agentName: "buyer-agent"));
+
+        var restingOrder = Assert.Single(exchange.GetOpenOrders());
+        Assert.Equal(CreateId(2), restingOrder.Id);
+        Assert.Equal(1m, restingOrder.Quantity);
+        Assert.DoesNotContain(exchange.GetOpenOrders(), order => order.Id == CreateId(3));
+    }
+
     private static Order CreateOrder(
         Guid id,
         OrderSide side,

@@ -19,4 +19,6 @@ public interface IExchangeEngine
     MarketSnapshot GetSnapshot();
 
     OrderBookSnapshot GetOrderBookSnapshot(int depth = 5);
+
+    IReadOnlyList<Order> GetOpenOrders();
 }
