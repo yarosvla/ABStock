@@ -20,9 +20,9 @@ public abstract class AgentBase : ITradeAgent
 
     public abstract AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal);
 
-    protected bool CanBuy(decimal price, decimal quantity) => State.Cash >= price * quantity;
+    protected bool CanBuy(decimal price, decimal quantity) => State.AvailableCash >= price * quantity;
 
-    protected bool CanSell(decimal quantity) => State.Position >= quantity;
+    protected bool CanSell(decimal quantity) => State.AvailablePosition >= quantity;
 
     protected Order CreateLimitOrder(OrderSide side, decimal price, decimal quantity) =>
         new(Guid.NewGuid(), State.AgentName, side, OrderType.Limit, price, quantity, DateTimeOffset.UtcNow);
