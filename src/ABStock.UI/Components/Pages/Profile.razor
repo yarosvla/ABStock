@@ -1,6 +1,14 @@
 @page "/profile"
 @layout CreateAssetLayout
 @rendermode InteractiveServer
+@using ABStock.Application.MarketHistory
+@using ABStock.Application.Simulation
+@using ABStock.Shared
+@using ABStock.UI.Services
+@implements IDisposable
+@inject ISimulationHistoryReader SimulationHistoryReader
+@inject IActiveAssetContext ActiveAssetContext
+@inject ISimulationRunner SimulationRunner
 
 <PageTitle>Профиль</PageTitle>
 
@@ -16,7 +24,7 @@
                     <span>Профиль</span>
                 </p>
                 <h1>Профиль</h1>
-                <p>Рабочие настройки, демо-предпочтения и локальная активность оператора</p>
+                <p>Рабочие настройки, история симуляций и текущий контекст актива @CurrentAsset.Draft.Name</p>
             </div>
         </header>
 
@@ -37,8 +45,8 @@
                     }
                     <p>Оператор симуляции · ABStock</p>
                     <div class="identity-tags">
-                        <span>V2 workspace</span>
-                        <span>Demo mode</span>
+                        <span>@CurrentAsset.Symbol</span>
+                        <span>@GetAssetTypeLabel(CurrentAsset.Draft.AssetType)</span>
                     </div>
                 </section>
 
@@ -122,15 +130,28 @@
                         <span>сегодня</span>
                     </div>
                     <div class="activity-list">
-                        @foreach (var item in ActivityItems)
+                        @if (ActivityItems.Count == 0)
                         {
                             <article>
-                                <time>@item.Time</time>
+                                <time>—</time>
                                 <div>
-                                    <strong>@item.Title</strong>
-                                    <span>@item.Detail</span>
+                                    <strong>История пока пуста</strong>
+                                    <span>После запуска симуляций и сделок здесь появятся реальные события.</span>
                                 </div>
                             </article>
+                        }
+                        else
+                        {
+                            @foreach (var item in ActivityItems)
+                            {
+                                <article>
+                                    <time>@item.Time</time>
+                                    <div>
+                                        <strong>@item.Title</strong>
+                                        <span>@item.Detail</span>
+                                    </div>
+                                </article>
+                            }
                         }
                     </div>
                 </section>
@@ -154,29 +175,53 @@
 </div>
 
 @code {
-    private static ProfileMetric[] ProfileMetrics =>
-    [
-        new("Сессий", "18", "за учебный стенд", "positive"),
-        new("Активов создано", "6", "последний: KZEN", ""),
-        new("Тестовых сделок", "3 214", "симуляция", "positive"),
-        new("Агентов", "4", "активный набор", "")
-    ];
+    private const int HistoryRefreshTickInterval = 5;
 
-    private static ProfilePreference[] TradingPreferences =>
-    [
-        new("bi-currency-exchange", "Валюта", "RUB"),
-        new("bi-clock-history", "Горизонт", "интрадей"),
-        new("bi-bar-chart", "График", "свечи"),
-        new("bi-list-columns", "Стакан", "6 уровней"),
-        new("bi-robot", "Агенты", "4 стратегии"),
-        new("bi-newspaper", "Новости", "AI-сигналы")
-    ];
+    private SimulationHistoryOverview historyOverview = new(0, 0, 0, 0, []);
+    private int ticksSinceHistoryRefresh;
+    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    private ProfileMetric[] ProfileMetrics => BuildProfileMetrics();
+    private ProfilePreference[] TradingPreferences => BuildTradingPreferences();
+    private IReadOnlyList<ActivityItem> ActivityItems => BuildActivityItems();
 
     private bool IsCompactMode { get; set; } = true;
     private bool SoundEnabled { get; set; } = false;
 
     private string userName = "Алексей Ковалёв";
     private bool isEditingName = false;
+
+    protected override void OnInitialized()
+    {
+        LoadHistory();
+        SimulationRunner.OnTick += HandleSimulationTick;
+    }
+
+    private void LoadHistory()
+    {
+        historyOverview = SimulationHistoryReader.GetOverview(10);
+    }
+
+    private void HandleSimulationTick(SimulationTickResult tickResult)
+    {
+        // GetOverview issues several aggregate queries; refresh periodically instead of
+        // on every tick to avoid hammering the database for each open Profile circuit.
+        if (++ticksSinceHistoryRefresh < HistoryRefreshTickInterval)
+        {
+            return;
+        }
+
+        ticksSinceHistoryRefresh = 0;
+        _ = InvokeAsync(() =>
+        {
+            LoadHistory();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        SimulationRunner.OnTick -= HandleSimulationTick;
+    }
 
     private string AvatarInitials
     {
@@ -200,16 +245,8 @@
     private static SecurityItem[] SecurityItems =>
     [
         new("bi-hdd-network", "Среда", "локальная", "positive"),
-        new("bi-shield-check", "Сохранение", "отключено", ""),
+        new("bi-shield-check", "История", "persisted", "positive"),
         new("bi-person-lock", "Авторизация", "демо", "")
-    ];
-
-    private static ActivityItem[] ActivityItems =>
-    [
-        new("15:42", "Открыт экран торгов", "проверка свечного графика"),
-        new("15:38", "Запущена симуляция", "актив KZEN"),
-        new("15:31", "Создан профиль актива", "энергетика, акция"),
-        new("15:24", "Проверены агенты", "Trend, Counter, Maker, News")
     ];
 
     private static NotificationItem[] NotificationItems =>
@@ -218,6 +255,42 @@
         new("Новости по активу", "включено", "positive"),
         new("Системные события", "тихо", "")
     ];
+
+    private ProfileMetric[] BuildProfileMetrics() =>
+    [
+        new("Сессий", historyOverview.RunCount.ToString(), "persisted runs", historyOverview.RunCount > 0 ? "positive" : string.Empty),
+        new("Активов создано", historyOverview.DistinctAssetCount.ToString(), $"текущий: {CurrentAsset.Symbol}", historyOverview.DistinctAssetCount > 0 ? "positive" : string.Empty),
+        new("Тестовых сделок", historyOverview.TotalTradeCount.ToString("N0"), "persisted history", historyOverview.TotalTradeCount > 0 ? "positive" : string.Empty),
+        new("Тиков рынка", historyOverview.TotalTickCount.ToString("N0"), "история симуляций", historyOverview.TotalTickCount > 0 ? "positive" : string.Empty)
+    ];
+
+    private ProfilePreference[] BuildTradingPreferences() =>
+    [
+        new("bi-currency-exchange", "Валюта", "RUB"),
+        new("bi-clock-history", "Горизонт", "интрадей"),
+        new("bi-bar-chart", "График", "свечи"),
+        new("bi-list-columns", "Стакан", "8 уровней"),
+        new("bi-robot", "Агенты", "4 стратегии"),
+        new("bi-newspaper", "Актив", CurrentAsset.Symbol)
+    ];
+
+    private IReadOnlyList<ActivityItem> BuildActivityItems() =>
+        historyOverview.RecentActivity
+            .Select(item => new ActivityItem(
+                item.OccurredAt.ToLocalTime().ToString("HH:mm"),
+                item.Title,
+                item.Detail))
+            .ToArray();
+
+    private static string GetAssetTypeLabel(AssetType assetType) => assetType switch
+    {
+        AssetType.Stock => "Акция",
+        AssetType.Bond => "Облигация",
+        AssetType.Commodity => "Товар",
+        AssetType.Crypto => "Криптоактив",
+        _ => assetType.ToString()
+    };
+
     private sealed record ProfileMetric(string Label, string Value, string Detail, string ClassName);
     private sealed record ProfilePreference(string Icon, string Label, string Value);
     private sealed record SecurityItem(string Icon, string Label, string Value, string ClassName);
