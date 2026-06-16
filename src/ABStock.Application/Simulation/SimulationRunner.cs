@@ -94,6 +94,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             _currentRunId = _marketHistoryStore.StartRun(config, startedAt);
             _tick = 0;
             _current = null;
+            _pendingNews = null;
             _runCts?.Dispose();
             _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var runCts = _runCts;
@@ -249,6 +250,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
                 _exchange = null;
                 _agents = [];
                 _currentRunId = Guid.Empty;
+                _current = null;
+                _pendingNews = null;
             }
         }
     }
@@ -289,7 +292,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
         var tickResult = new SimulationTickResult(
             ++_tick,
             snapshot,
-            _exchange.GetOrderBookSnapshot(),
+            _exchange.GetOrderBookSnapshot(depth: 8),
             GetAgentSnapshots(_agents, snapshot.LastPrice)
         );
 

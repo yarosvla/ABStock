@@ -6,8 +6,11 @@
 @using ABStock.AI.Services
 @using ABStock.Application.Simulation
 @using ABStock.Shared
+@using ABStock.UI.Services
+@implements IDisposable
 @inject INewsProcessingService NewsProcessingService
 @inject ISimulationRunner SimulationRunner
+@inject IActiveAssetContext ActiveAssetContext
 
 <PageTitle>Новости</PageTitle>
 
@@ -25,7 +28,7 @@
                     <span>Новости</span>
                 </p>
                 <h1>Новости и сигналы</h1>
-                <p>Добавляйте события и оценивайте их влияние на актив, цену и поведение агентов</p>
+                <p>Добавляйте события и оценивайте их влияние на @CurrentAsset.Draft.Name, цену и поведение агентов</p>
             </div>
         </header>
 
@@ -34,28 +37,28 @@
                 <section class="glass-card asset-card" aria-labelledby="asset-title">
                     <div class="asset-head">
                         <span class="asset-emblem" aria-hidden="true">
-                            <i class="bi bi-lightning-charge-fill"></i>
+                            <i class="bi @AssetIconClass"></i>
                         </span>
                         <div>
-                            <h2 id="asset-title">КвантЭнерго</h2>
+                            <h2 id="asset-title">@CurrentAsset.Draft.Name</h2>
                             <div class="asset-meta">
-                                <span>KZEN</span>
-                                <span>Акция</span>
-                                <span>Энергетика</span>
+                                <span>@CurrentAsset.Symbol</span>
+                                <span>@GetAssetTypeLabel(CurrentAsset.Draft.AssetType)</span>
+                                <span>@CurrentAsset.Draft.Industry</span>
                             </div>
-                            <p class="asset-state"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>Актив создан</p>
+                            <p class="asset-state"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>@AssetStatusLabel</p>
                         </div>
                     </div>
-                    <p class="asset-description">Профиль чувствителен к господдержке, контрактам на энергосети, регуляторике и капитальным затратам.</p>
+                    <p class="asset-description">@CurrentAsset.Profile.Description</p>
                 </section>
 
                 <section class="glass-card parameter-card news-profile-card" aria-labelledby="profile-title">
                     <div class="panel-title">
                         <h2 id="profile-title">Профиль новости</h2>
-                        <span>86/100</span>
+                        <span>@NewsSensitivityScore/100</span>
                     </div>
-                    <div class="sensitivity-gauge" aria-label="Высокая чувствительность к новостям">
-                        <span></span>
+                    <div class="sensitivity-gauge" aria-label="@($"{NewsSensitivityLabel} чувствительность к новостям")">
+                        <span style="width: @($"{NewsSensitivityScore}%")"></span>
                     </div>
                     <dl class="compact-list">
                         @foreach (var item in SensitivityRows)
@@ -199,12 +202,12 @@
                 <section class="glass-card order-book market-card" aria-labelledby="market-title">
                     <div class="panel-title">
                         <h2 id="market-title">Контекст рынка</h2>
-                        <span>Live demo</span>
+                        <span>@MarketContextLabel</span>
                     </div>
                     <div class="price-tile">
                         <span>Текущая цена</span>
-                        <strong>124.35 ₽</strong>
-                        <small>+4.65 ₽ (+3.88%)</small>
+                        <strong>@CurrentPriceLabel</strong>
+                        <small>@CurrentPriceChangeLabel</small>
                     </div>
                     <dl class="compact-list">
                         @foreach (var item in MarketRows)
@@ -241,8 +244,8 @@
                         <div class="delivery-note">
                             <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
                             <div>
-                                <strong>Сигнал передан в симуляцию</strong>
-                                <span>Реальная реакция цены зависит от реализации NewsDrivenAgent.</span>
+                                <strong>@SignalDeliveryTitle</strong>
+                                <span>@LiveAgentStatus</span>
                             </div>
                         </div>
                         <div class="impact-scale" aria-label="Сила влияния">
@@ -256,12 +259,12 @@
                 <section class="glass-card parameter-card agent-note-card" aria-labelledby="agent-note-title">
                     <div class="panel-title">
                         <h2 id="agent-note-title">NewsDrivenAgent</h2>
-                        <span>MVP</span>
+                        <span>Live</span>
                     </div>
                     <ul>
                         <li><i class="bi bi-check-circle" aria-hidden="true"></i>Получает `NewsSignal` из UI</li>
                         <li><i class="bi bi-check-circle" aria-hidden="true"></i>Сигнал хранится до следующего тика</li>
-                        <li><i class="bi bi-info-circle" aria-hidden="true"></i>Торговая реакция агента пока не реализована</li>
+                        <li><i class="bi bi-check-circle" aria-hidden="true"></i>На позитиве покупает по рынку, на негативе продаёт при наличии ликвидности и позиции</li>
                     </ul>
                 </section>
             </aside>
@@ -290,11 +293,25 @@
     private const int MinNewsLength = 24;
     private const int MaxNewsLength = 2000;
 
-    private string newsText = "КвантЭнерго подписала соглашение о поставке систем накопления энергии для федеральной программы модернизации энергетической инфраструктуры.";
+    private string newsText = string.Empty;
     private NewsSignal? analysisSignal;
     private string? errorMessage;
     private bool isAnalyzing;
     private bool signalSubmitted;
+    private SimulationTickResult? latestMarket;
+    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    private SimulationTickResult? CurrentMarket => latestMarket;
+    private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
+    private string AssetStatusLabel => CurrentAsset.IsFallback ? "Демо-контекст" : "Актив синхронизирован";
+    private int NewsSensitivityScore => (int)Math.Round(CurrentAsset.Profile.NewsSensitivity * 100m, MidpointRounding.AwayFromZero);
+    private string NewsSensitivityLabel => NewsSensitivityScore >= 80 ? "Высокая" : NewsSensitivityScore >= 60 ? "Средняя" : "Низкая";
+    private string MarketContextLabel => CurrentMarket is null ? "Нет live-торгов" : "Live market";
+    private string CurrentPriceLabel => CurrentMarket is null ? "—" : FormatMoney(CurrentMarket.Snapshot.LastPrice);
+    private string CurrentPriceChangeLabel => BuildCurrentPriceChangeLabel();
+    private IReadOnlyList<DataRow> SensitivityRows => BuildSensitivityRows();
+    private IReadOnlyList<DataRow> MarketRows => BuildMarketRows();
+    private IReadOnlyList<FactorChip> FactorChips => BuildFactorChips();
+    private string LiveAgentStatus => BuildLiveAgentStatus();
 
     private bool CanAnalyze => newsText.Trim().Length >= MinNewsLength;
     private string ResultStateClass => analysisSignal is null ? string.Empty : PolarityClass;
@@ -334,16 +351,16 @@
 
     private string RecommendedAction => analysisSignal?.Polarity switch
     {
-        SignalPolarity.Positive => "Покупательский сигнал",
-        SignalPolarity.Negative => "Продавецкий сигнал",
-        _ => "Нейтральный сигнал"
+        SignalPolarity.Positive => "Market buy",
+        SignalPolarity.Negative => "Market sell",
+        _ => "Hold / нейтрально"
     };
 
     private string ExpectedEffect => analysisSignal?.Polarity switch
     {
-        SignalPolarity.Positive => "Демо-ожидание: рост спроса в ближайшие тики.",
-        SignalPolarity.Negative => "Демо-ожидание: давление продавцов в ближайшие тики.",
-        _ => "Демо-ожидание: без выраженного смещения."
+        SignalPolarity.Positive => "При наличии ask и свободного кэша агент купит по рынку на следующем тике.",
+        SignalPolarity.Negative => "При наличии bid и позиции агент продаст по рынку на следующем тике.",
+        _ => "Нейтральная новость не должна смещать поведение NewsDrivenAgent."
     };
 
     private string ImpactPosition
@@ -355,48 +372,7 @@
         }
     }
 
-    private IReadOnlyList<NewsHistoryItem> NewsHistory { get; set; } =
-    [
-        new("15:39", "Господдержка энергосетей", "Позитивный фон", "positive"),
-        new("14:52", "Рост стоимости компонентов", "Риск маржи", "negative"),
-        new("13:18", "Новый пилотный проект", "Среднее влияние", "neutral")
-    ];
-
-    private static readonly AssetProfile DemoProfile = new(
-        "КвантЭнерго",
-        AssetType.Stock,
-        "Инновационная энергетическая компания, разрабатывающая системы накопления энергии нового поколения.",
-        ["Государственная поддержка", "Спрос на энергоэффективность", "Технологическая специализация", "Долгосрочные контракты"],
-        ["Рост капитальных затрат", "Зависимость от поставщиков", "Давление конкурентов"],
-        ["Регуляторный риск", "Капиталоёмкость проектов", "Срыв сроков внедрения"],
-        0.9m,
-        ["энергетика", "накопление энергии", "господдержка", "контракт", "модернизация"]
-    );
-
-    private static readonly DataRow[] SensitivityRows =
-    [
-        new("Регуляторные новости", "Высокая", "positive"),
-        new("Господдержка", "Высокая", "positive"),
-        new("Рыночные новости", "Средняя", null),
-        new("Капитальные затраты", "Высокий риск", "warning")
-    ];
-
-    private static readonly DataRow[] MarketRows =
-    [
-        new("Индекс МосБиржи", "3 500.12  +0.71%", "positive"),
-        new("Индекс электроэнергетики", "2 845.31  +1.25%", "positive"),
-        new("Нефть Brent", "82.14  -0.21%", "negative"),
-        new("USD/RUB", "89.43  -0.08%", "negative")
-    ];
-
-    private static readonly FactorChip[] FactorChips =
-    [
-        new("Крупный контракт", "green"),
-        new("Господдержка", "green"),
-        new("Регуляторный риск", "orange"),
-        new("Долгосрочный спрос", "blue"),
-        new("Энергетика", "purple")
-    ];
+    private IReadOnlyList<NewsHistoryItem> NewsHistory { get; set; } = [];
 
     private static readonly FlowStep[] FlowSteps =
     [
@@ -413,8 +389,35 @@
         new("Тональность", "Ожидает", "Введите новость", "neutral"),
         new("Уверенность", "—", "AI-анализ не запущен", "neutral"),
         new("Impact", "—", "Сила влияния неизвестна", "neutral"),
-        new("Статус агента", "Готов", "NewsDrivenAgent ожидает", "volume")
+        new("Статус агента", "Готов", "NewsDrivenAgent ожидает live-сигнал", "volume")
     ];
+
+    protected override void OnInitialized()
+    {
+        newsText = $"{CurrentAsset.Draft.Name} подписала соглашение о поставке решений для сектора «{CurrentAsset.Draft.Industry}», что может усилить спрос и ожидания по будущим контрактам.";
+        latestMarket = SimulationRunner.Current;
+        SimulationRunner.OnTick += HandleMarketTick;
+    }
+
+    private void HandleMarketTick(SimulationTickResult tickResult)
+    {
+        _ = InvokeAsync(() =>
+        {
+            latestMarket = tickResult;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        SimulationRunner.OnTick -= HandleMarketTick;
+    }
+
+    private string SignalDeliveryTitle => !signalSubmitted
+        ? "Сигнал не отправлен"
+        : SimulationRunner.IsRunning
+            ? "Сигнал передан в симуляцию"
+            : "Сигнал поставлен в очередь";
 
     private async Task AnalyzeNewsAsync()
     {
@@ -434,7 +437,7 @@
             var signal = NewsProcessingService.Analyze(new NewsAnalysisRequest
             {
                 NewsText = newsText.Trim(),
-                Profile = DemoProfile
+                Profile = CurrentAsset.Profile
             });
 
             analysisSignal = signal;
@@ -469,7 +472,7 @@
         var item = new NewsHistoryItem(
             DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture),
             title,
-            $"{PolarityLabel}, impact {signal.ImpactScore:0.00}",
+            $"{PolarityLabel}, impact {signal.ImpactScore:0.00}, {RecommendedAction}",
             PolarityClass.Replace("-signal", string.Empty));
 
         NewsHistory = NewsHistory.Prepend(item).Take(5).ToArray();
@@ -483,11 +486,135 @@
 
     private NewsMetric[] BuildNewsMetrics(NewsSignal signal) =>
     [
-        new("Тональность", PolarityLabel, RecommendedAction, PolarityClass.Contains("negative") ? "negative" : "positive"),
+        new(
+            "Тональность",
+            PolarityLabel,
+            RecommendedAction,
+            signal.Polarity == SignalPolarity.Negative
+                ? "negative"
+                : signal.Polarity == SignalPolarity.Positive
+                    ? "positive"
+                    : "neutral"),
         new("Уверенность", FormatPercent(signal.Confidence), "AI-сигнал готов", "positive"),
         new("Impact", signal.ImpactScore.ToString("0.00", CultureInfo.InvariantCulture), ImpactLabel, signal.Polarity == SignalPolarity.Negative ? "negative" : "positive"),
-        new("Статус агента", "Передан", "Следующий тик симуляции", "volume")
+        new("Статус агента", signalSubmitted ? "Передан" : "Черновик", LiveAgentStatus, "volume")
     ];
+
+    private string BuildLiveAgentStatus()
+    {
+        if (analysisSignal is null)
+        {
+            return SimulationRunner.IsRunning
+                ? "NewsDrivenAgent ждёт следующий сигнал"
+                : "Сигнал будет поставлен в очередь после запуска торгов";
+        }
+
+        if (!signalSubmitted)
+        {
+            return "AI-сигнал готов к отправке в симуляцию";
+        }
+
+        return SimulationRunner.IsRunning
+            ? "NewsDrivenAgent обработает сигнал на следующем тике через market buy/sell"
+            : "Сигнал сохранён и будет обработан после старта симуляции";
+    }
+
+    private string BuildCurrentPriceChangeLabel()
+    {
+        var snapshot = CurrentMarket?.Snapshot;
+        if (snapshot is null)
+        {
+            return "Торги ещё не запущены";
+        }
+
+        var prices = snapshot.RecentPrices;
+        if (prices.Count < 2)
+        {
+            return "Ждём больше тиков";
+        }
+
+        var first = prices[0];
+        var last = snapshot.LastPrice;
+        var change = last - first;
+        var percent = first == 0m ? 0m : change / first * 100m;
+        return $"{(change >= 0m ? "+" : string.Empty)}{change:0.00} ₽ ({(percent >= 0m ? "+" : string.Empty)}{percent:0.00}%)";
+    }
+
+    private IReadOnlyList<DataRow> BuildSensitivityRows()
+    {
+        var rows = new List<DataRow>
+        {
+            new("Чувствительность профиля", NewsSensitivityLabel, NewsSensitivityScore >= 80 ? "positive" : null),
+            new("Сектор", CurrentAsset.Draft.Industry, null),
+            new("Господдержка", CurrentAsset.Draft.IncludeGovernmentSupport ? "Учитывается" : "Не учитывается", CurrentAsset.Draft.IncludeGovernmentSupport ? "positive" : null),
+            new("Ключевой риск", CurrentAsset.Profile.Risks.FirstOrDefault() ?? "Не определён", "warning")
+        };
+
+        return rows;
+    }
+
+    private IReadOnlyList<DataRow> BuildMarketRows()
+    {
+        var snapshot = CurrentMarket?.Snapshot;
+        if (snapshot is null)
+        {
+            return
+            [
+                new("Состояние", "Торги не запущены", "warning"),
+                new("Актив", CurrentAsset.Symbol, null),
+                new("Цена", "—", null),
+                new("Статус агента", "Ожидание", null)
+            ];
+        }
+
+        return
+        [
+            new("Лучший bid", snapshot.BestBid is null ? "—" : FormatMoney(snapshot.BestBid.Value), "positive"),
+            new("Лучший ask", snapshot.BestAsk is null ? "—" : FormatMoney(snapshot.BestAsk.Value), "negative"),
+            new("Объём", $"{snapshot.Volume:0.##} шт.", null),
+            new("Последний тик", $"#{CurrentMarket?.Tick ?? 0}", null)
+        ];
+    }
+
+    private IReadOnlyList<FactorChip> BuildFactorChips()
+    {
+        var chips = new List<FactorChip>();
+
+        chips.AddRange(CurrentAsset.Profile.Keywords.Take(4).Select(keyword => new FactorChip(keyword, "blue")));
+
+        if (analysisSignal is not null)
+        {
+            chips.Add(new FactorChip(PolarityLabel, analysisSignal.Polarity == SignalPolarity.Negative ? "orange" : "green"));
+            chips.Add(new FactorChip(ImpactLabel, "purple"));
+        }
+
+        return chips
+            .DistinctBy(chip => chip.Label)
+            .Take(6)
+            .ToArray();
+    }
+
+    private static string GetAssetTypeLabel(AssetType assetType) =>
+        assetType switch
+        {
+            AssetType.Stock => "Акция",
+            AssetType.Bond => "Облигация",
+            AssetType.Commodity => "Товар",
+            AssetType.Crypto => "Криптоактив",
+            _ => assetType.ToString()
+        };
+
+    private static string GetAssetIconClass(AssetType assetType) =>
+        assetType switch
+        {
+            AssetType.Stock => "bi-graph-up-arrow",
+            AssetType.Bond => "bi-receipt",
+            AssetType.Commodity => "bi-box-seam",
+            AssetType.Crypto => "bi-currency-bitcoin",
+            _ => "bi-lightning-charge-fill"
+        };
+
+    private static string FormatMoney(decimal value) => $"{value:0.00} ₽";
 
     private sealed record NewsMetric(string Label, string Value, string Detail, string Accent);
     private sealed record DataRow(string Label, string Value, string? ValueClass);

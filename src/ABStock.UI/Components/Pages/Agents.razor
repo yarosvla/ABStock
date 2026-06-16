@@ -3,8 +3,10 @@
 @rendermode InteractiveServer
 @using ABStock.Application.Simulation
 @using ABStock.Shared
+@using ABStock.UI.Services
 @implements IDisposable
 @inject ISimulationRunner SimulationRunner
+@inject IActiveAssetContext ActiveAssetContext
 
 <PageTitle>Агенты</PageTitle>
 
@@ -22,11 +24,11 @@
                     <span>Агенты</span>
                 </p>
                 <h1>Торговые агенты</h1>
-                <p>Мониторинг стратегий, портфелей и решений агентов в реальном времени</p>
+                <p>Мониторинг стратегий, портфелей и решений агентов по активу @CurrentAsset.Draft.Name</p>
             </div>
         </header>
 
-        @if (latestTick is null)
+        @if (!SimulationRunner.IsRunning || latestTick is null)
         {
             <section class="glass-card empty-state" aria-label="Торги не запущены">
                 <div class="empty-content">
@@ -47,11 +49,11 @@
                     <section class="glass-card agent-asset-card" aria-labelledby="agent-asset-title">
                         <div class="asset-face">
                             <span class="asset-emblem" aria-hidden="true">
-                                <i class="bi bi-lightning-charge-fill"></i>
+                                <i class="bi @AssetIconClass"></i>
                             </span>
                             <div>
-                                <h2 id="agent-asset-title">КвантЭнерго</h2>
-                                <p>KZEN · акция · энергетика</p>
+                                <h2 id="agent-asset-title">@CurrentAsset.Draft.Name</h2>
+                                <p>@CurrentAsset.Symbol · @GetAssetTypeLabel(CurrentAsset.Draft.AssetType).ToLowerInvariant() · @CurrentAsset.Draft.Industry.ToLowerInvariant()</p>
                             </div>
                         </div>
                         <dl class="asset-agent-stats">
@@ -193,6 +195,9 @@
 @code {
     private SimulationTickResult? latestTick;
     private readonly Dictionary<string, decimal> initialPortfolios = new();
+    private readonly Dictionary<string, (decimal Cash, decimal Position)> initialStates = new();
+    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
 
     protected override void OnInitialized()
     {
@@ -207,9 +212,12 @@
 
     private void HandleTick(SimulationTickResult tickResult)
     {
-        CaptureInitialPortfolios(tickResult);
-        latestTick = tickResult;
-        _ = InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(() =>
+        {
+            CaptureInitialPortfolios(tickResult);
+            latestTick = tickResult;
+            StateHasChanged();
+        });
     }
 
     private void CaptureInitialPortfolios(SimulationTickResult tickResult)
@@ -217,6 +225,7 @@
         foreach (var agent in tickResult.Agents)
         {
             initialPortfolios.TryAdd(agent.Name, agent.PortfolioValue);
+            initialStates.TryAdd(agent.Name, (agent.Cash, agent.Position));
         }
     }
 
@@ -260,7 +269,8 @@
             {
                 var initialValue = initialPortfolios.GetValueOrDefault(agent.Name, agent.PortfolioValue);
                 var pnl = agent.PortfolioValue - initialValue;
-                var isActive = agent.Position != 0 || agent.Cash != initialValue;
+                var initialState = initialStates.GetValueOrDefault(agent.Name, (agent.Cash, agent.Position));
+                var isActive = agent.Cash != initialState.Cash || agent.Position != initialState.Position;
 
                 return new AgentTableRow(
                     agent.Name,
@@ -368,7 +378,8 @@
                 var cashPct = agent.PortfolioValue > 0 ? agent.Cash / agent.PortfolioValue * 100m : 100m;
                 var posPct = 100m - cashPct;
 
-                var isActive = agent.Position != 0 || agent.Cash != initialValue;
+                var initialState = initialStates.GetValueOrDefault(agent.Name, (agent.Cash, agent.Position));
+                var isActive = agent.Cash != initialState.Cash || agent.Position != initialState.Position;
                 var statusLabel = isActive ? "Активен" : "Ожидает";
                 var statusClass = isActive ? "status-active" : "status-idle";
                 var statusIcon = isActive ? "bi-activity" : "bi-clock-history";
@@ -412,6 +423,24 @@
         AgentType.MarketMaker => "type-maker",
         AgentType.NewsDriven => "type-news",
         _ => ""
+    };
+
+    private static string GetAssetTypeLabel(AssetType assetType) => assetType switch
+    {
+        AssetType.Stock => "Акция",
+        AssetType.Bond => "Облигация",
+        AssetType.Commodity => "Товар",
+        AssetType.Crypto => "Криптоактив",
+        _ => assetType.ToString()
+    };
+
+    private static string GetAssetIconClass(AssetType assetType) => assetType switch
+    {
+        AssetType.Stock => "bi-graph-up-arrow",
+        AssetType.Bond => "bi-receipt",
+        AssetType.Commodity => "bi-box-seam",
+        AssetType.Crypto => "bi-currency-bitcoin",
+        _ => "bi-lightning-charge-fill"
     };
 
     private static string GetTypeIcon(AgentType type) => type switch
