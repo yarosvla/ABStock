@@ -4,6 +4,7 @@
 @using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
+@using static ABStock.UI.Services.AgentDisplay
 @implements IDisposable
 @inject ISimulationRunner SimulationRunner
 @inject IActiveAssetContext ActiveAssetContext
@@ -120,6 +121,7 @@
                             <h2 id="agents-table-title">Состояние агентов</h2>
                             <span>Тик @latestTick.Tick</span>
                         </div>
+                        <p class="table-hint"><i class="bi bi-cursor-fill" aria-hidden="true"></i> Нажмите на агента, чтобы открыть детальную статистику</p>
                         <div class="agents-table">
                             <div class="agents-table-head">
                                 <span>Агент</span>
@@ -132,10 +134,11 @@
                             @foreach (var row in AgentRows)
                             {
                                 <div class="agents-table-row @row.TypeClass">
-                                    <div class="agent-name-cell">
+                                    <a class="agent-name-cell" href="/agents/@Uri.EscapeDataString(row.Name)" title="Открыть статистику агента">
                                         <span class="agent-icon"><i class="bi @row.TypeIcon" aria-hidden="true"></i></span>
                                         <strong>@row.Name</strong>
-                                    </div>
+                                        <i class="bi bi-chevron-right agent-open-hint" aria-hidden="true"></i>
+                                    </a>
                                     <span>@row.Strategy</span>
                                     <span>@row.Cash</span>
                                     <span class="@row.PositionClass">@row.Position</span>
@@ -406,70 +409,6 @@
             }).ToArray();
         }
     }
-
-    private static string GetTypeLabel(AgentType type) => type switch
-    {
-        AgentType.TrendFollowing => "Трендовый",
-        AgentType.CounterTrend => "Контртрендовый",
-        AgentType.MarketMaker => "Маркетмейкер",
-        AgentType.NewsDriven => "Новостной",
-        _ => type.ToString()
-    };
-
-    private static string GetTypeClass(AgentType type) => type switch
-    {
-        AgentType.TrendFollowing => "type-trend",
-        AgentType.CounterTrend => "type-counter",
-        AgentType.MarketMaker => "type-maker",
-        AgentType.NewsDriven => "type-news",
-        _ => ""
-    };
-
-    private static string GetAssetTypeLabel(AssetType assetType) => assetType switch
-    {
-        AssetType.Stock => "Акция",
-        AssetType.Bond => "Облигация",
-        AssetType.Commodity => "Товар",
-        AssetType.Crypto => "Криптоактив",
-        _ => assetType.ToString()
-    };
-
-    private static string GetAssetIconClass(AssetType assetType) => assetType switch
-    {
-        AssetType.Stock => "bi-graph-up-arrow",
-        AssetType.Bond => "bi-receipt",
-        AssetType.Commodity => "bi-box-seam",
-        AssetType.Crypto => "bi-currency-bitcoin",
-        _ => "bi-lightning-charge-fill"
-    };
-
-    private static string GetTypeIcon(AgentType type) => type switch
-    {
-        AgentType.TrendFollowing => "bi-graph-up-arrow",
-        AgentType.CounterTrend => "bi-arrow-down-up",
-        AgentType.MarketMaker => "bi-arrows-expand",
-        AgentType.NewsDriven => "bi-newspaper",
-        _ => "bi-robot"
-    };
-
-    private static string GetStrategyDescription(AgentType type) => type switch
-    {
-        AgentType.TrendFollowing => "Следует за направлением рынка. Покупает при росте цены, продаёт при падении.",
-        AgentType.CounterTrend => "Торгует против основного движения. Покупает просадки, продаёт на пиках.",
-        AgentType.MarketMaker => "Обеспечивает ликвидность. Одновременно выставляет заявки на покупку и продажу вокруг текущей цены.",
-        AgentType.NewsDriven => "Реагирует на внешние новости. Покупает при позитивном сигнале, продаёт при негативном.",
-        _ => ""
-    };
-
-    private static string FormatMoney(decimal value) => $"{value:N2} ₽";
-
-    private static string FormatNullableMoney(decimal? value) => value is null ? "-" : FormatMoney(value.Value);
-
-    private static string FormatPnl(decimal value) => value >= 0 ? $"+{value:N2} ₽" : $"{value:N2} ₽";
-
-    private static string FormatQuantity(decimal value) => value % 1m == 0m
-        ? value.ToString("0")
-        : value.ToString("0.##");
 
     private static string FormatAgentName(string agentName)
     {
