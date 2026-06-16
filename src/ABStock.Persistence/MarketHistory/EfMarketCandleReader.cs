@@ -39,7 +39,6 @@ internal sealed class EfMarketCandleReader(IDbContextFactory<AbStockDbContext> c
         var trades = db.Trades
             .AsNoTracking()
             .Where(trade => trade.SimulationRunId == runId)
-            .AsEnumerable()
             .ToArray();
 
         var intervalMs = checked((long)interval.TotalMilliseconds);
