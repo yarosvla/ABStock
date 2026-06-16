@@ -1,6 +1,12 @@
 @page "/create-asset"
 @layout CreateAssetLayout
 @rendermode InteractiveServer
+@using ABStock.AI.Models
+@using ABStock.AI.Services
+@using ABStock.Shared
+@using ABStock.UI.Services
+@inject IAssetProfileService AssetProfileService
+@inject IActiveAssetContext ActiveAssetContext
 
 <PageTitle>Создание актива</PageTitle>
 
@@ -81,11 +87,11 @@
 
                         <div class="summary-description">
                             <strong>Описание (кратко)</strong>
-                            <p>@DescriptionPreview</p>
+                            <p>@SummaryDescription</p>
                         </div>
 
-                        <button class="read-description-button" type="button">
-                            Читать полное описание
+                        <button class="read-description-button" type="button" @onclick="ToggleDescriptionExpansion">
+                            @(isDescriptionExpanded ? "Скрыть полное описание" : "Читать полное описание")
                             <i class="bi bi-chevron-down" aria-hidden="true"></i>
                         </button>
 
@@ -156,7 +162,7 @@
 
                             <div class="field-group @(ShowAssetNameValidation ? "has-error" : null)">
                                 <label for="asset-name">Название актива <span>*</span></label>
-                                <input id="asset-name" type="text" placeholder="Например: КвантЭнерго" @bind="assetName" @bind:event="oninput" aria-invalid="@ShowAssetNameValidation" />
+                                <input id="asset-name" type="text" placeholder="Например: КвантЭнерго" @bind="assetName" @bind:event="oninput" @bind:after="SyncDraftState" aria-invalid="@ShowAssetNameValidation" />
                                 @if (ShowAssetNameValidation)
                                 {
                                     <small class="validation-message">Укажите название актива.</small>
@@ -165,7 +171,7 @@
 
                             <div class="field-group @(ShowAssetDescriptionValidation ? "has-error" : null)">
                                 <label for="asset-description">Описание актива <span>*</span></label>
-                                <textarea id="asset-description" placeholder="Опишите бизнес-модель, регион, драйверы роста, ограничения и риски." @bind="assetDescription" @bind:event="oninput" aria-invalid="@ShowAssetDescriptionValidation"></textarea>
+                                <textarea id="asset-description" placeholder="Опишите бизнес-модель, регион, драйверы роста, ограничения и риски." @bind="assetDescription" @bind:event="oninput" @bind:after="SyncDraftState" aria-invalid="@ShowAssetDescriptionValidation"></textarea>
                                 @if (ShowAssetDescriptionValidation)
                                 {
                                     <small class="validation-message">Добавьте описание для генерации AI-профиля.</small>
@@ -206,14 +212,14 @@
                                     </div>
 
                                     <label class="toggle-row">
-                                        <input type="checkbox" @bind="includeGovernmentSupport" />
+                                        <input type="checkbox" @bind="includeGovernmentSupport" @bind:after="SyncDraftState" />
                                         <span>Учитывать государственную поддержку</span>
                                     </label>
 
                                     <label class="range-row">
                                         <span>Потенциал роста</span>
                                         <strong>@growthPotential%</strong>
-                                        <input type="range" min="0" max="100" step="1" @bind="growthPotential" />
+                                        <input type="range" min="0" max="100" step="1" @bind="growthPotential" @bind:after="SyncDraftState" />
                                     </label>
                                 </div>
                             }
@@ -316,12 +322,12 @@
                         <section class="profile-hero-card" id="profile-overview" aria-label="Сводка AI-профиля">
                             <div class="asset-summary-block">
                                 <div class="asset-emblem compact" aria-hidden="true">
-                                    <i class="bi bi-lightning-charge-fill"></i>
+                                    <i class="bi @selectedAssetType.IconClass"></i>
                                 </div>
                                 <div>
                                     <h3>@DisplayAssetName</h3>
                                     <div class="profile-chip-row">
-                                        <span>@selectedAssetType.Name</span>
+                                        <span>@DisplayAssetTypeName</span>
                                         <span>@selectedIndustry</span>
                                         <span>Россия / СНГ</span>
                                         <span>RUB</span>
@@ -332,12 +338,12 @@
                             <div class="profile-kpi-strip">
                                 <div class="kpi-card recommendation">
                                     <span>Рекомендация</span>
-                                    <strong class="positive-text">нейтрально-позитивная</strong>
+                                    <strong class="@RecommendationTextClass">@RecommendationLabel</strong>
                                     <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
                                 </div>
                                 <div class="kpi-card risk">
                                     <span>Риск</span>
-                                    <strong class="warning-text">умеренно высокий</strong>
+                                    <strong class="@RiskTextClass">@RiskLevelLabel</strong>
                                     <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
                                 </div>
                                 <div class="kpi-card horizon">
@@ -347,7 +353,7 @@
                                 </div>
                                 <div class="kpi-card confidence">
                                     <span>Уверенность</span>
-                                    <strong class="positive-text">82%</strong>
+                                    <strong class="positive-text">@ConfidenceLabel</strong>
                                     <i class="bi bi-bullseye" aria-hidden="true"></i>
                                 </div>
                             </div>
@@ -360,18 +366,18 @@
                                     <i class="bi bi-graph-up-arrow moving-panel-icon" aria-hidden="true"></i>
                                 </div>
                                 <ul class="driver-summary-list">
-                                    @foreach (var factor in PositiveFactors.Take(3))
+                                    @foreach (var factor in ProfilePositiveFactors.Take(3))
                                     {
                                         <li>
                                             <span class="signal-dot green-dot"></span>
                                             <strong>@factor.Title</strong>
-                                            <em>@(factor.Impact.Contains("Высок") ? "Высокое" : "Среднее")</em>
+                                            <em>@factor.Impact</em>
                                         </li>
                                     }
                                 </ul>
                                 <div class="panel-footline">
                                     <span>Позитивное влияние</span>
-                                    <strong>78%</strong>
+                                    <strong>@PositiveImpactLabel</strong>
                                 </div>
                             </article>
 
@@ -381,18 +387,18 @@
                                     <i class="bi bi-shield-exclamation moving-panel-icon shield-icon" aria-hidden="true"></i>
                                 </div>
                                 <ul class="risk-summary-list">
-                                    @foreach (var risk in RiskFactors.Take(3))
+                                    @foreach (var risk in ProfileRiskFactors.Take(3))
                                     {
                                         <li>
                                             <span class="signal-dot red-dot"></span>
                                             <strong>@risk.Title</strong>
-                                            <em>@risk.Impact</em>
+                                            <em>@risk.Probability</em>
                                         </li>
                                     }
                                 </ul>
                                 <div class="panel-footline risk-footline">
                                     <span>Общий уровень риска</span>
-                                    <strong>Умеренно высокий</strong>
+                                    <strong>@RiskLevelLabel</strong>
                                 </div>
                             </article>
 
@@ -425,14 +431,14 @@
                                         </svg>
 
                                         <div class="news-gauge-score">
-                                            <strong>86</strong>
+                                            <strong>@NewsSensitivityScore</strong>
                                             <span>/100</span>
                                         </div>
 
-                                        <small class="news-gauge-label">Высокая</small>
+                                        <small class="news-gauge-label">@NewsSensitivityLabel</small>
                                     </div>
                                     <ul class="news-sensitivity-list">
-                                        @foreach (var driver in SensitivityDrivers)
+                                        @foreach (var driver in ProfileSensitivityDrivers)
                                         {
                                             <li class="@(driver.Level == "Высокая" ? "high" : "medium")">
                                                 <span>@driver.Name</span>
@@ -452,28 +458,22 @@
                             <div class="profile-panel tags-panel">
                                 <h3>Ключевые теги</h3>
                                 <div class="tag-cloud sector-tags">
-                                    <span>Энергетика</span>
-                                    <span>Умные сети</span>
-                                    <span class="risk-tag">Регуляторный риск</span>
-                                    <span class="green-tag">Господдержка</span>
-                                    <span class="warning-tag">Высокая чувствительность</span>
+                                    @foreach (var tag in ProfileTags)
+                                    {
+                                        <span class="@tag.ClassName">@tag.Label</span>
+                                    }
                                 </div>
                             </div>
                             <div class="profile-panel conclusion-panel">
                                 <h3>Ключевые выводы</h3>
                                 <ul>
-                                    <li>
-                                        <i class="bi bi-bar-chart-line" aria-hidden="true"></i>
-                                        Основной драйвер: господдержка и спрос на энергоэффективность
-                                    </li>
-                                    <li>
-                                        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-                                        Главный риск: регуляторные изменения и капиталоёмкость проектов
-                                    </li>
-                                    <li>
-                                        <i class="bi bi-bullseye" aria-hidden="true"></i>
-                                        Профиль: умеренно высокий риск при нейтрально-позитивной рекомендации
-                                    </li>
+                                    @foreach (var conclusion in ProfileConclusions)
+                                    {
+                                        <li>
+                                            <i class="bi @conclusion.Icon" aria-hidden="true"></i>
+                                            @conclusion.Text
+                                        </li>
+                                    }
                                 </ul>
                             </div>
                         </section>
@@ -505,10 +505,10 @@
 @code {
     private readonly AssetTypeOption[] AssetTypes =
     [
-        new("Акция", "Публичная компания", "bi-graph-up-arrow"),
-        new("Облигация", "Долговой инструмент", "bi-receipt"),
-        new("ETF", "Биржевой фонд", "bi-bar-chart-line"),
-        new("Криптоактив", "Цифровой актив", "bi-currency-bitcoin")
+        new(AssetType.Stock, "Акция", "Публичная компания", "bi-graph-up-arrow"),
+        new(AssetType.Bond, "Облигация", "Долговой инструмент", "bi-receipt"),
+        new(AssetType.Commodity, "Товар", "Биржевой актив", "bi-bar-chart-line"),
+        new(AssetType.Crypto, "Криптоактив", "Цифровой актив", "bi-currency-bitcoin")
     ];
 
     private readonly string[] Industries =
@@ -530,33 +530,10 @@
         "Формирование тегов"
     ];
 
-    private static readonly FactorInsight[] PositiveFactors =
-    [
-        new("Государственная поддержка", "Может снижать финансовые риски на ранних стадиях и ускорять пилотные внедрения.", "Высокое влияние", "78%"),
-        new("Спрос на энергоэффективность", "Поддерживает долгосрочный рынок решений для накопления энергии и умных сетей.", "Среднее влияние", "74%"),
-        new("Технологическая специализация", "Создаёт дифференциацию, но требует регулярного подтверждения через внедрения.", "Среднее влияние", "69%"),
-        new("Экспортный потенциал СНГ", "Расширяет адресный рынок за пределы РФ при условии стабильной регуляторной среды.", "Умеренное влияние", "63%")
-    ];
-
-    private static readonly RiskInsight[] RiskFactors =
-    [
-        new("Регуляторный риск", "Регуляторные", "Изменения госполитики или правил субсидирования могут резко изменить экономику проектов.", "Средняя", "Высокий"),
-        new("Капиталоёмкость проектов", "Финансовые", "R&D и производство требуют значительных вложений до подтверждения масштабируемости.", "Высокая", "Высокий"),
-        new("Конкурентное давление", "Рыночные", "Крупные энергетические и промышленные игроки могут быстрее занять каналы продаж.", "Средняя", "Средний"),
-        new("Зависимость от господдержки", "Операционные", "Снижение бюджетного финансирования может замедлить внедрения и новые контракты.", "Средняя", "Высокий")
-    ];
-
-    private static readonly SensitivityDriver[] SensitivityDrivers =
-    [
-        new("Регуляторные новости", "Высокая"),
-        new("Господдержка", "Высокая"),
-        new("Рыночные новости", "Средняя")
-    ];
-
     private AssetTypeOption selectedAssetType = default!;
     private string selectedIndustry = "Энергетика";
-    private string assetName = "КвантЭнерго";
-    private string assetDescription = "КвантЭнерго — российская энергетическая компания, разрабатывающая и внедряющая системы накопления энергии нового поколения, решения для умных сетей и распределённой генерации.\n\nКомпания ориентирована на внутренний рынок РФ и страны СНГ, при поддержке государства активно развивает экспортный потенциал.";
+    private string assetName = ActiveAssetDefaults.DemoDraft.Name;
+    private string assetDescription = ActiveAssetDefaults.DemoDraft.Description;
     private bool isAssetTypeOpen;
     private bool isIndustryOpen;
     private bool isOptionalOpen;
@@ -565,21 +542,34 @@
     private bool includeGovernmentSupport = true;
     private int growthPotential = 85;
     private int generationStep = -1;
-    private DateTime? generatedAt;
+    private DateTimeOffset? generatedAt;
     private bool wasSubmitted;
+    private AssetProfile? generatedProfile;
+    private bool isDescriptionExpanded;
 
     protected override void OnInitialized()
     {
-        selectedAssetType = AssetTypes[0];
+        var draft = ActiveAssetContext.Draft ?? ActiveAssetDefaults.DemoDraft;
+        selectedAssetType = ResolveAssetTypeOption(draft.AssetType);
+        ApplyDraft(draft);
+
+        if (ActiveAssetContext.Profile is not null)
+        {
+            generatedProfile = ActiveAssetContext.Profile;
+            generatedAt = ActiveAssetContext.UpdatedAt;
+            isProfileGenerated = true;
+        }
     }
 
+    private AssetProfile CurrentProfile => generatedProfile ?? ActiveAssetDefaults.BuildProfile(BuildDraft());
     private bool CanGenerate => !string.IsNullOrWhiteSpace(assetName) && !string.IsNullOrWhiteSpace(assetDescription);
     private int CompletedRequiredFields => (string.IsNullOrWhiteSpace(assetName) ? 0 : 1) + (string.IsNullOrWhiteSpace(assetDescription) ? 0 : 1);
     private bool ShowAssetNameValidation => wasSubmitted && string.IsNullOrWhiteSpace(assetName);
     private bool ShowAssetDescriptionValidation => wasSubmitted && string.IsNullOrWhiteSpace(assetDescription);
     private string DisplayAssetName => string.IsNullOrWhiteSpace(assetName) ? "Новый актив" : assetName.Trim();
+    private string DisplayAssetTypeName => selectedAssetType.Name;
     private int GenerationProgress => isGenerating ? Math.Clamp((generationStep + 1) * 100 / AnalysisStages.Length, 8, 100) : 0;
-    private string GeneratedAtLabel => generatedAt?.ToString("dd.MM.yyyy HH:mm") ?? "не сформировано";
+    private string GeneratedAtLabel => generatedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "не сформировано";
     private string PageTitleText => isProfileGenerated
         ? "AI-профиль готов"
         : isGenerating
@@ -592,13 +582,82 @@
             ? "Модель последовательно оценивает описание, риски и чувствительность к новостям."
             : "Опишите актив, уточните параметры и получите профиль с факторами роста, рисками и чувствительностью к новостям.";
 
-    private string DescriptionPreview
+    private string DescriptionPreview => BuildDescriptionPreview(maxLength: 180);
+
+    private string SummaryDescription => isDescriptionExpanded
+        ? CurrentProfile.Description
+        : BuildDescriptionPreview(maxLength: 300);
+
+    private string RecommendationLabel =>
+        CurrentProfile.PositiveFactors.Count >= CurrentProfile.NegativeFactors.Count + 2
+            ? "позитивная"
+            : CurrentProfile.PositiveFactors.Count >= CurrentProfile.NegativeFactors.Count
+                ? "нейтрально-позитивная"
+                : "сбалансированная";
+
+    private string RecommendationTextClass => RecommendationLabel == "сбалансированная" ? "warning-text" : "positive-text";
+
+    private string RiskLevelLabel =>
+        CurrentProfile.Risks.Count + CurrentProfile.NegativeFactors.Count >= 5
+            ? "умеренно высокий"
+            : CurrentProfile.Risks.Count >= 2
+                ? "средний"
+                : "контролируемый";
+
+    private string RiskTextClass => RiskLevelLabel == "контролируемый" ? "positive-text" : "warning-text";
+
+    private string ConfidenceLabel => $"{Math.Clamp(64 + growthPotential / 4 + (includeGovernmentSupport ? 3 : 0), 68, 92)}%";
+
+    private int NewsSensitivityScore => (int)Math.Round(CurrentProfile.NewsSensitivity * 100m, MidpointRounding.AwayFromZero);
+
+    private string NewsSensitivityLabel => NewsSensitivityScore switch
     {
-        get
-        {
-            var value = string.IsNullOrWhiteSpace(assetDescription) ? "Описание не заполнено." : assetDescription.Trim().Replace("\n", " ");
-            return value.Length <= 180 ? value : $"{value[..180]}...";
-        }
+        >= 80 => "Высокая",
+        >= 60 => "Средняя",
+        _ => "Низкая"
+    };
+
+    private string PositiveImpactLabel => $"{Math.Clamp(58 + NewsSensitivityScore / 3, 62, 91)}%";
+
+    private IReadOnlyList<FactorInsight> ProfilePositiveFactors =>
+        CurrentProfile.PositiveFactors
+            .Take(4)
+            .Select((factor, index) => new FactorInsight(
+                factor,
+                BuildPositiveFactorDetail(factor),
+                index == 0 ? "Высокое влияние" : index == 1 ? "Среднее влияние" : "Умеренное влияние",
+                $"{Math.Clamp(NewsSensitivityScore - index * 6, 54, 94)}%"))
+            .ToArray();
+
+    private IReadOnlyList<RiskInsight> ProfileRiskFactors =>
+        CurrentProfile.Risks
+            .Concat(CurrentProfile.NegativeFactors)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(4)
+            .Select((risk, index) => new RiskInsight(
+                risk,
+                index == 0 ? "Рыночные" : index == 1 ? "Операционные" : "Структурные",
+                BuildRiskDetail(risk),
+                index == 0 ? "Высокая" : "Средняя",
+                index == 0 ? "Высокий" : "Средний"))
+            .ToArray();
+
+    private IReadOnlyList<SensitivityDriver> ProfileSensitivityDrivers => BuildSensitivityDrivers();
+
+    private IReadOnlyList<TagChip> ProfileTags => BuildProfileTags();
+
+    private IReadOnlyList<ProfileConclusion> ProfileConclusions => BuildConclusions();
+
+    private string BuildDescriptionPreview(int maxLength)
+    {
+        var source = isProfileGenerated
+            ? CurrentProfile.Description
+            : assetDescription;
+        var value = string.IsNullOrWhiteSpace(source)
+            ? "Описание не заполнено."
+            : source.Trim().Replace("\n", " ");
+
+        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
     }
 
     private void ToggleAssetType()
@@ -611,6 +670,7 @@
     {
         selectedAssetType = type;
         isAssetTypeOpen = false;
+        SyncDraftState();
     }
 
     private void ToggleOptional()
@@ -630,6 +690,7 @@
     {
         selectedIndustry = industry;
         isIndustryOpen = false;
+        SyncDraftState();
     }
 
     private async Task GenerateProfile()
@@ -655,10 +716,23 @@
             await Task.Delay(320);
         }
 
-        generatedAt = DateTime.Now;
+        var draft = BuildDraft();
+        generatedProfile = AssetProfileService.CreateProfile(new AssetProfileRequest
+        {
+            AssetType = draft.AssetType,
+            Name = draft.Name,
+            Description = draft.Description,
+            Industry = draft.Industry,
+            IncludeGovernmentSupport = draft.IncludeGovernmentSupport,
+            GrowthPotential = draft.GrowthPotential
+        });
+
+        generatedAt = DateTimeOffset.Now;
         generationStep = AnalysisStages.Length;
         isGenerating = false;
         isProfileGenerated = true;
+        isDescriptionExpanded = false;
+        ActiveAssetContext.SetProfile(draft, generatedProfile);
     }
 
     private Task RegenerateProfile()
@@ -668,10 +742,13 @@
 
     private void EditParameters()
     {
+        generatedProfile = null;
         isProfileGenerated = false;
         isGenerating = false;
         wasSubmitted = false;
         generationStep = -1;
+        isDescriptionExpanded = false;
+        ActiveAssetContext.SetDraft(BuildDraft());
     }
 
     private void ClearForm()
@@ -690,10 +767,121 @@
         wasSubmitted = false;
         generationStep = -1;
         generatedAt = null;
+        generatedProfile = null;
+        isDescriptionExpanded = false;
+        ActiveAssetContext.Clear();
     }
 
-    private sealed record AssetTypeOption(string Name, string Description, string IconClass);
+    private void ToggleDescriptionExpansion() => isDescriptionExpanded = !isDescriptionExpanded;
+
+    private void ApplyDraft(ActiveAssetDraft draft)
+    {
+        selectedAssetType = ResolveAssetTypeOption(draft.AssetType);
+        selectedIndustry = string.IsNullOrWhiteSpace(draft.Industry) ? Industries[0] : draft.Industry;
+        assetName = draft.Name;
+        assetDescription = draft.Description;
+        includeGovernmentSupport = draft.IncludeGovernmentSupport;
+        growthPotential = draft.GrowthPotential;
+    }
+
+    private void SyncDraftState()
+    {
+        if (isGenerating)
+        {
+            return;
+        }
+
+        ActiveAssetContext.SetDraft(BuildDraft());
+    }
+
+    private ActiveAssetDraft BuildDraft() =>
+        new(
+            Name: DisplayAssetName,
+            Description: string.IsNullOrWhiteSpace(assetDescription) ? "Описание не заполнено." : assetDescription.Trim(),
+            AssetType: selectedAssetType.Type,
+            Industry: selectedIndustry,
+            IncludeGovernmentSupport: includeGovernmentSupport,
+            GrowthPotential: growthPotential);
+
+    private AssetTypeOption ResolveAssetTypeOption(AssetType assetType) =>
+        AssetTypes.FirstOrDefault(item => item.Type == assetType) ?? AssetTypes[0];
+
+    private IReadOnlyList<SensitivityDriver> BuildSensitivityDrivers()
+    {
+        var drivers = new List<SensitivityDriver>
+        {
+            new("Корпоративные новости", NewsSensitivityScore >= 75 ? "Высокая" : "Средняя"),
+            new($"Сектор {selectedIndustry}", NewsSensitivityScore >= 65 ? "Высокая" : "Средняя"),
+            new(includeGovernmentSupport ? "Господдержка" : "Рыночный спрос", includeGovernmentSupport ? "Высокая" : "Средняя")
+        };
+
+        return drivers
+            .DistinctBy(driver => driver.Name)
+            .ToArray();
+    }
+
+    private IReadOnlyList<TagChip> BuildProfileTags()
+    {
+        var tags = new List<TagChip>
+        {
+            new(selectedIndustry, string.Empty),
+            new(DisplayAssetTypeName, string.Empty)
+        };
+
+        if (includeGovernmentSupport)
+        {
+            tags.Add(new("Господдержка", "green-tag"));
+        }
+
+        if (CurrentProfile.Risks.Count > 0)
+        {
+            tags.Add(new(CurrentProfile.Risks[0], "risk-tag"));
+        }
+
+        if (NewsSensitivityScore >= 70)
+        {
+            tags.Add(new("Высокая чувствительность", "warning-tag"));
+        }
+
+        tags.AddRange(CurrentProfile.Keywords
+            .Where(keyword => !string.Equals(keyword, DisplayAssetName, StringComparison.OrdinalIgnoreCase))
+            .Take(3)
+            .Select(keyword => new TagChip(keyword, string.Empty)));
+
+        return tags
+            .DistinctBy(tag => tag.Label)
+            .Take(5)
+            .ToArray();
+    }
+
+    private IReadOnlyList<ProfileConclusion> BuildConclusions()
+    {
+        var conclusions = new List<ProfileConclusion>();
+
+        if (CurrentProfile.PositiveFactors.Count > 0)
+        {
+            conclusions.Add(new("bi-bar-chart-line", $"Основной драйвер: {CurrentProfile.PositiveFactors[0]}"));
+        }
+
+        if (CurrentProfile.Risks.Count > 0)
+        {
+            conclusions.Add(new("bi-exclamation-triangle", $"Главный риск: {CurrentProfile.Risks[0]}"));
+        }
+
+        conclusions.Add(new("bi-bullseye", $"Профиль: {RiskLevelLabel} риск при рекомендации «{RecommendationLabel}»"));
+        return conclusions.Take(3).ToArray();
+    }
+
+    private static string BuildPositiveFactorDetail(string factor) =>
+        $"{factor}. Фактор учитывается в профиле как один из основных драйверов сценария роста.";
+
+    private static string BuildRiskDetail(string risk) =>
+        $"{risk}. Требует мониторинга в ленте новостей, ликвидности и в динамике поведения агентов.";
+
+    private sealed record AssetTypeOption(AssetType Type, string Name, string Description, string IconClass);
     private sealed record FactorInsight(string Title, string Detail, string Impact, string Confidence);
     private sealed record RiskInsight(string Title, string Type, string Detail, string Probability, string Impact);
     private sealed record SensitivityDriver(string Name, string Level);
+    private sealed record TagChip(string Label, string ClassName);
+    private sealed record ProfileConclusion(string Icon, string Text);
 }

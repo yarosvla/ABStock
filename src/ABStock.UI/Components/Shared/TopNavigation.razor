@@ -99,7 +99,7 @@
     [Parameter] public string AvatarInitials { get; set; } = "АК";
 
     private bool IsNotificationsOpen { get; set; } = false;
-    private bool IsTradingActive => SimulationRunner.Current is not null;
+    private bool IsTradingActive => SimulationRunner.IsRunning;
     private string MarketStatusLabel => IsTradingActive ? "Торги запущены" : "Торги не запущены";
     private string NotificationSummaryText => UnreadNotificationsCount switch
     {

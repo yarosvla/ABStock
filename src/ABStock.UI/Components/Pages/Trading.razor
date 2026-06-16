@@ -5,6 +5,7 @@
 @using ABStock.Application.Simulation.Diagnostics
 @using ABStock.Application.Simulation
 @using ABStock.Shared
+@using ABStock.UI.Services
 @using Microsoft.AspNetCore.Hosting
 @using Microsoft.Extensions.DependencyInjection
 @using Microsoft.Extensions.Hosting
@@ -15,6 +16,8 @@
 @inject IServiceProvider Services
 @inject IWebHostEnvironment Environment
 @inject IJSRuntime JS
+@inject IActiveAssetContext ActiveAssetContext
+@inject ISimulationHistoryReader SimulationHistoryReader
 
 <PageTitle>Торги</PageTitle>
 
@@ -30,388 +33,393 @@
                     <span>Торги</span>
                 </p>
                 <h1>Экран торгов</h1>
-                <p>Торги по активу запущены. Следите за ценой, ликвидностью и последними сделками</p>
+                <p>Следите за ценой, ликвидностью и последними сделками по активу @CurrentAsset.Draft.Name</p>
             </div>
         </header>
 
         <section class="trading-grid" aria-label="Рабочее место трейдера">
-            <aside class="left-column">
-                <section class="glass-card asset-card" aria-labelledby="asset-title">
-                    <div class="asset-head">
-                        <span class="asset-emblem" aria-hidden="true">
-                            <i class="bi bi-lightning-charge-fill"></i>
-                        </span>
-                        <div>
-                            <h2 id="asset-title">КвантЭнерго</h2>
-                            <div class="asset-meta">
-                                <span>KZEN</span>
-                                <span>Акция</span>
-                                <span>Энергетика</span>
-                            </div>
-                            <p class="asset-state"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>Актив
-                                создан</p>
+            <div class="market-workspace">
+                <aside class="left-column">
+                    <section class="glass-card asset-card" aria-labelledby="asset-title">
+                        <div class="asset-head">
+                            <span class="asset-emblem" aria-hidden="true">
+                                <i class="bi @AssetIconClass"></i>
+                            </span>
+                            <div>
+                                <h2 id="asset-title">@CurrentAsset.Draft.Name</h2>
+                                <div class="asset-meta">
+                                    <span>@CurrentAsset.Symbol</span>
+                                    <span>@GetAssetTypeLabel(CurrentAsset.Draft.AssetType)</span>
+                                    <span>@CurrentAsset.Draft.Industry</span>
+                                </div>
+                                <p class="asset-state">
+                                    <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                    @(CurrentAsset.IsFallback ? "Демо-контекст" : "Актив синхронизирован")
+                                </p>
                             </div>
                         </div>
-                        <p class="asset-description">Инновационная энергетическая компания, разрабатывающая и внедряющая
-                            системы накопления энергии нового поколения на основе квантовых технологий.</p>
-                        </section>
+                        <p class="asset-description">@CurrentAsset.Profile.Description</p>
+                    </section>
 
-                        <section class="glass-card parameter-card" aria-labelledby="parameters-title">
-                            <h2 id="parameters-title">Параметры актива</h2>
-                            <dl class="parameter-list">
-                                @foreach (var parameter in AssetParameters)
+                    <section class="glass-card parameter-card" aria-labelledby="parameters-title">
+                        <h2 id="parameters-title">Параметры актива</h2>
+                        <dl class="parameter-list">
+                            @foreach (var parameter in AssetParameters)
+                            {
+                                <div>
+                                    <dt>@parameter.Label</dt>
+                                    <dd class="@parameter.ValueClass">@parameter.Value</dd>
+                                </div>
+                            }
+                        </dl>
+                    </section>
+                </aside>
+
+                <section class="center-column">
+                    <div class="metrics-strip" aria-label="Ключевые рыночные показатели">
+                        @foreach (var metric in MarketMetrics)
+                        {
+                            <article class="glass-card metric-card @metric.Accent">
+                                <span>@metric.Label</span>
+                                <strong>@metric.Value</strong>
+                                <small>@metric.Detail</small>
+                                @if (metric.Accent == "volume")
                                 {
+                                    <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
+                                        @foreach (var bar in metric.Bars)
+                                        {
+                                            <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
+                                        }
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg class="sparkline-chart" viewBox="0 0 96 42" aria-hidden="true">
+                                        <polygon points="@metric.Projection" />
+                                        <polyline points="@metric.Sparkline" />
+                                    </svg>
+                                }
+                            </article>
+                        }
+                    </div>
+
+                    @{
+                        var chartData = ChartSummary;
+                    }
+                    <section class="glass-card chart-card" aria-labelledby="chart-title">
+                        <div class="chart-toolbar">
+                            <div class="chart-topline">
+                                <div class="timeframe-row" aria-label="Таймфрейм">
+                                    @foreach (var item in Timeframes)
+                                    {
+                                        <button class="@(item.Key == selectedTimeframe ? "active" : null)" type="button"
+                                                @onclick="() => SelectTimeframe(item.Key)">@item.Label</button>
+                                    }
+                                </div>
+                                <span class="market-active"><i class="bi bi-record-circle"
+                                                                   aria-hidden="true"></i>@chartData.MarketState</span>
+                            </div>
+
+                            <div class="chart-header">
+                                <h2 id="chart-title">@CurrentAsset.Draft.Name · @selectedTimeframe · @CurrentAsset.Symbol</h2>
+                                <dl>
                                     <div>
-                                        <dt>@parameter.Label</dt>
-                                        <dd class="@parameter.ValueClass">@parameter.Value</dd>
+                                        <dt>ОТКР</dt>
+                                        <dd>@chartData.Open</dd>
+                                    </div>
+                                    <div>
+                                        <dt>МАКС</dt>
+                                        <dd>@chartData.High</dd>
+                                    </div>
+                                    <div>
+                                        <dt>МИН</dt>
+                                        <dd>@chartData.Low</dd>
+                                    </div>
+                                    <div>
+                                        <dt>ЗАКР</dt>
+                                        <dd>@chartData.Close</dd>
+                                    </div>
+                                    <div>
+                                        <dt></dt>
+                                        <dd class="@chartData.ChangeClass">@chartData.Change</dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        </div>
+
+                        <div class="chart-stage-shell">
+                            <button class="chart-live-reset" type="button" hidden>
+                                <i class="bi bi-broadcast-pin" aria-hidden="true"></i>
+                                Live
+                            </button>
+                            <div class="chart-stage"
+                                 @ref="chartViewport"
+                                 tabindex="0"
+                                 aria-label="Свечной график цены @CurrentAsset.Draft.Name">
+                                <div class="chart-surface" role="img" aria-label="Биржевой график цены @CurrentAsset.Draft.Name"></div>
+                                <div class="chart-hover-legend" aria-live="polite">
+                                    <span class="chart-hover-time" data-role="time">Нет данных</span>
+                                    <div class="chart-hover-values">
+                                        <span><small>O</small><strong data-role="open">-</strong></span>
+                                        <span><small>H</small><strong data-role="high">-</strong></span>
+                                        <span><small>L</small><strong data-role="low">-</strong></span>
+                                        <span><small>C</small><strong data-role="close">-</strong></span>
+                                    </div>
+                                </div>
+                                <div class="chart-empty-state">Нет данных</div>
+                            </div>
+                        </div>
+
+                        <footer class="chart-footer">
+                            <a class="chart-attribution"
+                               href="https://www.tradingview.com/"
+                               target="_blank"
+                               rel="noreferrer noopener">
+                                TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc.
+                            </a>
+                            <span>@chartData.UpdatedAt</span>
+                        </footer>
+                    </section>
+                </section>
+
+                <aside class="right-column">
+                    @{
+                        var orderBook = OrderBookData;
+                        var spread = Spread;
+                    }
+                    <section class="glass-card order-book" aria-labelledby="book-title">
+                        <div class="panel-heading">
+                            <div class="book-title-block">
+                                <h2 id="book-title">Стакан</h2>
+                                <p>Лучшие цены и глубина рынка</p>
+                            </div>
+                            <div class="book-spread-meta">
+                                <strong>@spread.Value</strong>
+                                <small>@spread.Detail</small>
+                            </div>
+                        </div>
+                        <div class="book-head">
+                            <span class="book-cell-price">Цена (₽)</span>
+                            <span class="book-cell-volume">Объём (шт.)</span>
+                            <span class="book-cell-total">Сумма (шт.)</span>
+                        </div>
+
+                        <div class="book-side sells">
+                            @foreach (var row in orderBook.Asks)
+                            {
+                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
+                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                    <strong class="book-cell-price">@row.Price</strong>
+                                    <span class="book-cell-volume">@row.Volume</span>
+                                    <span class="book-cell-total">@row.Total</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="book-side buys">
+                            @foreach (var row in orderBook.Bids)
+                            {
+                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
+                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                    <strong class="book-cell-price">@row.Price</strong>
+                                    <span class="book-cell-volume">@row.Volume</span>
+                                    <span class="book-cell-total">@row.Total</span>
+                                </div>
+                            }
+                        </div>
+                    </section>
+
+                    <section class="glass-card trades-card" aria-labelledby="trades-title">
+                        <h2 id="trades-title">Последние сделки</h2>
+                        <div class="trade-head">
+                            <span>Время</span>
+                            <span>Цена (₽)</span>
+                            <span>Объём (шт.)</span>
+                            <span>Контрагенты</span>
+                        </div>
+                        <div class="trade-list">
+                            @foreach (var trade in RecentTrades)
+                            {
+                                <div class="trade-row @trade.SideClass">
+                                    <span>@trade.Time</span>
+                                    <strong>@trade.Price</strong>
+                                    <span>@trade.Volume</span>
+                                    <div class="trade-participants" title="@($"{trade.Buyer} / {trade.Seller}")">
+                                        <span>@trade.Buyer</span>
+                                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                                        <span>@trade.Seller</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </section>
+                </aside>
+
+                @{
+                    var status = Status;
+                }
+                <section class="glass-card status-strip" aria-label="Показатели рынка">
+                    <div class="status-metric">
+                        <small>С момента запуска</small>
+                        <strong class="positive">@status.Elapsed</strong>
+                    </div>
+                    <div class="status-metric">
+                        <small>Количество сделок</small>
+                        <strong>@status.TradeCount</strong>
+                    </div>
+                    <div class="status-metric">
+                        <small>Участников</small>
+                        <strong>@status.Participants</strong>
+                    </div>
+                    <div class="status-metric status-range">
+                        <small>Дневной диапазон</small>
+                        <strong>@status.Range</strong>
+                        <div class="range-track" aria-hidden="true">
+                            <span></span>
+                            <i style="@status.RangeMarkerStyle"></i>
+                        </div>
+                    </div>
+                    <div class="status-metric status-liquidity">
+                        <small>Ликвидность</small>
+                        <strong class="@status.LiquidityClass">@status.Liquidity</strong>
+                        <span>@status.LiquidityDetail</span>
+                    </div>
+
+                    <a class="portfolio-button status-cta" href="/news">
+                        <i class="bi bi-newspaper" aria-hidden="true"></i>
+                        <div>
+                            <strong>Добавить новость</strong>
+                            <span>Передать live-сигнал в симуляцию</span>
+                        </div>
+                    </a>
+                </section>
+
+                @if (DebugControl is not null)
+                {
+                    <details class="glass-card debug-accordion">
+                        <summary class="debug-summary">
+                            <span>
+                                <strong id="debug-title">Debug</strong>
+                                <small>Dev-only инструменты и сценарии</small>
+                            </span>
+                            <em>@(string.IsNullOrWhiteSpace(debugMessage) ? "Закрыто" : debugMessage)</em>
+                        </summary>
+
+                        <div class="debug-panel">
+                            <div class="debug-grid">
+                                <div class="debug-group">
+                                    <label>
+                                        Участник
+                                        <input @bind="debugAgentName" />
+                                    </label>
+                                    <label>
+                                        Сторона
+                                        <select @bind="debugOrderSide">
+                                            <option value="@OrderSide.Buy">Buy</option>
+                                            <option value="@OrderSide.Sell">Sell</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        Тип
+                                        <select @bind="debugOrderType">
+                                            <option value="@OrderType.Limit">Limit</option>
+                                            <option value="@OrderType.Market">Market</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        Цена
+                                        <input type="number" step="0.01" disabled="@(debugOrderType == OrderType.Market)" @bind="debugOrderPrice" />
+                                    </label>
+                                    <label>
+                                        Кол-во
+                                        <input type="number" step="0.01" min="0.01" @bind="debugOrderQuantity" />
+                                    </label>
+                                    <button type="button" @onclick="SubmitDebugOrder">Добавить заявку</button>
+                                </div>
+
+                                <div class="debug-group">
+                                    <label>
+                                        Агент
+                                        <select @bind="debugAgentType">
+                                            <option value="@AgentType.MarketMaker">MarketMaker</option>
+                                            <option value="@AgentType.TrendFollowing">TrendFollowing</option>
+                                            <option value="@AgentType.CounterTrend">CounterTrend</option>
+                                            <option value="@AgentType.NewsDriven">NewsDriven</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        Cash
+                                        <input type="number" step="100" min="0" @bind="debugAgentCash" />
+                                    </label>
+                                    <label>
+                                        Position
+                                        <input type="number" step="1" min="0" @bind="debugAgentPosition" />
+                                    </label>
+                                    <button type="button" @onclick="AddDebugAgent">Добавить агента</button>
+                                </div>
+                            </div>
+
+                            <div class="debug-scenarios">
+                                <div class="debug-scenarios-head">
+                                    <strong>Сценарии рынка</strong>
+                                    <span>Быстрые пресеты для красивого движения графика и проверки стакана</span>
+                                </div>
+                                <div class="debug-scenario-buttons">
+                                    <button type="button"
+                                            class="scenario-button bullish"
+                                            disabled="@isRunningDebugScenario"
+                                            @onclick="RunBullishScenarioAsync">
+                                        <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+                                        <span>Рост</span>
+                                    </button>
+                                    <button type="button"
+                                            class="scenario-button bearish"
+                                            disabled="@isRunningDebugScenario"
+                                            @onclick="RunSelloffScenarioAsync">
+                                        <i class="bi bi-graph-down-arrow" aria-hidden="true"></i>
+                                        <span>Sell-off</span>
+                                    </button>
+                                    <button type="button"
+                                            class="scenario-button reversal"
+                                            disabled="@isRunningDebugScenario"
+                                            @onclick="RunReversalScenarioAsync">
+                                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                                        <span>Разворот</span>
+                                    </button>
+                                    <button type="button"
+                                            class="scenario-button stop"
+                                            disabled="@(!isRunningDebugScenario)"
+                                            @onclick="StopDebugScenario">
+                                        <i class="bi bi-stop-circle" aria-hidden="true"></i>
+                                        <span>Стоп</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="debug-agents">
+                                <div class="debug-agents-head">
+                                    <span>Имя</span>
+                                    <span>Тип</span>
+                                    <span>Cash</span>
+                                    <span>Position</span>
+                                    <span>Value</span>
+                                </div>
+                                @foreach (var agent in latestTick?.Agents ?? [])
+                                {
+                                    <div class="debug-agent-row">
+                                        <strong>@agent.Name</strong>
+                                        <span>@agent.Type</span>
+                                        <span>@FormatMoney(agent.Cash)</span>
+                                        <span>@FormatQuantity(agent.Position)</span>
+                                        <span>@FormatMoney(agent.PortfolioValue)</span>
                                     </div>
                                 }
-                            </dl>
-                        </section>
-                    </aside>
-
-                    <section class="center-column">
-                        <div class="metrics-strip" aria-label="Ключевые рыночные показатели">
-                            @foreach (var metric in MarketMetrics)
-                            {
-                                <article class="glass-card metric-card @metric.Accent">
-                                    <span>@metric.Label</span>
-                                    <strong>@metric.Value</strong>
-                                    <small>@metric.Detail</small>
-                                    @if (metric.Accent == "volume")
-                                    {
-                                        <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
-                                            @foreach (var bar in metric.Bars)
-                                            {
-                                                <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
-                                            }
-                                        </svg>
-                                    }
-                                    else
-                                    {
-                                        <svg class="sparkline-chart" viewBox="0 0 96 42" aria-hidden="true">
-                                            <polygon points="@metric.Projection" />
-                                            <polyline points="@metric.Sparkline" />
-                                        </svg>
-                                    }
-                                </article>
-                            }
+                            </div>
                         </div>
-
-                        @{
-                            var chartData = ChartSummary;
-                        }
-                        <section class="glass-card chart-card" aria-labelledby="chart-title">
-                            <div class="chart-toolbar">
-                                <div class="chart-topline">
-                                    <div class="timeframe-row" aria-label="Таймфрейм">
-                                        @foreach (var item in Timeframes)
-                                        {
-                                            <button class="@(item.Key == selectedTimeframe ? "active" : null)" type="button"
-                                                    @onclick="() => SelectTimeframe(item.Key)">@item.Label</button>
-                                        }
-                                    </div>
-                                    <span class="market-active"><i class="bi bi-record-circle"
-                                                                       aria-hidden="true"></i>@chartData.MarketState</span>
-                                    </div>
-
-                                    <div class="chart-header">
-                                        <h2 id="chart-title">КвантЭнерго · @selectedTimeframe · ABStock</h2>
-                                        <dl>
-                                            <div>
-                                                <dt>ОТКР</dt>
-                                                <dd>@chartData.Open</dd>
-                                            </div>
-                                            <div>
-                                                <dt>МАКС</dt>
-                                                <dd>@chartData.High</dd>
-                                            </div>
-                                            <div>
-                                                <dt>МИН</dt>
-                                                <dd>@chartData.Low</dd>
-                                            </div>
-                                            <div>
-                                                <dt>ЗАКР</dt>
-                                                <dd>@chartData.Close</dd>
-                                            </div>
-                                            <div>
-                                                <dt></dt>
-                                                <dd class="@chartData.ChangeClass">@chartData.Change</dd>
-                                            </div>
-                                        </dl>
-                                    </div>
-                                </div>
-
-                                <div class="chart-stage-shell">
-                                    <div class="chart-stage"
-                                         @ref="chartViewport"
-                                         tabindex="0"
-                                         aria-label="Свечной график цены КвантЭнерго">
-                                        <div class="chart-surface" role="img" aria-label="Биржевой график цены КвантЭнерго"></div>
-                                        <div class="chart-hover-legend" aria-live="polite">
-                                            <span class="chart-hover-time" data-role="time">Нет данных</span>
-                                            <div class="chart-hover-values">
-                                                <span><small>O</small><strong data-role="open">-</strong></span>
-                                                <span><small>H</small><strong data-role="high">-</strong></span>
-                                                <span><small>L</small><strong data-role="low">-</strong></span>
-                                                <span><small>C</small><strong data-role="close">-</strong></span>
-                                            </div>
-                                        </div>
-                                        <div class="chart-empty-state">Нет данных</div>
-                                    </div>
-                                </div>
-
-                                <footer class="chart-footer">
-                                    <a class="chart-attribution"
-                                       href="https://www.tradingview.com/"
-                                       target="_blank"
-                                       rel="noreferrer noopener">
-                                        TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc.
-                                    </a>
-                                    <span>@chartData.UpdatedAt</span>
-                                </footer>
-                            </section>
-                        </section>
-
-                        <aside class="right-column">
-                            @{
-                                var orderBook = OrderBookData;
-                            }
-                            <section class="glass-card order-book" aria-labelledby="book-title">
-                                <h2 id="book-title">Стакан</h2>
-                                <div class="book-head">
-                                    <span class="book-cell-price">Цена (₽)</span>
-                                    <span class="book-cell-volume">Объём (шт.)</span>
-                                    <span class="book-cell-total">Сумма (шт.)</span>
-                                </div>
-
-                                <div class="book-side sells">
-                                    <div class="book-side-header ask-side-header">
-                                        <span>ASK</span>
-                                        <small>Продажа</small>
-                                    </div>
-                                    <svg class="book-depth-shape ask-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
-                                         aria-hidden="true">
-                                        <path d="@orderBook.AskFillPath" />
-                                        <path class="depth-line" d="@orderBook.AskLinePath" />
-                                    </svg>
-                                    @foreach (var row in orderBook.Asks)
-                                    {
-                                        <div class="book-row">
-                                            <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                            <strong class="book-cell-price">@row.Price</strong>
-                                            <span class="book-cell-volume">@row.Volume</span>
-                                            <span class="book-cell-total">@row.Total</span>
-                                        </div>
-                                    }
-                                </div>
-
-                                <div class="spread-row">
-                                    <i class="@Spread.Icon" aria-hidden="true"></i>
-                                    <strong>@Spread.Value</strong>
-                                    <span>@Spread.Detail</span>
-                                </div>
-
-                                <div class="book-side buys">
-                                    <div class="book-side-header bid-side-header">
-                                        <span>BID</span>
-                                        <small>Покупка</small>
-                                    </div>
-                                    <svg class="book-depth-shape bid-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
-                                         aria-hidden="true">
-                                        <path d="@orderBook.BidFillPath" />
-                                        <path class="depth-line" d="@orderBook.BidLinePath" />
-                                    </svg>
-                                    @foreach (var row in orderBook.Bids)
-                                    {
-                                        <div class="book-row">
-                                            <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                            <strong class="book-cell-price">@row.Price</strong>
-                                            <span class="book-cell-volume">@row.Volume</span>
-                                            <span class="book-cell-total">@row.Total</span>
-                                        </div>
-                                    }
-                                </div>
-                            </section>
-
-                            <section class="glass-card trades-card" aria-labelledby="trades-title">
-                                <h2 id="trades-title">Последние сделки</h2>
-                                <div class="trade-head">
-                                    <span>Время</span>
-                                    <span>Цена (₽)</span>
-                                    <span>Объём (шт.)</span>
-                                    <span>Участники</span>
-                                </div>
-                                <div class="trade-list">
-                                    @foreach (var trade in RecentTrades)
-                                    {
-                                        <div class="trade-row @trade.SideClass">
-                                            <span>@trade.Time</span>
-                                            <strong>@trade.Price</strong>
-                                            <span>@trade.Volume</span>
-                                            <em>@trade.Side</em>
-                                        </div>
-                                    }
-                                </div>
-                            </section>
-                        </aside>
-
-                        @{
-                            var status = Status;
-                        }
-                        <section class="glass-card status-strip" aria-label="Показатели рынка">
-                            <div class="status-metric">
-                                <small>С момента запуска</small>
-                                <strong class="positive">@status.Elapsed</strong>
-                            </div>
-                            <div class="status-metric">
-                                <small>Количество сделок</small>
-                                <strong>@status.TradeCount</strong>
-                            </div>
-                            <div class="status-metric">
-                                <small>Участников</small>
-                                <strong>@status.Participants</strong>
-                            </div>
-                            <div class="status-metric status-range">
-                                <small>Дневной диапазон</small>
-                                <strong>@status.Range</strong>
-                                <div class="range-track" aria-hidden="true">
-                                    <span></span>
-                                    <i style="@status.RangeMarkerStyle"></i>
-                                </div>
-                            </div>
-                            <div class="status-metric">
-                                <small>Ликвидность</small>
-                                <strong class="@status.LiquidityClass">@status.Liquidity</strong>
-                                <span>@status.LiquidityDetail</span>
-                            </div>
-
-                            <a class="portfolio-button" href="/news">
-                                <i class="bi bi-newspaper" aria-hidden="true"></i>
-                                <span>Добавить новость</span>
-                            </a>
-                        </section>
-
-                        @if (DebugControl is not null)
-                        {
-                            <section class="glass-card debug-panel" aria-labelledby="debug-title">
-                                <div class="debug-header">
-                                    <h2 id="debug-title">Debug</h2>
-                                    <span>@debugMessage</span>
-                                </div>
-
-                                <div class="debug-grid">
-                                    <div class="debug-group">
-                                        <label>
-                                            Участник
-                                            <input @bind="debugAgentName" />
-                                        </label>
-                                        <label>
-                                            Сторона
-                                            <select @bind="debugOrderSide">
-                                                <option value="@OrderSide.Buy">Buy</option>
-                                                <option value="@OrderSide.Sell">Sell</option>
-                                            </select>
-                                        </label>
-                                        <label>
-                                            Тип
-                                            <select @bind="debugOrderType">
-                                                <option value="@OrderType.Limit">Limit</option>
-                                                <option value="@OrderType.Market">Market</option>
-                                            </select>
-                                        </label>
-                                        <label>
-                                            Цена
-                                            <input type="number" step="0.01" disabled="@(debugOrderType == OrderType.Market)" @bind="debugOrderPrice" />
-                                        </label>
-                                        <label>
-                                            Кол-во
-                                            <input type="number" step="0.01" min="0.01" @bind="debugOrderQuantity" />
-                                        </label>
-                                        <button type="button" @onclick="SubmitDebugOrder">Добавить заявку</button>
-                                    </div>
-
-                                    <div class="debug-group">
-                                        <label>
-                                            Агент
-                                            <select @bind="debugAgentType">
-                                                <option value="@AgentType.MarketMaker">MarketMaker</option>
-                                                <option value="@AgentType.TrendFollowing">TrendFollowing</option>
-                                                <option value="@AgentType.CounterTrend">CounterTrend</option>
-                                                <option value="@AgentType.NewsDriven">NewsDriven</option>
-                                            </select>
-                                        </label>
-                                        <label>
-                                            Cash
-                                            <input type="number" step="100" min="0" @bind="debugAgentCash" />
-                                        </label>
-                                        <label>
-                                            Position
-                                            <input type="number" step="1" min="0" @bind="debugAgentPosition" />
-                                        </label>
-                                        <button type="button" @onclick="AddDebugAgent">Добавить агента</button>
-                                    </div>
-                                </div>
-
-                                <div class="debug-scenarios">
-                                    <div class="debug-scenarios-head">
-                                        <strong>Сценарии рынка</strong>
-                                        <span>Быстрые пресеты для красивого движения графика и проверки стакана</span>
-                                    </div>
-                                    <div class="debug-scenario-buttons">
-                                        <button type="button"
-                                                class="scenario-button bullish"
-                                                disabled="@isRunningDebugScenario"
-                                                @onclick="RunBullishScenarioAsync">
-                                            <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
-                                            <span>Рост</span>
-                                        </button>
-                                        <button type="button"
-                                                class="scenario-button bearish"
-                                                disabled="@isRunningDebugScenario"
-                                                @onclick="RunSelloffScenarioAsync">
-                                            <i class="bi bi-graph-down-arrow" aria-hidden="true"></i>
-                                            <span>Sell-off</span>
-                                        </button>
-                                        <button type="button"
-                                                class="scenario-button reversal"
-                                                disabled="@isRunningDebugScenario"
-                                                @onclick="RunReversalScenarioAsync">
-                                            <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
-                                            <span>Разворот</span>
-                                        </button>
-                                        <button type="button"
-                                                class="scenario-button stop"
-                                                disabled="@(!isRunningDebugScenario)"
-                                                @onclick="StopDebugScenario">
-                                            <i class="bi bi-stop-circle" aria-hidden="true"></i>
-                                            <span>Стоп</span>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div class="debug-agents">
-                                    <div class="debug-agents-head">
-                                        <span>Имя</span>
-                                        <span>Тип</span>
-                                        <span>Cash</span>
-                                        <span>Position</span>
-                                        <span>Value</span>
-                                    </div>
-                                    @foreach (var agent in latestTick?.Agents ?? [])
-                                    {
-                                        <div class="debug-agent-row">
-                                            <strong>@agent.Name</strong>
-                                            <span>@agent.Type</span>
-                                            <span>@FormatMoney(agent.Cash)</span>
-                                            <span>@FormatQuantity(agent.Position)</span>
-                                            <span>@FormatMoney(agent.PortfolioValue)</span>
-                                        </div>
-                                    }
-                                </div>
-                            </section>
-                        }
-                    </section>
+                    </details>
+                }
+            </div>
+        </section>
                 </main>
             </div>
 
@@ -438,7 +446,10 @@
 
     private const decimal DemoStartPrice = 124.35m;
     private const int MetricHistoryLimit = 72;
+    private const int VisibleOrderBookDepth = 50;
 
+    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
     private MarketMetric[] MarketMetrics => BuildMarketMetrics(latestTick);
 
     private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
@@ -455,23 +466,12 @@
             : null;
 
     private ChartSummaryData ChartSummary => BuildChartSummaryData(GetSelectedTimeframeState(), latestTick, lastChartUpdate);
-
-    private static readonly AssetParameter[] AssetParameters =
-    [
-        new("Тип актива", "Акция", null),
-        new("Сектор", "Энергетика", null),
-        new("Валюта торгов", "RUB", null),
-        new("Шаг цены", "0.05 ₽", null),
-        new("Капитализация (оценка)", "12.43 млрд ₽", null),
-        new("Количество акций", "100 000 000", null),
-        new("Дата создания", "23.05.2025", null),
-        new("Статус", "Актив создан", "positive")
-    ];
+    private AssetParameter[] AssetParameters => BuildAssetParameters();
 
     private string selectedTimeframe = "30s";
     private SimulationTickResult? latestTick;
     private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
-    private DateTimeOffset startedAt = DateTimeOffset.Now;
+    private DateTimeOffset runStartedAt = DateTimeOffset.Now;
     private ElementReference chartViewport;
     private IJSObjectReference? tradingChartModule;
     private bool isChartRegistered;
@@ -489,6 +489,8 @@
     private readonly List<Trade> tradeHistory = [];
     private readonly HashSet<string> activeScenarioSupportAgentKeys = [];
     private readonly HashSet<string> loadedHistoryTimeframes = [];
+    private SimulationRunSummary? currentRunSummary;
+    private Guid observedRunId = Guid.Empty;
     private string debugAgentName = "Manual";
     private OrderSide debugOrderSide = OrderSide.Buy;
     private OrderType debugOrderType = OrderType.Limit;
@@ -510,7 +512,7 @@
         pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime: true);
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         SimulationRunner.OnTick += HandleTick;
         latestTick = SimulationRunner.Current;
@@ -520,54 +522,97 @@
             LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
         }
 
-        _ = RunSimulationAsync();
+        await EnsureSimulationAsync();
     }
 
-    private async Task RunSimulationAsync()
+    private async Task EnsureSimulationAsync()
     {
-        if (SimulationRunner.Current is not null)
+        // Load the summary for the currently running singleton simulation first, so the
+        // match check below sees the real asset name/type instead of falling back to
+        // CurrentAsset.IsFallback on a freshly-created component (which would needlessly
+        // restart an already-matching run on re-navigation).
+        UpdateRunSummary();
+
+        if (SimulationRunner.IsRunning && SimulationMatchesCurrentAsset())
         {
+            UpdateRunSummary();
             return;
         }
 
-        await SimulationRunner.StartAsync(CreateDemoConfig());
+        if (SimulationRunner.IsRunning)
+        {
+            await SimulationRunner.StopAsync();
+            ResetViewState();
+        }
+
+        await SimulationRunner.StartAsync(CreateDemoConfig(CurrentAsset));
+        UpdateRunSummary();
     }
 
     private void HandleTick(SimulationTickResult tickResult)
     {
+        _ = InvokeAsync(() =>
+        {
+            ApplyTick(tickResult);
+            StateHasChanged();
+        });
+    }
+
+    private void ApplyTick(SimulationTickResult tickResult)
+    {
         var receivedAt = DateTimeOffset.Now;
         latestTick = tickResult;
         lastChartUpdate = receivedAt;
+        UpdateRunSummary();
         UpdateMetricHistory(tickResult);
         UpdateChartSeries(tickResult, receivedAt);
         LoadPersistedCandles(selectedTimeframe);
-        _ = InvokeAsync(StateHasChanged);
+        _ = TrySyncChartAsync();
+    }
+
+    private async Task TrySyncChartAsync()
+    {
+        if (pendingChartSync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var modulePath = Assets["Components/Pages/Trading.razor.js"];
+            if (!modulePath.StartsWith("./", StringComparison.Ordinal) &&
+                !modulePath.StartsWith("/", StringComparison.Ordinal) &&
+                !modulePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                modulePath = $"./{modulePath}";
+            }
+
+            tradingChartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", modulePath);
+
+            if (!isChartRegistered)
+            {
+                await tradingChartModule.InvokeVoidAsync("register", chartViewport);
+                isChartRegistered = true;
+            }
+
+            var payload = pendingChartSync;
+            await tradingChartModule.InvokeVoidAsync("sync", chartViewport, payload);
+            pendingChartSync = null;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+            // ElementReference is not ready yet; OnAfterRenderAsync will sync.
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var modulePath = Assets["Components/Pages/Trading.razor.js"];
-        if (!modulePath.StartsWith("./", StringComparison.Ordinal) &&
-            !modulePath.StartsWith("/", StringComparison.Ordinal) &&
-            !modulePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-        {
-            modulePath = $"./{modulePath}";
-        }
-
-        tradingChartModule ??= await JS.InvokeAsync<IJSObjectReference>(
-            "import",
-            modulePath);
-
-        if (!isChartRegistered)
-        {
-            await tradingChartModule.InvokeVoidAsync("register", chartViewport);
-            isChartRegistered = true;
-        }
-
         if (pendingChartSync is not null)
         {
-            await tradingChartModule.InvokeVoidAsync("sync", chartViewport, pendingChartSync);
-            pendingChartSync = null;
+            await TrySyncChartAsync();
         }
     }
 
@@ -729,7 +774,7 @@
         var selectedSeries = GetSelectedTimeframeState();
         pendingChartSync = createdBarsForSelectedTimeframe > 1
             ? BuildFullChartSyncPayload(forceScrollToRealtime: false)
-            : BuildIncrementalChartSyncPayload(selectedSeries.Candles[^1], forceScrollToRealtime: selectedSeries.Candles.Count <= 2);
+            : BuildIncrementalChartSyncPayload(selectedSeries.Candles[^1], forceScrollToRealtime: false);
     }
 
     private void SubmitDebugOrder()
@@ -949,19 +994,106 @@
         return activated;
     }
 
-    private static SimulationConfig CreateDemoConfig() =>
+    private void ResetViewState()
+    {
+        latestTick = null;
+        currentRunSummary = null;
+        observedRunId = Guid.Empty;
+        runStartedAt = DateTimeOffset.Now;
+        lastChartUpdate = DateTimeOffset.Now;
+        chartStatePrimed = false;
+        metricsPrimed = false;
+        previousVolume = 0m;
+        pendingChartSync = null;
+        priceMetricHistory.Clear();
+        bidMetricHistory.Clear();
+        askMetricHistory.Clear();
+        volumeMetricHistory.Clear();
+        tradeHistory.Clear();
+        seenTradeIds.Clear();
+        processedTradeIds.Clear();
+        loadedHistoryTimeframes.Clear();
+        activeScenarioSupportAgentKeys.Clear();
+
+        foreach (var state in timeframeSeriesStates.Values)
+        {
+            state.Candles.Clear();
+        }
+    }
+
+    private void UpdateRunSummary()
+    {
+        var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty)
+        {
+            currentRunSummary = null;
+            observedRunId = Guid.Empty;
+            return;
+        }
+
+        if (observedRunId == runId && currentRunSummary is not null)
+        {
+            runStartedAt = currentRunSummary.StartedAt.ToLocalTime();
+            return;
+        }
+
+        currentRunSummary = SimulationHistoryReader.GetRun(runId);
+        observedRunId = runId;
+
+        if (currentRunSummary is not null)
+        {
+            runStartedAt = currentRunSummary.StartedAt.ToLocalTime();
+        }
+    }
+
+    private bool SimulationMatchesCurrentAsset()
+    {
+        if (currentRunSummary is null)
+        {
+            return CurrentAsset.IsFallback;
+        }
+
+        return string.Equals(currentRunSummary.AssetName, CurrentAsset.Draft.Name, StringComparison.Ordinal) &&
+               currentRunSummary.AssetType == CurrentAsset.Draft.AssetType;
+    }
+
+    private static SimulationConfig CreateDemoConfig(ActiveAssetView asset) =>
         new(
-            "КвантЭнерго",
-            "Демо-актив для проверки связки UI, Application и Exchange.",
-            AssetType.Stock,
-            DemoStartPrice,
+            asset.Draft.Name,
+            asset.Profile.Description,
+            asset.Draft.AssetType,
+            CalculateStartPrice(asset),
             TimeSpan.FromSeconds(1),
             [
-                new AgentSpec(AgentType.MarketMaker, 100_000m, 100m),
-                new AgentSpec(AgentType.TrendFollowing, 100_000m, 50m),
-                new AgentSpec(AgentType.CounterTrend, 100_000m, 50m),
-                new AgentSpec(AgentType.NewsDriven, 100_000m, 50m)
+                new AgentSpec(AgentType.MarketMaker, 140_000m, 160m),
+                new AgentSpec(AgentType.TrendFollowing, 110_000m, 60m),
+                new AgentSpec(AgentType.CounterTrend, 110_000m, 60m),
+                new AgentSpec(AgentType.NewsDriven, 105_000m, 55m)
             ]);
+
+    private static decimal CalculateStartPrice(ActiveAssetView asset)
+    {
+        if (asset.IsFallback)
+        {
+            return DemoStartPrice;
+        }
+
+        var basePrice = asset.Draft.AssetType switch
+        {
+            AssetType.Stock => 96m,
+            AssetType.Bond => 101m,
+            AssetType.Commodity => 88m,
+            AssetType.Crypto => 72m,
+            _ => DemoStartPrice
+        };
+
+        var adjusted = basePrice
+            + asset.Draft.GrowthPotential * 0.42m
+            + (asset.Draft.IncludeGovernmentSupport ? 4m : 0m)
+            + asset.Profile.NewsSensitivity * 10m;
+
+        return Math.Round(adjusted / 0.05m, MidpointRounding.AwayFromZero) * 0.05m;
+    }
 
     private void UpdateMetricHistory(SimulationTickResult tickResult)
     {
@@ -1358,6 +1490,25 @@ BuildVolumeBars(volumeMetricHistory))
         ];
     }
 
+    private AssetParameter[] BuildAssetParameters()
+    {
+        var runStarted = currentRunSummary?.StartedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "ожидание запуска";
+        var sensitivity = $"{Math.Round(CurrentAsset.Profile.NewsSensitivity * 100m, 0):0}/100";
+        var keywordSummary = string.Join(", ", CurrentAsset.Profile.Keywords.Take(3));
+
+        return
+        [
+            new("Тип актива", GetAssetTypeLabel(CurrentAsset.Draft.AssetType), null),
+            new("Сектор", CurrentAsset.Draft.Industry, null),
+            new("Валюта торгов", "RUB", null),
+            new("Символ", CurrentAsset.Symbol, null),
+            new("Чувствительность к новостям", sensitivity, CurrentAsset.Profile.NewsSensitivity >= 0.7m ? "positive" : null),
+            new("Ключевые теги", string.IsNullOrWhiteSpace(keywordSummary) ? "нет данных" : keywordSummary, null),
+            new("Запуск симуляции", runStarted, null),
+            new("Статус", SimulationRunner.IsRunning ? "Торги активны" : "Ожидание запуска", SimulationRunner.IsRunning ? "positive" : null)
+        ];
+    }
+
     private static OrderBookViewData BuildOrderBookData(OrderBookSnapshot? orderBook)
     {
         var asks = GetVisibleOrderBookLevels(orderBook?.Asks ?? [], reverse: true);
@@ -1365,16 +1516,12 @@ BuildVolumeBars(volumeMetricHistory))
 
         return new OrderBookViewData(
             BuildOrderBookRows(asks),
-            BuildOrderBookRows(bids),
-            BuildDepthFillPath(asks, isBid: false),
-            BuildDepthLinePath(asks, isBid: false),
-            BuildDepthFillPath(bids, isBid: true),
-            BuildDepthLinePath(bids, isBid: true));
+            BuildOrderBookRows(bids));
     }
 
     private static OrderBookLevel[] GetVisibleOrderBookLevels(IReadOnlyList<OrderBookLevel> levels, bool reverse)
     {
-        var visibleLevels = levels.Take(6).ToArray();
+        var visibleLevels = levels.Take(VisibleOrderBookDepth).ToArray();
         if (reverse)
         {
             Array.Reverse(visibleLevels);
@@ -1387,8 +1534,7 @@ BuildVolumeBars(volumeMetricHistory))
     {
         var maxQuantity = levels.Count == 0 ? 0m : levels.Max(level => level.Quantity);
         var total = 0m;
-
-        return levels
+        var rows = levels
             .Select(level =>
             {
                 total += level.Quantity;
@@ -1399,59 +1545,29 @@ BuildVolumeBars(volumeMetricHistory))
                     FormatQuantity(level.Quantity),
                     FormatQuantity(total),
                     depth,
-                    $"width: {depth}%");
+                    $"width: {depth}%;",
+                    false);
             })
-            .ToArray();
-    }
+            .ToList();
 
-    private static string BuildDepthFillPath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
-    {
-        var linePath = BuildDepthLinePath(levels, isBid);
-        return isBid
-            ? $"{linePath} V125 H300 Z"
-            : $"{linePath} V125 H0 Z";
-    }
-
-    private static string BuildDepthLinePath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
-    {
-        if (levels.Count == 0)
+        if (rows.Count == 0)
         {
-            return isBid ? "M300 0 H300" : "M0 0 H0";
+            rows.Add(new OrderBookRow("—", "—", "—", 0, "width: 0%;", true));
         }
 
-        var rowHeight = 125d / levels.Count;
-        var maxTotal = levels.Sum(level => level.Quantity);
-        var cumulative = 0m;
-        var segments = new List<string>(levels.Count);
-
-        for (var index = 0; index < levels.Count; index++)
-        {
-            cumulative += levels[index].Quantity;
-            var ratio = maxTotal == 0m ? 0d : (double)(cumulative / maxTotal);
-            var x = isBid ? 286 - ratio * 226 : 14 + ratio * 226;
-            var y = index * rowHeight + rowHeight / 2;
-
-            if (index == 0)
-            {
-                segments.Add($"M{FormatSvgNumber(isBid ? 286 : 14)} {FormatSvgNumber(y)} L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
-            }
-            else
-            {
-                segments.Add($"L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
-            }
-        }
-
-        return string.Join(" ", segments);
+        return rows.ToArray();
     }
 
     private static TradeRow[] BuildTradeRows(IReadOnlyList<Trade> trades) =>
         trades
             .OrderByDescending(trade => trade.ExecutedAt)
+            .Take(50)
             .Select(trade => new TradeRow(
                 trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
                 FormatPrice(trade.Price),
                 FormatQuantity(trade.Quantity),
-                FormatTradeParticipants(trade.BuyerAgentName, trade.SellerAgentName),
+                FormatAgentName(trade.BuyerAgentName),
+                FormatAgentName(trade.SellerAgentName),
                 GetTradeClass(trade)))
             .ToArray();
 
@@ -1460,7 +1576,7 @@ BuildVolumeBars(volumeMetricHistory))
         var snapshot = tickResult?.Snapshot;
         if (snapshot?.BestBid is null || snapshot.BestAsk is null)
         {
-            return new SpreadData("bi bi-dash", FormatMoney(snapshot?.LastPrice ?? DemoStartPrice), "Спред недоступен");
+            return new SpreadData("bi bi-dash", "— / —", "Спред недоступен");
         }
 
         var spread = snapshot.BestAsk.Value - snapshot.BestBid.Value;
@@ -1469,7 +1585,7 @@ BuildVolumeBars(volumeMetricHistory))
 
         return new SpreadData(
             spread <= 0m ? "bi bi-caret-left-fill" : "bi bi-arrows-collapse",
-            FormatMoney(snapshot.LastPrice),
+            $"{FormatMoney(snapshot.BestBid.Value)} / {FormatMoney(snapshot.BestAsk.Value)}",
             $"Спред {FormatPrice(spread)} ₽ ({spreadPercent:0.00}%)");
     }
 
@@ -1488,7 +1604,7 @@ BuildVolumeBars(volumeMetricHistory))
         var askDepth = tickResult?.OrderBook.Asks.Sum(level => level.Quantity) ?? 0m;
         var totalDepth = bidDepth + askDepth;
         var liquidity = GetLiquidity(tickResult, totalDepth);
-        var elapsed = DateTimeOffset.Now - startedAt;
+        var elapsed = DateTimeOffset.Now - runStartedAt;
 
         return new StatusStripData(
             elapsed.ToString(@"hh\:mm\:ss"),
@@ -1605,16 +1721,13 @@ maxY)
 
     private static string GetTradeClass(Trade trade)
     {
-        if (string.Equals(trade.BuyerAgentName, "MarketMaker", StringComparison.Ordinal))
+        if (trade.BuyerAgentName.Contains("MarketMaker", StringComparison.Ordinal))
         {
             return "sell";
         }
 
         return "buy";
     }
-
-    private static string FormatTradeParticipants(string buyer, string seller) =>
-        $"{FormatAgentName(buyer)} / {FormatAgentName(seller)}";
 
     private static string FormatAgentName(string agentName)
     {
@@ -1623,11 +1736,13 @@ maxY)
             return "-";
         }
 
-        var compactName = agentName switch
+        var normalized = agentName.Trim();
+        var compactName = normalized switch
         {
             "TrendFollowing" => "Trend",
             "CounterTrend" => "Counter",
             "MarketMaker" => "Maker",
+            "NewsDriven" => "News",
             _ => null
         };
 
@@ -1636,15 +1751,35 @@ maxY)
             return compactName;
         }
 
-        var builder = new System.Text.StringBuilder(agentName.Length + 4);
-
-        for (var index = 0; index < agentName.Length; index++)
+        if (normalized.Contains("TrendFollowing", StringComparison.Ordinal))
         {
-            var current = agentName[index];
+            return normalized.Replace("TrendFollowing", "Trend", StringComparison.Ordinal);
+        }
+
+        if (normalized.Contains("CounterTrend", StringComparison.Ordinal))
+        {
+            return normalized.Replace("CounterTrend", "Counter", StringComparison.Ordinal);
+        }
+
+        if (normalized.Contains("MarketMaker", StringComparison.Ordinal))
+        {
+            return normalized.Replace("MarketMaker", "Maker", StringComparison.Ordinal);
+        }
+
+        if (normalized.Contains("NewsDriven", StringComparison.Ordinal))
+        {
+            return normalized.Replace("NewsDriven", "News", StringComparison.Ordinal);
+        }
+
+        var builder = new System.Text.StringBuilder(normalized.Length + 4);
+
+        for (var index = 0; index < normalized.Length; index++)
+        {
+            var current = normalized[index];
             if (index > 0 &&
                 char.IsUpper(current) &&
-                (char.IsLower(agentName[index - 1]) ||
-                 (index + 1 < agentName.Length && char.IsLower(agentName[index + 1]))))
+                (char.IsLower(normalized[index - 1]) ||
+                 (index + 1 < normalized.Length && char.IsLower(normalized[index + 1]))))
             {
                 builder.Append(' ');
             }
@@ -1654,6 +1789,26 @@ maxY)
 
         return builder.ToString();
     }
+
+    private static string GetAssetTypeLabel(AssetType assetType) =>
+        assetType switch
+        {
+            AssetType.Stock => "Акция",
+            AssetType.Bond => "Облигация",
+            AssetType.Commodity => "Товар",
+            AssetType.Crypto => "Криптоактив",
+            _ => assetType.ToString()
+        };
+
+    private static string GetAssetIconClass(AssetType assetType) =>
+        assetType switch
+        {
+            AssetType.Stock => "bi-graph-up-arrow",
+            AssetType.Bond => "bi-receipt",
+            AssetType.Commodity => "bi-box-seam",
+            AssetType.Crypto => "bi-currency-bitcoin",
+            _ => "bi-lightning-charge-fill"
+        };
 
     private static (string Label, string ClassName) GetLiquidity(SimulationTickResult? tickResult, decimal totalDepth)
     {
@@ -1717,12 +1872,8 @@ Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
     private sealed record OrderBookViewData(
         IReadOnlyList<OrderBookRow> Asks,
-        IReadOnlyList<OrderBookRow> Bids,
-        string AskFillPath,
-        string AskLinePath,
-        string BidFillPath,
-        string BidLinePath);
-    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle);
+        IReadOnlyList<OrderBookRow> Bids);
+    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle, bool IsEmpty);
     private sealed record SpreadData(string Icon, string Value, string Detail);
     private sealed record StatusStripData(
         string Elapsed,
@@ -1733,7 +1884,7 @@ Projection, IReadOnlyList<BarRect> Bars);
         string Liquidity,
         string LiquidityClass,
         string LiquidityDetail);
-    private sealed record TradeRow(string Time, string Price, string Volume, string Side, string SideClass);
+    private sealed record TradeRow(string Time, string Price, string Volume, string Buyer, string Seller, string SideClass);
     private sealed record ChartSummaryData(
         string Open,
         string High,
