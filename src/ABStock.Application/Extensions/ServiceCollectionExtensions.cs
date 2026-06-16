@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IAgentFactory, AgentFactory>();
         services.TryAddSingleton<IMarketHistoryStore, NullMarketHistoryStore>();
         services.TryAddSingleton<IMarketCandleReader, NullMarketCandleReader>();
+        services.TryAddSingleton<ISimulationHistoryReader, NullSimulationHistoryReader>();
         services.TryAddSingleton<SimulationRunner>();
         services.TryAddSingleton<ISimulationRunner>(provider => provider.GetRequiredService<SimulationRunner>());
         return services;
