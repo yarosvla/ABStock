@@ -1,5 +1,4 @@
 import {
-    CandlestickSeries,
     ColorType,
     CrosshairMode,
     LineStyle,
@@ -170,53 +169,95 @@ function applyTimeframeOptions(controller, timeframe) {
         timeScale: {
             barSpacing: options.barSpacing,
             minBarSpacing: Math.max(6, options.barSpacing - 3),
+            rightOffset: getDynamicRightOffset(controller.data.length, options),
             timeVisible: options.timeVisible,
             secondsVisible: options.secondsVisible
         }
     });
 }
 
+function getDynamicRightOffset(count, options) {
+    if (count <= 1) {
+        return 3;
+    }
+
+    if (count < options.minVisibleBars) {
+        return Math.max(2, (options.minVisibleBars - count) * 0.22 + 1.6);
+    }
+
+    return 2;
+}
+
 function handleVisibleRangeChange(controller, range) {
     if (!range || controller.data.length === 0) {
         controller.followRealtime = true;
+        toggleLiveReset(controller);
         return;
     }
 
     const lastIndex = controller.data.length - 1;
     const thresholdBars = FOLLOW_THRESHOLD_PX / Math.max(controller.barSpacing, 1);
     controller.followRealtime = lastIndex - range.to <= thresholdBars;
+    toggleLiveReset(controller);
 }
 
-function ensureViewport(controller, forceScrollToRealtime = false) {
-    const options = getTimeframeOptions(controller.currentTimeframe);
-    const count = controller.data.length;
-
-    if (count === 0) {
+function toggleLiveReset(controller) {
+    if (!controller.liveButton) {
         return;
     }
 
-    if (count <= options.minVisibleBars) {
-        controller.chart.timeScale().setVisibleLogicalRange({
-            from: -0.5,
-            to: options.minVisibleBars - 0.5
-        });
-        controller.followRealtime = true;
+    controller.liveButton.hidden = controller.data.length === 0 || controller.followRealtime;
+}
+
+function resetToLive(controller) {
+    controller.followRealtime = true;
+    toggleLiveReset(controller);
+    requestAnimationFrame(() => {
+        controller.chart.timeScale().scrollToRealTime();
+    });
+}
+
+function ensureViewport(controller, { forceScrollToRealtime = false, fitContent = false } = {}) {
+    const options = getTimeframeOptions(controller.currentTimeframe);
+    const count = controller.data.length;
+    const timeScale = controller.chart.timeScale();
+
+    if (count === 0) {
+        toggleLiveReset(controller);
+        return;
+    }
+
+    timeScale.applyOptions({
+        rightOffset: getDynamicRightOffset(count, options)
+    });
+
+    if (fitContent || !controller.hasViewport) {
+        controller.hasViewport = true;
+        timeScale.fitContent();
+
+        if (forceScrollToRealtime || controller.followRealtime) {
+            requestAnimationFrame(() => timeScale.scrollToRealTime());
+        }
+
+        toggleLiveReset(controller);
         return;
     }
 
     if (forceScrollToRealtime || controller.followRealtime) {
-        controller.chart.timeScale().scrollToRealTime();
+        timeScale.scrollToRealTime();
     }
+
+    toggleLiveReset(controller);
 }
 
-function replaceData(controller, data, forceScrollToRealtime) {
+function replaceData(controller, data, forceScrollToRealtime, fitContent) {
     controller.data = data;
     controller.series.setData(data);
     updateEmptyState(controller);
     refreshLegend(controller);
 
     requestAnimationFrame(() => {
-        ensureViewport(controller, forceScrollToRealtime);
+        ensureViewport(controller, { forceScrollToRealtime, fitContent });
     });
 }
 
@@ -238,7 +279,7 @@ function updateLatestPoint(controller, point, forceScrollToRealtime) {
     refreshLegend(controller);
 
     requestAnimationFrame(() => {
-        ensureViewport(controller, forceScrollToRealtime);
+        ensureViewport(controller, { forceScrollToRealtime });
     });
 }
 
@@ -305,8 +346,8 @@ export function register(root) {
         rightPriceScale: {
             borderVisible: false,
             scaleMargins: {
-                top: 0.1,
-                bottom: 0.08
+                top: 0.06,
+                bottom: 0.02
             }
         },
         leftPriceScale: {
@@ -316,14 +357,14 @@ export function register(root) {
             borderVisible: false,
             rightOffset: 0,
             lockVisibleTimeRangeOnResize: true,
-            rightBarStaysOnScroll: true,
-            shiftVisibleRangeOnNewBar: true,
-            fixLeftEdge: true,
+            rightBarStaysOnScroll: false,
+            shiftVisibleRangeOnNewBar: false,
+            fixLeftEdge: false,
             allowShiftVisibleRangeOnWhitespaceReplacement: true
         }
     });
 
-    const series = chart.addSeries(CandlestickSeries, {
+    const series = chart.addCandlestickSeries({
         upColor: "#36d98a",
         downColor: "#ff6b5f",
         borderUpColor: "#36d98a",
@@ -335,18 +376,22 @@ export function register(root) {
     });
 
     const controller = {
+        root,
         chart,
         series,
         surface,
         legend: root.querySelector(".chart-hover-legend"),
         emptyState: root.querySelector(".chart-empty-state"),
+        liveButton: root.querySelector(".chart-live-reset"),
         currentTimeframe: "30s",
         barSpacing: defaultTimeframe.barSpacing,
         data: [],
         followRealtime: true,
+        hasViewport: false,
         resizeObserver: null,
         visibleRangeHandler: null,
-        crosshairHandler: null
+        crosshairHandler: null,
+        liveButtonHandler: null
     };
 
     applyTimeframeOptions(controller, controller.currentTimeframe);
@@ -355,9 +400,14 @@ export function register(root) {
 
     controller.visibleRangeHandler = range => handleVisibleRangeChange(controller, range);
     controller.crosshairHandler = param => handleCrosshairMove(controller, param);
+    controller.liveButtonHandler = event => {
+        event.preventDefault();
+        resetToLive(controller);
+    };
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(controller.visibleRangeHandler);
     chart.subscribeCrosshairMove(controller.crosshairHandler);
+    controller.liveButton?.addEventListener("click", controller.liveButtonHandler);
 
     controller.resizeObserver = new ResizeObserver(entries => {
         const relevant = entries.find(entry => entry.target === surface) ?? entries[0];
@@ -368,10 +418,11 @@ export function register(root) {
         const width = Math.max(1, Math.round(relevant.contentRect.width));
         const height = Math.max(1, Math.round(relevant.contentRect.height));
         controller.chart.resize(width, height);
-        ensureViewport(controller, false);
+        ensureViewport(controller, { forceScrollToRealtime: false });
     });
 
     controller.resizeObserver.observe(surface);
+    toggleLiveReset(controller);
     controllers.set(root, controller);
 }
 
@@ -383,6 +434,7 @@ export function sync(root, payload) {
         return;
     }
 
+    const timeframeChanged = controller.currentTimeframe !== normalized.timeframe;
     applyTimeframeOptions(controller, normalized.timeframe);
 
     if (normalized.action === "update" && normalized.candle) {
@@ -399,7 +451,12 @@ export function sync(root, payload) {
         ? normalized.data.map(normalizePoint).filter(Boolean)
         : [];
 
-    replaceData(controller, data, normalized.forceScrollToRealtime);
+    replaceData(
+        controller,
+        data,
+        normalized.forceScrollToRealtime,
+        timeframeChanged || !controller.hasViewport || normalized.forceScrollToRealtime
+    );
 }
 
 export function dispose(root) {
@@ -410,6 +467,7 @@ export function dispose(root) {
 
     controller.chart.timeScale().unsubscribeVisibleLogicalRangeChange(controller.visibleRangeHandler);
     controller.chart.unsubscribeCrosshairMove(controller.crosshairHandler);
+    controller.liveButton?.removeEventListener("click", controller.liveButtonHandler);
     controller.resizeObserver?.disconnect();
     controller.chart.remove();
     controllers.delete(root);
