@@ -23,9 +23,11 @@ public static class ServiceCollectionExtensions
         services.RemoveAll<IMarketHistoryStore>();
         services.RemoveAll<IMarketCandleReader>();
         services.RemoveAll<ISimulationHistoryReader>();
+        services.RemoveAll<IAgentStatisticsReader>();
         services.TryAddSingleton<IMarketHistoryStore, EfMarketHistoryStore>();
         services.TryAddSingleton<IMarketCandleReader, EfMarketCandleReader>();
         services.TryAddSingleton<ISimulationHistoryReader, EfSimulationHistoryReader>();
+        services.TryAddSingleton<IAgentStatisticsReader, EfAgentStatisticsReader>();
 
         return services;
     }
