@@ -2,5 +2,5 @@ namespace ABStock.AI.Internal;
 
 internal interface IFinBertAnalyzer
 {
-    FinBertResult Analyze(String text);
+    Task<FinBertResult> AnalyzeAsync(String text, CancellationToken ct = default);
 }

@@ -8,7 +8,7 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 
 // Add services to the container.
 builder.Services.AddABStockApplication();
-builder.Services.AddABStockAI();
+builder.Services.AddABStockAI(builder.Configuration);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

@@ -4,20 +4,18 @@ internal sealed class StubFinBertAnalyzer : IFinBertAnalyzer
 {
     private readonly Random _rnd = new();
 
-    public FinBertResult Analyze(String text)
+    public Task<FinBertResult> AnalyzeAsync(String text, CancellationToken ct = default)
     {
-        
         var positive = (decimal) _rnd.NextDouble();
         var negative = (decimal) _rnd.NextDouble();
         var neutral = (decimal) _rnd.NextDouble();
-
         var total = positive + negative + neutral;
 
-        return new FinBertResult
+        return Task.FromResult(new FinBertResult
         {
             PositiveProbability = Math.Round(positive / total, 4),
             NeutralProbability = Math.Round(neutral / total, 4),
             NegativeProbability = Math.Round(negative / total, 4)
-        };
+        });
     }
 }
