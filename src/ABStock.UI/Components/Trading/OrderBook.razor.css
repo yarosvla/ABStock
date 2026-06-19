@@ -1,0 +1,250 @@
+/* Classic centered order book: asks on top, spread divider, bids below.
+   Numbers are tabular/monospace and right-aligned; depth bars grow from the
+   price side and are coloured by side. */
+
+.order-book {
+    --ob-grid: minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 1fr);
+    --ob-ask: 255, 107, 95;
+    --ob-bid: 54, 217, 138;
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    padding: 12px 12px 10px;
+    gap: 6px;
+}
+
+.order-book.glass-card {
+    border-radius: 5px;
+}
+
+.ob-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ob-title h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #eef4fb;
+}
+
+.ob-title p {
+    margin: 2px 0 0;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(191, 208, 229, 0.55);
+}
+
+.ob-columns {
+    display: grid;
+    grid-template-columns: var(--ob-grid);
+    gap: 8px;
+    padding: 0 10px 2px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(191, 208, 229, 0.5);
+}
+
+.ob-columns .ob-volume,
+.ob-columns .ob-total {
+    text-align: right;
+}
+
+/* --- sides ------------------------------------------------------------- */
+
+.ob-side {
+    /* flex-basis:auto keeps rows visible when the column collapses to auto height
+       (responsive single-column layout) while still growing to fill the tall
+       order-book cell in the desktop grid. */
+    flex: 1 1 auto;
+    min-height: 92px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+}
+
+.ob-side::-webkit-scrollbar {
+    width: 4px;
+}
+
+.ob-side::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+}
+
+/* asks stack so the best (lowest) ask sits at the bottom, next to the spread */
+.ob-asks {
+    justify-content: flex-end;
+}
+
+.ob-bids {
+    justify-content: flex-start;
+}
+
+/* --- rows -------------------------------------------------------------- */
+
+.ob-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--ob-grid);
+    align-items: center;
+    gap: 8px;
+    min-height: 22px;
+    padding: 0 10px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    font-family: "JetBrains Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    isolation: isolate;
+}
+
+.ob-row > .ob-price,
+.ob-row > .ob-volume,
+.ob-row > .ob-total {
+    position: relative;
+    z-index: 1;
+}
+
+.ob-row > .ob-depth {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    right: 0;
+    z-index: 0;
+    width: 0;
+    border-radius: 5px 0 0 5px;
+    transition: width 0.18s ease-out;
+}
+
+.ob-asks .ob-depth {
+    background: linear-gradient(90deg, rgba(var(--ob-ask), 0), rgba(var(--ob-ask), 0.22));
+}
+
+.ob-bids .ob-depth {
+    background: linear-gradient(90deg, rgba(var(--ob-bid), 0), rgba(var(--ob-bid), 0.22));
+}
+
+.ob-price {
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.ob-asks .ob-price {
+    color: #ff8076;
+}
+
+.ob-bids .ob-price {
+    color: #4fe3a3;
+}
+
+.ob-volume,
+.ob-total {
+    text-align: right;
+    color: rgba(214, 224, 240, 0.92);
+}
+
+.ob-total {
+    color: rgba(186, 201, 224, 0.66);
+}
+
+.ob-row:hover {
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.ob-row.is-empty {
+    color: rgba(160, 178, 204, 0.4);
+    justify-items: center;
+}
+
+.ob-row.is-empty .ob-price,
+.ob-row.is-empty .ob-volume,
+.ob-row.is-empty .ob-total {
+    color: rgba(160, 178, 204, 0.4);
+}
+
+/* --- center divider ---------------------------------------------------- */
+
+.ob-center {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 3px 0;
+    padding: 7px 12px;
+    border-radius: 5px;
+    border: 1px solid rgba(149, 168, 196, 0.16);
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+        rgba(11, 21, 36, 0.82);
+}
+
+.ob-last {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    color: #eef4fb;
+}
+
+.ob-last i {
+    font-size: 12px;
+}
+
+.ob-center.up .ob-last {
+    color: #4fe3a3;
+}
+
+.ob-center.down .ob-last {
+    color: #ff8076;
+}
+
+.ob-center.neutral .ob-last i {
+    color: rgba(191, 208, 229, 0.6);
+}
+
+.ob-spread {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.ob-spread small {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(191, 208, 229, 0.5);
+}
+
+.ob-spread strong {
+    font-size: 12px;
+    font-weight: 700;
+    color: #e4edf7;
+}
+
+.ob-spread em {
+    font-size: 10px;
+    font-style: normal;
+    color: rgba(191, 208, 229, 0.7);
+}
+
+@media (max-width: 700px) {
+    .ob-title p {
+        display: none;
+    }
+}

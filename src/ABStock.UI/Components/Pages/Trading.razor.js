@@ -9,12 +9,12 @@ const FOLLOW_THRESHOLD_PX = 24;
 const controllers = new WeakMap();
 
 const timeframeConfig = {
-    "10s": { barSpacing: 13, minVisibleBars: 18, timeVisible: true, secondsVisible: true },
-    "30s": { barSpacing: 13, minVisibleBars: 18, timeVisible: true, secondsVisible: true },
-    "1m": { barSpacing: 12, minVisibleBars: 20, timeVisible: true, secondsVisible: false },
-    "5m": { barSpacing: 11, minVisibleBars: 22, timeVisible: true, secondsVisible: false },
-    "15m": { barSpacing: 10, minVisibleBars: 24, timeVisible: true, secondsVisible: false },
-    "1h": { barSpacing: 9, minVisibleBars: 24, timeVisible: true, secondsVisible: false }
+    "10s": { barSpacing: 10, minVisibleBars: 28, timeVisible: true, secondsVisible: true },
+    "30s": { barSpacing: 10, minVisibleBars: 28, timeVisible: true, secondsVisible: true },
+    "1m": { barSpacing: 9, minVisibleBars: 32, timeVisible: true, secondsVisible: false },
+    "5m": { barSpacing: 9, minVisibleBars: 34, timeVisible: true, secondsVisible: false },
+    "15m": { barSpacing: 8, minVisibleBars: 38, timeVisible: true, secondsVisible: false },
+    "1h": { barSpacing: 8, minVisibleBars: 38, timeVisible: true, secondsVisible: false }
 };
 
 const defaultTimeframe = timeframeConfig["30s"];
@@ -55,6 +55,7 @@ function normalizePayload(payload) {
         action: payload.action ?? payload.Action ?? "setData",
         timeframe: payload.timeframe ?? payload.Timeframe ?? "30s",
         forceScrollToRealtime: payload.forceScrollToRealtime ?? payload.ForceScrollToRealtime ?? false,
+        isNewBar: payload.isNewBar ?? payload.IsNewBar ?? false,
         data: payload.data ?? payload.Data ?? null,
         candle: payload.candle ?? payload.Candle ?? null
     };
@@ -164,6 +165,7 @@ function applyTimeframeOptions(controller, timeframe) {
     const options = getTimeframeOptions(timeframe);
     controller.currentTimeframe = timeframe;
     controller.barSpacing = options.barSpacing;
+    controller.lastRightOffset = getDynamicRightOffset(controller.data.length, options);
 
     controller.chart.applyOptions({
         timeScale: {
@@ -227,17 +229,20 @@ function ensureViewport(controller, { forceScrollToRealtime = false, fitContent 
         return;
     }
 
-    timeScale.applyOptions({
-        rightOffset: getDynamicRightOffset(count, options)
-    });
+    const nextRightOffset = getDynamicRightOffset(count, options);
+    if (controller.lastRightOffset !== nextRightOffset) {
+        controller.lastRightOffset = nextRightOffset;
+        timeScale.applyOptions({ rightOffset: nextRightOffset });
+    }
 
     if (fitContent || !controller.hasViewport) {
         controller.hasViewport = true;
-        timeScale.fitContent();
 
-        if (forceScrollToRealtime || controller.followRealtime) {
-            requestAnimationFrame(() => timeScale.scrollToRealTime());
-        }
+        // Lock candles to the configured bar width instead of fitContent(): fitContent zooms the
+        // few initial bars to span the whole canvas, which made the candles look enormous. A fixed
+        // bar spacing keeps them a normal size and just leaves whitespace to the left.
+        timeScale.applyOptions({ barSpacing: options.barSpacing });
+        requestAnimationFrame(() => timeScale.scrollToRealTime());
 
         toggleLiveReset(controller);
         return;
@@ -266,21 +271,27 @@ function upsertPoint(controller, point) {
 
     if (lastPoint && lastPoint.time === point.time) {
         controller.data[controller.data.length - 1] = point;
-        return;
+        return false;
     }
 
     controller.data.push(point);
+    return true;
 }
 
-function updateLatestPoint(controller, point, forceScrollToRealtime) {
-    upsertPoint(controller, point);
+function updateLatestPoint(controller, point, { forceScrollToRealtime = false, isNewBar = false } = {}) {
+    const appended = upsertPoint(controller, point);
     controller.series.update(point);
     updateEmptyState(controller);
     refreshLegend(controller);
 
-    requestAnimationFrame(() => {
-        ensureViewport(controller, { forceScrollToRealtime });
-    });
+    // A bar that merely refines the current candle (same timestamp) does not move the
+    // viewport, so we skip the costly time-scale work that previously ran every tick and
+    // caused the chart to flicker. Only realign when a new bar appears or a scroll is forced.
+    if (appended || isNewBar || forceScrollToRealtime || !controller.hasViewport) {
+        requestAnimationFrame(() => {
+            ensureViewport(controller, { forceScrollToRealtime });
+        });
+    }
 }
 
 export function register(root) {
@@ -345,9 +356,13 @@ export function register(root) {
         },
         rightPriceScale: {
             borderVisible: false,
+            // autoScale fits the price axis to the *visible* candles, so as the chart scrolls
+            // the vertical range follows the price action instead of staying pinned to the
+            // whole session. Roomier margins keep the candles vertically centred and readable.
+            autoScale: true,
             scaleMargins: {
-                top: 0.06,
-                bottom: 0.02
+                top: 0.14,
+                bottom: 0.14
             }
         },
         leftPriceScale: {
@@ -385,6 +400,7 @@ export function register(root) {
         liveButton: root.querySelector(".chart-live-reset"),
         currentTimeframe: "30s",
         barSpacing: defaultTimeframe.barSpacing,
+        lastRightOffset: null,
         data: [],
         followRealtime: true,
         hasViewport: false,
@@ -435,7 +451,9 @@ export function sync(root, payload) {
     }
 
     const timeframeChanged = controller.currentTimeframe !== normalized.timeframe;
-    applyTimeframeOptions(controller, normalized.timeframe);
+    if (timeframeChanged) {
+        applyTimeframeOptions(controller, normalized.timeframe);
+    }
 
     if (normalized.action === "update" && normalized.candle) {
         const point = normalizePoint(normalized.candle);
@@ -443,7 +461,10 @@ export function sync(root, payload) {
             return;
         }
 
-        updateLatestPoint(controller, point, normalized.forceScrollToRealtime);
+        updateLatestPoint(controller, point, {
+            forceScrollToRealtime: normalized.forceScrollToRealtime,
+            isNewBar: normalized.isNewBar
+        });
         return;
     }
 
