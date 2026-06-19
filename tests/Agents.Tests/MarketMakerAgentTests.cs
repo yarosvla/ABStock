@@ -5,8 +5,19 @@ namespace ABStock.Agents.Tests;
 
 public sealed class MarketMakerAgentTests
 {
+    private const int LadderLevels = 4;
+
     private static MarketSnapshot CreateSnapshot(decimal lastPrice) =>
         new(lastPrice, BestBid: null, BestAsk: null, Volume: 0m, RecentPrices: [], RecentTrades: []);
+
+    private static decimal GetPriceStep(decimal spreadPercent) =>
+        Math.Max(spreadPercent / LadderLevels, 0.0025m);
+
+    private static decimal GetBidPrice(decimal lastPrice, decimal spreadPercent, int level) =>
+        lastPrice * (1 - GetPriceStep(spreadPercent) * level);
+
+    private static decimal GetAskPrice(decimal lastPrice, decimal spreadPercent, int level) =>
+        lastPrice * (1 + GetPriceStep(spreadPercent) * level);
 
     [Fact]
     public void Decide_PlacesBidAndAsk_WhenHasPositionAndCash()
@@ -17,9 +28,9 @@ public sealed class MarketMakerAgentTests
 
         var decision = agent.Decide(snapshot, null);
 
-        Assert.Equal(2, decision.Orders.Count);
-        Assert.Contains(decision.Orders, o => o.Side == OrderSide.Buy);
-        Assert.Contains(decision.Orders, o => o.Side == OrderSide.Sell);
+        Assert.Equal(6, decision.Orders.Count);
+        Assert.Equal(4, decision.Orders.Count(o => o.Side == OrderSide.Buy));
+        Assert.Equal(2, decision.Orders.Count(o => o.Side == OrderSide.Sell));
     }
 
     [Fact]
@@ -34,8 +45,8 @@ public sealed class MarketMakerAgentTests
         var bid = decision.Orders.First(o => o.Side == OrderSide.Buy);
         var ask = decision.Orders.First(o => o.Side == OrderSide.Sell);
 
-        Assert.Equal(99m, bid.Price);
-        Assert.Equal(101m, ask.Price);
+        Assert.Equal(GetBidPrice(100m, 0.01m, 1), bid.Price);
+        Assert.Equal(GetAskPrice(100m, 0.01m, 1), ask.Price);
     }
 
     [Fact]
@@ -46,8 +57,8 @@ public sealed class MarketMakerAgentTests
 
         var decision = agent.Decide(snapshot, null);
 
-        Assert.Single(decision.Orders);
-        Assert.Equal(OrderSide.Buy, decision.Orders[0].Side);
+        Assert.Equal(LadderLevels, decision.Orders.Count);
+        Assert.All(decision.Orders, order => Assert.Equal(OrderSide.Buy, order.Side));
     }
 
     [Fact]
@@ -59,8 +70,8 @@ public sealed class MarketMakerAgentTests
 
         var decision = agent.Decide(snapshot, null);
 
-        Assert.Single(decision.Orders);
-        Assert.Equal(OrderSide.Sell, decision.Orders[0].Side);
+        Assert.Equal(2, decision.Orders.Count);
+        Assert.All(decision.Orders, order => Assert.Equal(OrderSide.Sell, order.Side));
     }
 
     [Fact]
@@ -87,7 +98,7 @@ public sealed class MarketMakerAgentTests
         var bid = decision.Orders.First(o => o.Side == OrderSide.Buy);
         var ask = decision.Orders.First(o => o.Side == OrderSide.Sell);
 
-        Assert.Equal(190m, bid.Price);
-        Assert.Equal(210m, ask.Price);
+        Assert.Equal(GetBidPrice(200m, 0.05m, 1), bid.Price);
+        Assert.Equal(GetAskPrice(200m, 0.05m, 1), ask.Price);
     }
 }

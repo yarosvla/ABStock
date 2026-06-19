@@ -4,6 +4,7 @@ namespace ABStock.Agents.Strategies;
 
 public class MarketMakerAgent : AgentBase
 {
+    private const int LadderLevels = 4;
     private readonly decimal _spreadPercent;
     private readonly decimal _orderQuantity;
 
@@ -16,16 +17,30 @@ public class MarketMakerAgent : AgentBase
 
     public override AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal)
     {
-        var bidPrice = snapshot.LastPrice * (1 - _spreadPercent);
-        var askPrice = snapshot.LastPrice * (1 + _spreadPercent);
-
         var orders = new List<Order>();
+        var remainingCash = State.Cash;
+        var remainingPosition = State.Position;
+        var priceStep = Math.Max(_spreadPercent / LadderLevels, 0.0025m);
 
-        if (CanBuy(bidPrice, _orderQuantity))
-            orders.Add(CreateOrder(OrderSide.Buy, bidPrice, _orderQuantity));
+        for (var level = 1; level <= LadderLevels; level++)
+        {
+            var levelQuantity = _orderQuantity + (LadderLevels - level) * 0.5m;
+            var bidPrice = snapshot.LastPrice * (1 - priceStep * level);
+            var askPrice = snapshot.LastPrice * (1 + priceStep * level);
+            var buyCost = bidPrice * levelQuantity;
 
-        if (CanSell(_orderQuantity))
-            orders.Add(CreateOrder(OrderSide.Sell, askPrice, _orderQuantity));
+            if (remainingCash >= buyCost)
+            {
+                orders.Add(CreateLimitOrder(OrderSide.Buy, bidPrice, levelQuantity));
+                remainingCash -= buyCost;
+            }
+
+            if (remainingPosition >= levelQuantity)
+            {
+                orders.Add(CreateLimitOrder(OrderSide.Sell, askPrice, levelQuantity));
+                remainingPosition -= levelQuantity;
+            }
+        }
 
         if (orders.Count == 0)
             return HoldDecision($"Cannot place orders: cash={State.Cash}, position={State.Position}");
@@ -33,7 +48,7 @@ public class MarketMakerAgent : AgentBase
         return new AgentDecision(
             State.AgentName,
             TradeAction.Hold,
-            $"Bid at {bidPrice:F2}, Ask at {askPrice:F2}, spread={_spreadPercent:P0}",
+            $"Maintaining {LadderLevels}-level liquidity ladder around {snapshot.LastPrice:F2}",
             orders
         );
     }

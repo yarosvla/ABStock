@@ -14,6 +14,7 @@ public sealed class ExchangeEngine : IExchangeEngine
     private readonly int _maxRecentPrices;
     private readonly int _maxRecentTrades;
     private decimal _lastPrice;
+    private decimal _totalVolume;
 
     public ExchangeEngine(
         decimal startPrice = 100m,
@@ -77,6 +78,7 @@ public sealed class ExchangeEngine : IExchangeEngine
     {
         ArgumentNullException.ThrowIfNull(orders);
 
+        var candidateOrders = new List<Order>();
         var acceptedOrders = new List<Order>();
         var rejectedOrders = new List<RejectedOrder>();
 
@@ -85,7 +87,7 @@ public sealed class ExchangeEngine : IExchangeEngine
             try
             {
                 _orderValidator.Validate(order);
-                acceptedOrders.Add(order);
+                candidateOrders.Add(order);
             }
             catch (Exception exception)
             {
@@ -94,9 +96,17 @@ public sealed class ExchangeEngine : IExchangeEngine
         }
 
         var trades = new List<Trade>();
-        foreach (var order in acceptedOrders)
+        foreach (var order in candidateOrders)
         {
-            trades.AddRange(ProcessAcceptedOrder(order));
+            try
+            {
+                trades.AddRange(ProcessAcceptedOrder(order));
+                acceptedOrders.Add(order);
+            }
+            catch (Exception exception)
+            {
+                rejectedOrders.Add(new RejectedOrder(order, exception.Message));
+            }
         }
 
         return new SubmitResult(
@@ -107,13 +117,33 @@ public sealed class ExchangeEngine : IExchangeEngine
         );
     }
 
+    public bool CancelOrder(Guid orderId)
+    {
+        if (orderId == Guid.Empty)
+        {
+            throw new ArgumentException("Order id is required.", nameof(orderId));
+        }
+
+        return _orderBook.Remove(orderId);
+    }
+
+    public int CancelOrdersByAgent(string agentName)
+    {
+        if (string.IsNullOrWhiteSpace(agentName))
+        {
+            throw new ArgumentException("Agent name is required.", nameof(agentName));
+        }
+
+        return _orderBook.RemoveByAgent(agentName);
+    }
+
     public MarketSnapshot GetSnapshot()
     {
         return new MarketSnapshot(
             LastPrice: _lastPrice,
             BestBid: _orderBook.BestBid?.Price,
             BestAsk: _orderBook.BestAsk?.Price,
-            Volume: _trades.Sum(trade => trade.Quantity),
+            Volume: _totalVolume,
             RecentPrices: _prices.ToArray(),
             RecentTrades: _trades.ToArray()
         );
@@ -124,6 +154,11 @@ public sealed class ExchangeEngine : IExchangeEngine
         return _orderBook.GetSnapshot(depth);
     }
 
+    public IReadOnlyList<Order> GetOpenOrders()
+    {
+        return [.._orderBook.BuyOrders, .._orderBook.SellOrders];
+    }
+
     private IReadOnlyList<Trade> ProcessAcceptedOrder(Order order)
     {
         if (order.Type == OrderType.Market)
@@ -131,9 +166,18 @@ public sealed class ExchangeEngine : IExchangeEngine
             return ExecuteMarketOrder(order);
         }
 
+        EnsureLimitOrderDoesNotSelfTrade(order);
         _orderBook.Add(order);
 
         return MatchOrders();
+    }
+
+    private void EnsureLimitOrderDoesNotSelfTrade(Order order)
+    {
+        if (_orderBook.WouldSelfTrade(order))
+        {
+            throw new InvalidOperationException("Order would match another order from the same agent.");
+        }
     }
 
     private IReadOnlyList<Trade> ExecuteMarketOrder(Order marketOrder)
@@ -219,6 +263,7 @@ public sealed class ExchangeEngine : IExchangeEngine
         );
 
         _trades.Add(trade);
+        _totalVolume += quantity;
         _lastPrice = price;
         _prices.Add(price);
         TrimHistory();

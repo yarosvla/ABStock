@@ -1,44 +1,28 @@
 @page "/trading"
 @layout CreateAssetLayout
 @rendermode InteractiveServer
+@using ABStock.Application.MarketHistory
+@using ABStock.Application.Simulation.Diagnostics
 @using ABStock.Application.Simulation
 @using ABStock.Shared
+@using ABStock.UI.Services
+@using Microsoft.AspNetCore.Hosting
+@using Microsoft.Extensions.DependencyInjection
+@using Microsoft.Extensions.Hosting
 @implements IDisposable
+@implements IAsyncDisposable
 @inject ISimulationRunner SimulationRunner
+@inject IMarketCandleReader CandleReader
+@inject IServiceProvider Services
+@inject IWebHostEnvironment Environment
+@inject IJSRuntime JS
+@inject IActiveAssetContext ActiveAssetContext
+@inject ISimulationHistoryReader SimulationHistoryReader
 
 <PageTitle>Торги</PageTitle>
 
 <div class="trading-shell">
-    <nav class="top-navigation" aria-label="Основная навигация">
-        <a class="brand" href="/" aria-label="ABStock">
-            <span class="brand-mark" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span class="brand-name">ABStock</span>
-        </a>
-
-        <div class="nav-links" aria-label="Разделы">
-            <a href="/create-asset">Создание актива</a>
-            <a class="active" href="/trading">Торги</a>
-            <a href="/news">Новости</a>
-            <a href="#agents-screen">Агенты</a>
-            <a href="#profile-screen">Профиль</a>
-        </div>
-
-        <div class="nav-actions">
-            <span class="market-status"><span aria-hidden="true"></span>Торги запущены</span>
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
-            <span class="date-chip">@Clock.Date</span>
-            <button class="icon-button" type="button" aria-label="Уведомления">
-                <i class="bi bi-bell" aria-hidden="true"></i>
-                <span class="notification-badge">3</span>
-            </button>
-            <button class="icon-button" type="button" aria-label="Настройки">
-                <i class="bi bi-gear" aria-hidden="true"></i>
-            </button>
-            <button class="avatar-button" type="button" aria-label="Профиль пользователя">АК</button>
-        </div>
-    </nav>
+    <TopNavigation ActivePage="Trading" ShowClock="true" />
 
     <main class="trading-main">
         <header class="page-heading">
@@ -49,310 +33,423 @@
                     <span>Торги</span>
                 </p>
                 <h1>Экран торгов</h1>
-                <p>Торги по активу запущены. Следите за ценой, ликвидностью и последними сделками</p>
+                <p>Следите за ценой, ликвидностью и последними сделками по активу @CurrentAsset.Draft.Name</p>
             </div>
         </header>
 
         <section class="trading-grid" aria-label="Рабочее место трейдера">
-            <aside class="left-column">
-                <section class="glass-card asset-card" aria-labelledby="asset-title">
-                    <div class="asset-head">
-                        <span class="asset-emblem" aria-hidden="true">
-                            <i class="bi bi-lightning-charge-fill"></i>
-                        </span>
-                        <div>
-                            <h2 id="asset-title">КвантЭнерго</h2>
-                            <div class="asset-meta">
-                                <span>KZEN</span>
-                                <span>Акция</span>
-                                <span>Энергетика</span>
-                            </div>
-                            <p class="asset-state"><i class="bi bi-check-circle-fill" aria-hidden="true"></i>Актив
-                                создан</p>
+            <div class="market-workspace">
+                <aside class="left-column">
+                    <section class="glass-card asset-card" aria-labelledby="asset-title">
+                        <div class="asset-head">
+                            <span class="asset-emblem" aria-hidden="true">
+                                <i class="bi @AssetIconClass"></i>
+                            </span>
+                            <div>
+                                <h2 id="asset-title">@CurrentAsset.Draft.Name</h2>
+                                <div class="asset-meta">
+                                    <span>@CurrentAsset.Symbol</span>
+                                    <span>@GetAssetTypeLabel(CurrentAsset.Draft.AssetType)</span>
+                                    <span>@CurrentAsset.Draft.Industry</span>
+                                </div>
+                                <p class="asset-state">
+                                    <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+                                    @(CurrentAsset.IsFallback ? "Демо-контекст" : "Актив синхронизирован")
+                                </p>
                             </div>
                         </div>
-                        <p class="asset-description">Инновационная энергетическая компания, разрабатывающая и внедряющая
-                            системы накопления энергии нового поколения на основе квантовых технологий.</p>
-                        </section>
-
-                        <section class="glass-card parameter-card" aria-labelledby="parameters-title">
-                            <h2 id="parameters-title">Параметры актива</h2>
-                            <dl class="parameter-list">
-                                @foreach (var parameter in AssetParameters)
-                                {
-                                    <div>
-                                        <dt>@parameter.Label</dt>
-                                        <dd class="@parameter.ValueClass">@parameter.Value</dd>
-                                    </div>
-                                }
-                            </dl>
-                        </section>
-                    </aside>
-
-                    <section class="center-column">
-                        <div class="metrics-strip" aria-label="Ключевые рыночные показатели">
-                            @foreach (var metric in MarketMetrics)
-                            {
-                                <article class="glass-card metric-card @metric.Accent">
-                                    <span>@metric.Label</span>
-                                    <strong>@metric.Value</strong>
-                                    <small>@metric.Detail</small>
-                                    @if (metric.Accent == "volume")
-                                    {
-                                        <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
-                                            @foreach (var bar in metric.Bars)
-                                            {
-                                                <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
-                                            }
-                                        </svg>
-                                    }
-                                    else
-                                    {
-                                        <svg class="sparkline-chart" viewBox="0 0 96 42" aria-hidden="true">
-                                            <polygon points="@metric.Projection" />
-                                            <polyline points="@metric.Sparkline" />
-                                        </svg>
-                                    }
-                                </article>
-                            }
-                        </div>
-
-                        @{
-                            var chartData = ChartData;
-                        }
-                        <section class="glass-card chart-card" aria-labelledby="chart-title">
-                            <div class="chart-toolbar">
-                                <div class="chart-topline">
-                                    <div class="timeframe-row" aria-label="Таймфрейм">
-                                        @foreach (var item in Timeframes)
-                                        {
-                                            <button class="@(item == selectedTimeframe ? "active" : null)" type="button"
-                                                    @onclick="() => SelectTimeframe(item)">@item</button>
-                                        }
-                                    </div>
-                                    <span class="market-active"><i class="bi bi-record-circle"
-                                                                       aria-hidden="true"></i>@chartData.MarketState</span>
-                                    </div>
-
-                                    <div class="chart-header">
-                                        <h2 id="chart-title">КвантЭнерго · @selectedTimeframe · ABStock</h2>
-                                        <dl>
-                                            <div>
-                                                <dt>ОТКР</dt>
-                                                <dd>@chartData.Open</dd>
-                                            </div>
-                                            <div>
-                                                <dt>МАКС</dt>
-                                                <dd>@chartData.High</dd>
-                                            </div>
-                                            <div>
-                                                <dt>МИН</dt>
-                                                <dd>@chartData.Low</dd>
-                                            </div>
-                                            <div>
-                                                <dt>ЗАКР</dt>
-                                                <dd>@chartData.Close</dd>
-                                            </div>
-                                            <div>
-                                                <dt></dt>
-                                                <dd class="@chartData.ChangeClass">@chartData.Change</dd>
-                                            </div>
-                                        </dl>
-                                    </div>
-                                </div>
-
-                                <div class="chart-stage">
-                                    <svg class="price-chart" viewBox="0 0 960 430" role="img"
-                                         aria-label="Свечной график цены КвантЭнерго">
-                                        <defs>
-                                            <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
-                                                <stop offset="0" stop-color="#122842" />
-                                                <stop offset="0.54" stop-color="#0E1B2E" />
-                                                <stop offset="1" stop-color="#09111F" />
-                                            </linearGradient>
-                                            <linearGradient id="chartGlow" x1="0" x2="1" y1="0" y2="0">
-                                                <stop offset="0" stop-color="#7C5CFF" stop-opacity="0.18" />
-                                                <stop offset="0.52" stop-color="#55C7FF" stop-opacity="0.1" />
-                                                <stop offset="1" stop-color="#36D98A" stop-opacity="0.12" />
-                                            </linearGradient>
-                                        </defs>
-                                        <rect width="960" height="430" fill="url(#chartFill)" />
-                                        <rect x="@ChartPanelLeft" y="18" width="@ChartPanelWidth" height="332" rx="10"
-                                              fill="url(#chartGlow)" />
-
-                                        @foreach (var x in chartData.GridX)
-                                        {
-                                            <line class="grid-line vertical-grid-line" x1="@x" y1="@ChartPlotTop" x2="@x"
-                                                  y2="@ChartPlotBottom" />
-                                        }
-                                        @foreach (var label in chartData.PriceLabels)
-                                        {
-                                            <line class="grid-line horizontal-grid-line" x1="@ChartPlotLeft" y1="@label.Y"
-                                                  x2="@ChartPlotRight" y2="@label.Y" />
-                                        }
-
-                                        <line class="price-marker-line" x1="@ChartPlotLeft" y1="@chartData.LastPriceY"
-                                              x2="@chartData.PlotRight" y2="@chartData.LastPriceY" />
-
-                                        @foreach (var candle in chartData.Candles)
-                                        {
-                                            <g class="candle @(candle.IsUp ? "up" : "down")">
-                                                <line x1="@candle.X" y1="@candle.HighY" x2="@candle.X" y2="@candle.LowY" />
-                                                <rect x="@candle.BodyX" y="@candle.BodyY" width="@candle.BodyWidth"
-                                                      height="@candle.BodyHeight" rx="1.5" />
-                                            </g>
-                                        }
-
-                                        <g class="axis-labels">
-                                            @foreach (var label in chartData.PriceLabels)
-                                            {
-                                                @SvgText(ChartAxisLabelX, label.Y, label.Text, "end")
-                                            }
-                                            @foreach (var label in chartData.TickLabels)
-                                            {
-                                                @SvgText(label.X, 377, label.Text, "middle")
-                                            }
-                                        </g>
-
-                                        <g class="price-tag">
-                                            <rect x="@chartData.PriceTagX" y="@chartData.PriceTagY" width="66" height="22" rx="7" />
-                                            <text x="@chartData.PriceTagTextX"
-                                                  y="@chartData.PriceTagTextY">@chartData.LastPrice</text>
-                                        </g>
-                                    </svg>
-                                </div>
-
-                                <footer class="chart-footer">
-                                    <span>@chartData.UpdatedAt</span>
-                                </footer>
-                            </section>
-                        </section>
-
-                        <aside class="right-column">
-                            @{
-                                var orderBook = OrderBookData;
-                            }
-                            <section class="glass-card order-book" aria-labelledby="book-title">
-                                <h2 id="book-title">Книга заявок</h2>
-                                <div class="book-head">
-                                    <span class="book-cell-price">Цена (₽)</span>
-                                    <span class="book-cell-volume">Объём (шт.)</span>
-                                    <span class="book-cell-total">Сумма (шт.)</span>
-                                </div>
-
-                                <div class="book-side sells">
-                                    <svg class="book-depth-shape ask-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
-                                         aria-hidden="true">
-                                        <path d="@orderBook.AskFillPath" />
-                                        <path class="depth-line" d="@orderBook.AskLinePath" />
-                                    </svg>
-                                    @foreach (var row in orderBook.Asks)
-                                    {
-                                        <div class="book-row">
-                                            <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                            <strong class="book-cell-price">@row.Price</strong>
-                                            <span class="book-cell-volume">@row.Volume</span>
-                                            <span class="book-cell-total">@row.Total</span>
-                                        </div>
-                                    }
-                                </div>
-
-                                <div class="spread-row">
-                                    <i class="@Spread.Icon" aria-hidden="true"></i>
-                                    <strong>@Spread.Value</strong>
-                                    <span>@Spread.Detail</span>
-                                </div>
-
-                                <div class="book-side buys">
-                                    <svg class="book-depth-shape bid-depth" viewBox="0 0 300 125" preserveAspectRatio="none"
-                                         aria-hidden="true">
-                                        <path d="@orderBook.BidFillPath" />
-                                        <path class="depth-line" d="@orderBook.BidLinePath" />
-                                    </svg>
-                                    @foreach (var row in orderBook.Bids)
-                                    {
-                                        <div class="book-row">
-                                            <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                            <strong class="book-cell-price">@row.Price</strong>
-                                            <span class="book-cell-volume">@row.Volume</span>
-                                            <span class="book-cell-total">@row.Total</span>
-                                        </div>
-                                    }
-                                </div>
-                            </section>
-
-                            <section class="glass-card trades-card" aria-labelledby="trades-title">
-                                <h2 id="trades-title">Последние сделки</h2>
-                                <div class="trade-head">
-                                    <span>Время</span>
-                                    <span>Цена (₽)</span>
-                                    <span>Объём (шт.)</span>
-                                    <span>Участники</span>
-                                </div>
-                                @foreach (var trade in RecentTrades)
-                                {
-                                    <div class="trade-row @trade.SideClass">
-                                        <span>@trade.Time</span>
-                                        <strong>@trade.Price</strong>
-                                        <span>@trade.Volume</span>
-                                        <em>@trade.Side</em>
-                                    </div>
-                                }
-                            </section>
-                        </aside>
-
-                        @{
-                            var status = Status;
-                        }
-                        <section class="glass-card status-strip" aria-label="Показатели рынка">
-                            <div class="status-metric">
-                                <small>С момента запуска</small>
-                                <strong class="positive">@status.Elapsed</strong>
-                            </div>
-                            <div class="status-metric">
-                                <small>Количество сделок</small>
-                                <strong>@status.TradeCount</strong>
-                            </div>
-                            <div class="status-metric">
-                                <small>Участников</small>
-                                <strong>@status.Participants</strong>
-                            </div>
-                            <div class="status-metric status-range">
-                                <small>Дневной диапазон</small>
-                                <strong>@status.Range</strong>
-                                <div class="range-track" aria-hidden="true">
-                                    <span></span>
-                                    <i style="@status.RangeMarkerStyle"></i>
-                                </div>
-                            </div>
-                            <div class="status-metric">
-                                <small>Ликвидность</small>
-                                <strong class="@status.LiquidityClass">@status.Liquidity</strong>
-                                <span>@status.LiquidityDetail</span>
-                            </div>
-
-                            <a class="portfolio-button" href="/news">
-                                <i class="bi bi-newspaper" aria-hidden="true"></i>
-                                <span>Добавить новость</span>
-                            </a>
-                        </section>
+                        <p class="asset-description">@CurrentAsset.Profile.Description</p>
                     </section>
+
+                    <section class="glass-card parameter-card" aria-labelledby="parameters-title">
+                        <h2 id="parameters-title">Параметры актива</h2>
+                        <dl class="parameter-list">
+                            @foreach (var parameter in AssetParameters)
+                            {
+                                <div>
+                                    <dt>@parameter.Label</dt>
+                                    <dd class="@parameter.ValueClass">@parameter.Value</dd>
+                                </div>
+                            }
+                        </dl>
+                    </section>
+                </aside>
+
+                <section class="center-column">
+                    <div class="metrics-strip" aria-label="Ключевые рыночные показатели">
+                        @foreach (var metric in MarketMetrics)
+                        {
+                            <article class="glass-card metric-card @metric.Accent">
+                                <span>@metric.Label</span>
+                                <strong>@metric.Value</strong>
+                                <small>@metric.Detail</small>
+                                @if (metric.Accent == "volume")
+                                {
+                                    <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
+                                        @foreach (var bar in metric.Bars)
+                                        {
+                                            <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
+                                        }
+                                    </svg>
+                                }
+                                else
+                                {
+                                    <svg class="sparkline-chart" viewBox="0 0 96 42" aria-hidden="true">
+                                        <polygon points="@metric.Projection" />
+                                        <polyline points="@metric.Sparkline" />
+                                    </svg>
+                                }
+                            </article>
+                        }
+                    </div>
+
+                    @{
+                        var chartData = ChartSummary;
+                    }
+                    <section class="glass-card chart-card" aria-labelledby="chart-title">
+                        <div class="chart-toolbar">
+                            <div class="chart-topline">
+                                <div class="timeframe-row" aria-label="Таймфрейм">
+                                    @foreach (var item in Timeframes)
+                                    {
+                                        <button class="@(item.Key == selectedTimeframe ? "active" : null)" type="button"
+                                                @onclick="() => SelectTimeframe(item.Key)">@item.Label</button>
+                                    }
+                                </div>
+                                <span class="market-active"><i class="bi bi-record-circle"
+                                                                   aria-hidden="true"></i>@chartData.MarketState</span>
+                            </div>
+
+                            <div class="chart-header">
+                                <h2 id="chart-title">@CurrentAsset.Draft.Name · @selectedTimeframe · @CurrentAsset.Symbol</h2>
+                                <dl>
+                                    <div>
+                                        <dt>ОТКР</dt>
+                                        <dd>@chartData.Open</dd>
+                                    </div>
+                                    <div>
+                                        <dt>МАКС</dt>
+                                        <dd>@chartData.High</dd>
+                                    </div>
+                                    <div>
+                                        <dt>МИН</dt>
+                                        <dd>@chartData.Low</dd>
+                                    </div>
+                                    <div>
+                                        <dt>ЗАКР</dt>
+                                        <dd>@chartData.Close</dd>
+                                    </div>
+                                    <div>
+                                        <dt></dt>
+                                        <dd class="@chartData.ChangeClass">@chartData.Change</dd>
+                                    </div>
+                                </dl>
+                            </div>
+                        </div>
+
+                        <div class="chart-stage-shell">
+                            <button class="chart-live-reset" type="button" hidden>
+                                <i class="bi bi-broadcast-pin" aria-hidden="true"></i>
+                                Live
+                            </button>
+                            <div class="chart-stage"
+                                 @ref="chartViewport"
+                                 tabindex="0"
+                                 aria-label="Свечной график цены @CurrentAsset.Draft.Name">
+                                <div class="chart-surface" role="img" aria-label="Биржевой график цены @CurrentAsset.Draft.Name"></div>
+                                <div class="chart-hover-legend" aria-live="polite">
+                                    <span class="chart-hover-time" data-role="time">Нет данных</span>
+                                    <div class="chart-hover-values">
+                                        <span><small>O</small><strong data-role="open">-</strong></span>
+                                        <span><small>H</small><strong data-role="high">-</strong></span>
+                                        <span><small>L</small><strong data-role="low">-</strong></span>
+                                        <span><small>C</small><strong data-role="close">-</strong></span>
+                                    </div>
+                                </div>
+                                <div class="chart-empty-state">Нет данных</div>
+                            </div>
+                        </div>
+
+                        <footer class="chart-footer">
+                            <a class="chart-attribution"
+                               href="https://www.tradingview.com/"
+                               target="_blank"
+                               rel="noreferrer noopener">
+                                TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc.
+                            </a>
+                            <span>@chartData.UpdatedAt</span>
+                        </footer>
+                    </section>
+                </section>
+
+                <aside class="right-column">
+                    @{
+                        var orderBook = OrderBookData;
+                        var spread = Spread;
+                    }
+                    <section class="glass-card order-book" aria-labelledby="book-title">
+                        <div class="panel-heading">
+                            <div class="book-title-block">
+                                <h2 id="book-title">Стакан</h2>
+                                <p>Лучшие цены и глубина рынка</p>
+                            </div>
+                            <div class="book-spread-meta">
+                                <strong>@spread.Value</strong>
+                                <small>@spread.Detail</small>
+                            </div>
+                        </div>
+                        <div class="book-head">
+                            <span class="book-cell-price">Цена (₽)</span>
+                            <span class="book-cell-volume">Объём (шт.)</span>
+                            <span class="book-cell-total">Сумма (шт.)</span>
+                        </div>
+
+                        <div class="book-side sells">
+                            @foreach (var row in orderBook.Asks)
+                            {
+                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
+                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                    <strong class="book-cell-price">@row.Price</strong>
+                                    <span class="book-cell-volume">@row.Volume</span>
+                                    <span class="book-cell-total">@row.Total</span>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="book-side buys">
+                            @foreach (var row in orderBook.Bids)
+                            {
+                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
+                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
+                                    <strong class="book-cell-price">@row.Price</strong>
+                                    <span class="book-cell-volume">@row.Volume</span>
+                                    <span class="book-cell-total">@row.Total</span>
+                                </div>
+                            }
+                        </div>
+                    </section>
+
+                    <section class="glass-card trades-card" aria-labelledby="trades-title">
+                        <h2 id="trades-title">Последние сделки</h2>
+                        <div class="trade-head">
+                            <span>Время</span>
+                            <span>Цена (₽)</span>
+                            <span>Объём (шт.)</span>
+                            <span>Контрагенты</span>
+                        </div>
+                        <div class="trade-list">
+                            @foreach (var trade in RecentTrades)
+                            {
+                                <div class="trade-row @trade.SideClass">
+                                    <span>@trade.Time</span>
+                                    <strong>@trade.Price</strong>
+                                    <span>@trade.Volume</span>
+                                    <div class="trade-participants" title="@($"{trade.Buyer} / {trade.Seller}")">
+                                        <span>@trade.Buyer</span>
+                                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                                        <span>@trade.Seller</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </section>
+                </aside>
+
+                @{
+                    var status = Status;
+                }
+                <section class="glass-card status-strip" aria-label="Показатели рынка">
+                    <div class="status-metric">
+                        <small>С момента запуска</small>
+                        <strong class="positive">@status.Elapsed</strong>
+                    </div>
+                    <div class="status-metric">
+                        <small>Количество сделок</small>
+                        <strong>@status.TradeCount</strong>
+                    </div>
+                    <div class="status-metric">
+                        <small>Участников</small>
+                        <strong>@status.Participants</strong>
+                    </div>
+                    <div class="status-metric status-range">
+                        <small>Дневной диапазон</small>
+                        <strong>@status.Range</strong>
+                        <div class="range-track" aria-hidden="true">
+                            <span></span>
+                            <i style="@status.RangeMarkerStyle"></i>
+                        </div>
+                    </div>
+                    <div class="status-metric status-liquidity">
+                        <small>Ликвидность</small>
+                        <strong class="@status.LiquidityClass">@status.Liquidity</strong>
+                        <span>@status.LiquidityDetail</span>
+                    </div>
+
+                    <a class="portfolio-button status-cta" href="/news">
+                        <i class="bi bi-newspaper" aria-hidden="true"></i>
+                        <div>
+                            <strong>Добавить новость</strong>
+                            <span>Передать live-сигнал в симуляцию</span>
+                        </div>
+                    </a>
+                </section>
+
+                @if (DebugControl is not null)
+                {
+                    <details class="glass-card debug-accordion">
+                        <summary class="debug-summary">
+                            <span>
+                                <strong id="debug-title">Debug</strong>
+                                <small>Dev-only инструменты и сценарии</small>
+                            </span>
+                            <em>@(string.IsNullOrWhiteSpace(debugMessage) ? "Закрыто" : debugMessage)</em>
+                        </summary>
+
+                        <div class="debug-panel">
+                            <div class="debug-grid">
+                                <div class="debug-group">
+                                    <label>
+                                        Участник
+                                        <input @bind="debugAgentName" />
+                                    </label>
+                                    <label>
+                                        Сторона
+                                        <select @bind="debugOrderSide">
+                                            <option value="@OrderSide.Buy">Buy</option>
+                                            <option value="@OrderSide.Sell">Sell</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        Тип
+                                        <select @bind="debugOrderType">
+                                            <option value="@OrderType.Limit">Limit</option>
+                                            <option value="@OrderType.Market">Market</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        Цена
+                                        <input type="number" step="0.01" disabled="@(debugOrderType == OrderType.Market)" @bind="debugOrderPrice" />
+                                    </label>
+                                    <label>
+                                        Кол-во
+                                        <input type="number" step="0.01" min="0.01" @bind="debugOrderQuantity" />
+                                    </label>
+                                    <button type="button" @onclick="SubmitDebugOrder">Добавить заявку</button>
+                                </div>
+
+                                <div class="debug-group">
+                                    <label>
+                                        Агент
+                                        <select @bind="debugAgentType">
+                                            <option value="@AgentType.MarketMaker">MarketMaker</option>
+                                            <option value="@AgentType.TrendFollowing">TrendFollowing</option>
+                                            <option value="@AgentType.CounterTrend">CounterTrend</option>
+                                            <option value="@AgentType.NewsDriven">NewsDriven</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        Cash
+                                        <input type="number" step="100" min="0" @bind="debugAgentCash" />
+                                    </label>
+                                    <label>
+                                        Position
+                                        <input type="number" step="1" min="0" @bind="debugAgentPosition" />
+                                    </label>
+                                    <button type="button" @onclick="AddDebugAgent">Добавить агента</button>
+                                </div>
+                            </div>
+
+                            <div class="debug-scenarios">
+                                <div class="debug-scenarios-head">
+                                    <strong>Сценарии рынка</strong>
+                                    <span>Быстрые пресеты для красивого движения графика и проверки стакана</span>
+                                </div>
+                                <div class="debug-scenario-buttons">
+                                    <button type="button"
+                                            class="scenario-button bullish"
+                                            disabled="@isRunningDebugScenario"
+                                            @onclick="RunBullishScenarioAsync">
+                                        <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
+                                        <span>Рост</span>
+                                    </button>
+                                    <button type="button"
+                                            class="scenario-button bearish"
+                                            disabled="@isRunningDebugScenario"
+                                            @onclick="RunSelloffScenarioAsync">
+                                        <i class="bi bi-graph-down-arrow" aria-hidden="true"></i>
+                                        <span>Sell-off</span>
+                                    </button>
+                                    <button type="button"
+                                            class="scenario-button reversal"
+                                            disabled="@isRunningDebugScenario"
+                                            @onclick="RunReversalScenarioAsync">
+                                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
+                                        <span>Разворот</span>
+                                    </button>
+                                    <button type="button"
+                                            class="scenario-button stop"
+                                            disabled="@(!isRunningDebugScenario)"
+                                            @onclick="StopDebugScenario">
+                                        <i class="bi bi-stop-circle" aria-hidden="true"></i>
+                                        <span>Стоп</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="debug-agents">
+                                <div class="debug-agents-head">
+                                    <span>Имя</span>
+                                    <span>Тип</span>
+                                    <span>Cash</span>
+                                    <span>Position</span>
+                                    <span>Value</span>
+                                </div>
+                                @foreach (var agent in latestTick?.Agents ?? [])
+                                {
+                                    <div class="debug-agent-row">
+                                        <strong>@agent.Name</strong>
+                                        <span>@agent.Type</span>
+                                        <span>@FormatMoney(agent.Cash)</span>
+                                        <span>@FormatQuantity(agent.Position)</span>
+                                        <span>@FormatMoney(agent.PortfolioValue)</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </details>
+                }
+            </div>
+        </section>
                 </main>
             </div>
 
 @code {
-    private static readonly string[] Timeframes = ["1м", "5м", "15м", "1ч", "4ч", "1д"];
-    private const decimal DemoStartPrice = 124.35m;
-    private const double ChartPanelLeft = 18;
-    private const double ChartPanelWidth = 906;
-    private const double ChartPlotLeft = 34;
-    private const double ChartPlotRight = 884;
-    private const double ChartAxisLabelX = 914;
-    private const double ChartPlotTop = 28;
-    private const double ChartPlotBottom = 336;
-    private const double ChartPlotHeight = ChartPlotBottom - ChartPlotTop;
-    private const int MetricHistoryLimit = 24;
+    private static readonly TimeframeDefinition[] Timeframes =
+    [
+        new("10s", "10s", TimeSpan.FromSeconds(10)),
+        new("30s", "30s", TimeSpan.FromSeconds(30)),
+        new("1m", "1m", TimeSpan.FromMinutes(1)),
+        new("5m", "5m", TimeSpan.FromMinutes(5)),
+        new("15m", "15m", TimeSpan.FromMinutes(15)),
+        new("1h", "1h", TimeSpan.FromHours(1))
+    ];
 
+    private static readonly IReadOnlyDictionary<string, TimeframeDefinition> TimeframesByKey =
+        Timeframes.ToDictionary(item => item.Key, StringComparer.Ordinal);
+
+    private static readonly DebugScenarioSupportAgent[] ScenarioSupportAgents =
+    [
+        new("scenario-maker-boost", AgentType.MarketMaker, 240_000m, 220m),
+        new("scenario-trend-boost-a", AgentType.TrendFollowing, 220_000m, 140m),
+        new("scenario-trend-boost-b", AgentType.TrendFollowing, 200_000m, 120m)
+    ];
+
+    private const decimal DemoStartPrice = 124.35m;
+    private const int MetricHistoryLimit = 72;
+    private const int VisibleOrderBookDepth = 50;
+
+    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
     private MarketMetric[] MarketMetrics => BuildMarketMetrics(latestTick);
 
     private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
@@ -361,98 +458,676 @@
 
     private StatusStripData Status => BuildStatusStripData(latestTick);
 
-    private ClockData Clock => BuildClockData();
+    private TradeRow[] RecentTrades => BuildTradeRows(tradeHistory);
 
-    private TradeRow[] RecentTrades => BuildTradeRows(latestTick?.Snapshot.RecentTrades ?? []);
+    private ISimulationDebugControl? DebugControl =>
+        Environment.IsDevelopment()
+            ? Services.GetService<ISimulationDebugControl>()
+            : null;
 
-    private static readonly AssetParameter[] AssetParameters =
-    [
-        new("Тип актива", "Акция", null),
-        new("Сектор", "Энергетика", null),
-        new("Валюта торгов", "RUB", null),
-        new("Шаг цены", "0.05 ₽", null),
-        new("Капитализация (оценка)", "12.43 млрд ₽", null),
-        new("Количество акций", "100 000 000", null),
-        new("Дата создания", "23.05.2025", null),
-        new("Статус", "Актив создан", "positive")
-    ];
+    private ChartSummaryData ChartSummary => BuildChartSummaryData(GetSelectedTimeframeState(), latestTick, lastChartUpdate);
+    private AssetParameter[] AssetParameters => BuildAssetParameters();
 
-    private string selectedTimeframe = "5м";
+    private string selectedTimeframe = "30s";
     private SimulationTickResult? latestTick;
     private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
-    private DateTimeOffset startedAt = DateTimeOffset.Now;
+    private DateTimeOffset runStartedAt = DateTimeOffset.Now;
+    private ElementReference chartViewport;
+    private IJSObjectReference? tradingChartModule;
+    private bool isChartRegistered;
+    private bool metricsPrimed;
+    private bool chartStatePrimed;
+    private ChartSyncPayload? pendingChartSync;
     private decimal previousVolume;
     private readonly HashSet<Guid> seenTradeIds = [];
-    private readonly List<decimal> priceMetricHistory = [DemoStartPrice];
-    private readonly List<decimal> bidMetricHistory = [DemoStartPrice];
-    private readonly List<decimal> askMetricHistory = [DemoStartPrice];
-    private readonly List<decimal> volumeMetricHistory = [0m];
+    private readonly HashSet<Guid> processedTradeIds = [];
+    private readonly Dictionary<string, TimeframeSeriesState> timeframeSeriesStates = CreateTimeframeSeriesStates();
+    private readonly List<decimal> priceMetricHistory = [];
+    private readonly List<decimal> bidMetricHistory = [];
+    private readonly List<decimal> askMetricHistory = [];
+    private readonly List<decimal> volumeMetricHistory = [];
+    private readonly List<Trade> tradeHistory = [];
+    private readonly HashSet<string> activeScenarioSupportAgentKeys = [];
+    private readonly HashSet<string> loadedHistoryTimeframes = [];
+    private SimulationRunSummary? currentRunSummary;
+    private Guid observedRunId = Guid.Empty;
+    private string debugAgentName = "Manual";
+    private OrderSide debugOrderSide = OrderSide.Buy;
+    private OrderType debugOrderType = OrderType.Limit;
+    private decimal? debugOrderPrice = DemoStartPrice;
+    private decimal debugOrderQuantity = 1m;
+    private AgentType debugAgentType = AgentType.TrendFollowing;
+    private decimal debugAgentCash = 100_000m;
+    private decimal debugAgentPosition = 10m;
+    private string? debugMessage;
+    private bool isRunningDebugScenario;
+    private CancellationTokenSource? debugScenarioCts;
 
-    private PriceChartData ChartData => BuildPriceChartData(latestTick, selectedTimeframe, lastChartUpdate);
+    private TimeframeSeriesState GetSelectedTimeframeState() => timeframeSeriesStates[selectedTimeframe];
 
     private void SelectTimeframe(string timeframe)
     {
         selectedTimeframe = timeframe;
+        LoadPersistedCandles(timeframe, forceScrollToRealtime: true);
+        pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime: true);
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         SimulationRunner.OnTick += HandleTick;
         latestTick = SimulationRunner.Current;
+        if (latestTick is not null)
+        {
+            PrimeFromSnapshot(latestTick, DateTimeOffset.Now);
+            LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
+        }
 
-        _ = RunSimulationAsync();
+        await EnsureSimulationAsync();
     }
 
-    private async Task RunSimulationAsync()
+    private async Task EnsureSimulationAsync()
     {
-        await SimulationRunner.StartAsync(CreateDemoConfig());
+        // Load the summary for the currently running singleton simulation first, so the
+        // match check below sees the real asset name/type instead of falling back to
+        // CurrentAsset.IsFallback on a freshly-created component (which would needlessly
+        // restart an already-matching run on re-navigation).
+        UpdateRunSummary();
+
+        if (SimulationRunner.IsRunning && SimulationMatchesCurrentAsset())
+        {
+            UpdateRunSummary();
+            return;
+        }
+
+        if (SimulationRunner.IsRunning)
+        {
+            await SimulationRunner.StopAsync();
+            ResetViewState();
+        }
+
+        await SimulationRunner.StartAsync(CreateDemoConfig(CurrentAsset));
+        UpdateRunSummary();
     }
 
     private void HandleTick(SimulationTickResult tickResult)
     {
-        latestTick = tickResult;
-        lastChartUpdate = DateTimeOffset.Now;
-        UpdateMetricHistory(tickResult);
-        _ = InvokeAsync(StateHasChanged);
+        _ = InvokeAsync(() =>
+        {
+            ApplyTick(tickResult);
+            StateHasChanged();
+        });
     }
 
-    private static SimulationConfig CreateDemoConfig() =>
+    private void ApplyTick(SimulationTickResult tickResult)
+    {
+        var receivedAt = DateTimeOffset.Now;
+        latestTick = tickResult;
+        lastChartUpdate = receivedAt;
+        UpdateRunSummary();
+        UpdateMetricHistory(tickResult);
+        UpdateChartSeries(tickResult, receivedAt);
+        LoadPersistedCandles(selectedTimeframe);
+        _ = TrySyncChartAsync();
+    }
+
+    private async Task TrySyncChartAsync()
+    {
+        if (pendingChartSync is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var modulePath = Assets["Components/Pages/Trading.razor.js"];
+            if (!modulePath.StartsWith("./", StringComparison.Ordinal) &&
+                !modulePath.StartsWith("/", StringComparison.Ordinal) &&
+                !modulePath.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                modulePath = $"./{modulePath}";
+            }
+
+            tradingChartModule ??= await JS.InvokeAsync<IJSObjectReference>("import", modulePath);
+
+            if (!isChartRegistered)
+            {
+                await tradingChartModule.InvokeVoidAsync("register", chartViewport);
+                isChartRegistered = true;
+            }
+
+            var payload = pendingChartSync;
+            await tradingChartModule.InvokeVoidAsync("sync", chartViewport, payload);
+            pendingChartSync = null;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+            // ElementReference is not ready yet; OnAfterRenderAsync will sync.
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (pendingChartSync is not null)
+        {
+            await TrySyncChartAsync();
+        }
+    }
+
+    private static Dictionary<string, TimeframeSeriesState> CreateTimeframeSeriesStates() =>
+        Timeframes.ToDictionary(item => item.Key, item => new TimeframeSeriesState(item), StringComparer.Ordinal);
+
+    private void PrimeFromSnapshot(SimulationTickResult tickResult, DateTimeOffset receivedAt)
+    {
+        PrimeMetricHistory(tickResult);
+        PrimeChartSeries(tickResult, receivedAt);
+    }
+
+    private void PrimeMetricHistory(SimulationTickResult tickResult)
+    {
+        if (metricsPrimed)
+        {
+            return;
+        }
+
+        priceMetricHistory.Clear();
+        bidMetricHistory.Clear();
+        askMetricHistory.Clear();
+        volumeMetricHistory.Clear();
+
+        var snapshot = tickResult.Snapshot;
+        var prices = snapshot.RecentPrices.Count > 0
+            ? snapshot.RecentPrices
+            : [snapshot.LastPrice];
+
+        foreach (var price in prices.TakeLast(MetricHistoryLimit))
+        {
+            AppendMetricValue(priceMetricHistory, price);
+        }
+
+        var bestBid = snapshot.BestBid ?? snapshot.LastPrice;
+        var bestAsk = snapshot.BestAsk ?? snapshot.LastPrice;
+        var historySeedCount = Math.Clamp(Math.Min(prices.Count, 12), 1, 12);
+        for (var index = 0; index < historySeedCount; index++)
+        {
+            AppendMetricValue(bidMetricHistory, bestBid);
+            AppendMetricValue(askMetricHistory, bestAsk);
+        }
+
+        tradeHistory.Clear();
+        var seededTrades = snapshot.RecentTrades
+            .OrderBy(trade => trade.ExecutedAt)
+            .ToArray();
+
+        if (seededTrades.Length == 0)
+        {
+            AppendMetricValue(volumeMetricHistory, 0m);
+        }
+        else
+        {
+            foreach (var trade in seededTrades)
+            {
+                if (!seenTradeIds.Add(trade.Id))
+                {
+                    continue;
+                }
+
+                tradeHistory.Add(trade);
+                AppendMetricValue(volumeMetricHistory, trade.Quantity);
+            }
+        }
+
+        previousVolume = snapshot.Volume;
+        metricsPrimed = true;
+    }
+
+    private void PrimeChartSeries(SimulationTickResult tickResult, DateTimeOffset receivedAt)
+    {
+        if (chartStatePrimed)
+        {
+            return;
+        }
+
+        var bootstrapEvents = BuildBootstrapEvents(tickResult.Snapshot, receivedAt);
+        if (bootstrapEvents.Count == 0)
+        {
+            ApplyLiveEventToAllTimeframes(new LivePriceEvent(GetFallbackEventTimestamp(tickResult.Snapshot, receivedAt), tickResult.Snapshot.LastPrice));
+        }
+        else
+        {
+            foreach (var liveEvent in bootstrapEvents)
+            {
+                ApplyLiveEventToAllTimeframes(liveEvent);
+            }
+        }
+
+        foreach (var trade in tickResult.Snapshot.RecentTrades)
+        {
+            processedTradeIds.Add(trade.Id);
+        }
+
+        chartStatePrimed = true;
+        pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime: true);
+    }
+
+    private void UpdateChartSeries(SimulationTickResult tickResult, DateTimeOffset receivedAt)
+    {
+        if (!chartStatePrimed)
+        {
+            PrimeChartSeries(tickResult, receivedAt);
+            return;
+        }
+
+        var snapshot = tickResult.Snapshot;
+        var liveEvents = snapshot.RecentTrades
+            .Where(trade => processedTradeIds.Add(trade.Id))
+            .OrderBy(trade => trade.ExecutedAt)
+            .Select(trade => new LivePriceEvent(trade.ExecutedAt, trade.Price))
+            .ToArray();
+
+        if (liveEvents.Length == 0)
+        {
+            var selectedState = GetSelectedTimeframeState();
+            if (selectedState.Candles.Count == 0 ||
+                selectedState.Candles[^1].Close != snapshot.LastPrice)
+            {
+                liveEvents =
+                [
+                    new LivePriceEvent(GetFallbackEventTimestamp(snapshot, receivedAt), snapshot.LastPrice)
+                ];
+            }
+        }
+
+        if (liveEvents.Length == 0)
+        {
+            return;
+        }
+
+        var selectedStateChanged = false;
+        var createdBarsForSelectedTimeframe = 0;
+
+        foreach (var liveEvent in liveEvents)
+        {
+            foreach (var timeframe in Timeframes)
+            {
+                var result = AppendLiveEvent(timeframeSeriesStates[timeframe.Key], liveEvent);
+                if (!result.Changed || timeframe.Key != selectedTimeframe)
+                {
+                    continue;
+                }
+
+                selectedStateChanged = true;
+                if (result.CreatedNewBar)
+                {
+                    createdBarsForSelectedTimeframe++;
+                }
+            }
+        }
+
+        if (!selectedStateChanged)
+        {
+            return;
+        }
+
+        var selectedSeries = GetSelectedTimeframeState();
+        pendingChartSync = createdBarsForSelectedTimeframe > 1
+            ? BuildFullChartSyncPayload(forceScrollToRealtime: false)
+            : BuildIncrementalChartSyncPayload(selectedSeries.Candles[^1], forceScrollToRealtime: false);
+    }
+
+    private void SubmitDebugOrder()
+    {
+        var debugControl = DebugControl;
+        if (debugControl is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var result = debugControl.SubmitOrder(new SimulationDebugOrderRequest(
+                debugAgentName,
+                debugOrderSide,
+                debugOrderType,
+                debugOrderType == OrderType.Market ? null : debugOrderPrice,
+                debugOrderQuantity));
+
+            debugMessage = $"Заявка: принято {result.AcceptedOrders.Count}, сделок {result.Trades.Count}, отказов {result.RejectedOrders.Count}";
+        }
+        catch (Exception exception)
+        {
+            debugMessage = exception.Message;
+        }
+    }
+
+    private void AddDebugAgent()
+    {
+        var debugControl = DebugControl;
+        if (debugControl is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var agent = debugControl.AddAgent(new AgentSpec(debugAgentType, debugAgentCash, debugAgentPosition));
+            debugMessage = $"Добавлен агент {agent.Name}";
+        }
+        catch (Exception exception)
+        {
+            debugMessage = exception.Message;
+        }
+    }
+
+    private Task RunBullishScenarioAsync() =>
+        RunDebugScenarioAsync(
+            "Рост",
+            [
+                new DebugScenarioStep(OrderSide.Buy, 1.80m, 1600),
+                new DebugScenarioStep(OrderSide.Buy, 2.15m, 1600),
+                new DebugScenarioStep(OrderSide.Buy, 2.55m, 1800),
+                new DebugScenarioStep(OrderSide.Sell, 0.95m, 1400),
+                new DebugScenarioStep(OrderSide.Buy, 2.75m, 1800),
+                new DebugScenarioStep(OrderSide.Buy, 3.10m, 1800),
+                new DebugScenarioStep(OrderSide.Sell, 1.10m, 1400),
+                new DebugScenarioStep(OrderSide.Buy, 3.35m, 1800),
+                new DebugScenarioStep(OrderSide.Buy, 2.90m, 1600),
+                new DebugScenarioStep(OrderSide.Sell, 1.15m, 1400),
+                new DebugScenarioStep(OrderSide.Buy, 3.50m, 2000),
+                new DebugScenarioStep(OrderSide.Buy, 3.85m, 2000)
+            ],
+            ScenarioSupportAgents);
+
+    private Task RunSelloffScenarioAsync() =>
+        RunDebugScenarioAsync(
+            "Sell-off",
+            [
+                new DebugScenarioStep(OrderSide.Sell, 1.80m, 1600),
+                new DebugScenarioStep(OrderSide.Sell, 2.20m, 1600),
+                new DebugScenarioStep(OrderSide.Sell, 2.60m, 1800),
+                new DebugScenarioStep(OrderSide.Buy, 0.95m, 1400),
+                new DebugScenarioStep(OrderSide.Sell, 2.85m, 1800),
+                new DebugScenarioStep(OrderSide.Sell, 3.15m, 1800),
+                new DebugScenarioStep(OrderSide.Buy, 1.10m, 1400),
+                new DebugScenarioStep(OrderSide.Sell, 3.40m, 1800),
+                new DebugScenarioStep(OrderSide.Sell, 2.95m, 1600),
+                new DebugScenarioStep(OrderSide.Buy, 1.15m, 1400),
+                new DebugScenarioStep(OrderSide.Sell, 3.55m, 2000),
+                new DebugScenarioStep(OrderSide.Sell, 3.90m, 2000)
+            ],
+            ScenarioSupportAgents);
+
+    private Task RunReversalScenarioAsync() =>
+        RunDebugScenarioAsync(
+            "Разворот",
+            [
+                new DebugScenarioStep(OrderSide.Sell, 1.50m, 1400),
+                new DebugScenarioStep(OrderSide.Sell, 1.95m, 1600),
+                new DebugScenarioStep(OrderSide.Sell, 2.40m, 1600),
+                new DebugScenarioStep(OrderSide.Buy, 0.80m, 1200),
+                new DebugScenarioStep(OrderSide.Sell, 2.85m, 1800),
+                new DebugScenarioStep(OrderSide.Sell, 3.20m, 1800),
+                new DebugScenarioStep(OrderSide.Buy, 1.10m, 1200),
+                new DebugScenarioStep(OrderSide.Buy, 2.20m, 1400),
+                new DebugScenarioStep(OrderSide.Buy, 2.65m, 1600),
+                new DebugScenarioStep(OrderSide.Sell, 0.90m, 1200),
+                new DebugScenarioStep(OrderSide.Buy, 3.00m, 1800),
+                new DebugScenarioStep(OrderSide.Buy, 3.35m, 1800),
+                new DebugScenarioStep(OrderSide.Buy, 2.70m, 1600)
+            ],
+            ScenarioSupportAgents);
+
+    private void StopDebugScenario()
+    {
+        debugScenarioCts?.Cancel();
+    }
+
+    private async Task RunDebugScenarioAsync(
+        string scenarioLabel,
+        IReadOnlyList<DebugScenarioStep> steps,
+        IReadOnlyList<DebugScenarioSupportAgent>? supportAgents = null)
+    {
+        var debugControl = DebugControl;
+        if (debugControl is null || steps.Count == 0 || isRunningDebugScenario)
+        {
+            return;
+        }
+
+        isRunningDebugScenario = true;
+        debugScenarioCts = new CancellationTokenSource();
+        var token = debugScenarioCts.Token;
+        var totalTrades = 0;
+        var acceptedOrders = 0;
+        var rejectedOrders = 0;
+        var activatedSupportAgents = ActivateScenarioSupportAgents(debugControl, supportAgents);
+
+        debugMessage = activatedSupportAgents > 0
+            ? $"{scenarioLabel}: сценарий запущен, усилители рынка {activatedSupportAgents}"
+            : $"{scenarioLabel}: сценарий запущен";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            for (var index = 0; index < steps.Count; index++)
+            {
+                token.ThrowIfCancellationRequested();
+
+                var step = steps[index];
+                var result = SubmitDebugScenarioOrder(
+                    debugControl,
+                    scenarioLabel,
+                    index + 1,
+                    step.Side,
+                    step.Quantity);
+
+                totalTrades += result.Trades.Count;
+                acceptedOrders += result.AcceptedOrders.Count;
+                rejectedOrders += result.RejectedOrders.Count;
+
+                debugMessage = $"{scenarioLabel}: шаг {index + 1}/{steps.Count}, сделок {totalTrades}";
+                await InvokeAsync(StateHasChanged);
+
+                if (index < steps.Count - 1)
+                {
+                    await Task.Delay(step.DelayMs, token);
+                }
+            }
+
+            debugMessage = $"{scenarioLabel}: завершён, принято {acceptedOrders}, сделок {totalTrades}, отказов {rejectedOrders}";
+        }
+        catch (OperationCanceledException)
+        {
+            debugMessage = $"{scenarioLabel}: сценарий остановлен";
+        }
+        catch (Exception exception)
+        {
+            debugMessage = exception.Message;
+        }
+        finally
+        {
+            isRunningDebugScenario = false;
+            debugScenarioCts?.Dispose();
+            debugScenarioCts = null;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static SubmitResult SubmitDebugScenarioOrder(
+        ISimulationDebugControl debugControl,
+        string scenarioLabel,
+        int stepIndex,
+        OrderSide side,
+        decimal quantity)
+    {
+        return debugControl.SubmitOrder(new SimulationDebugOrderRequest(
+            $"{scenarioLabel}-{stepIndex:00}",
+            side,
+            OrderType.Market,
+            null,
+            quantity));
+    }
+
+    private int ActivateScenarioSupportAgents(
+        ISimulationDebugControl debugControl,
+        IReadOnlyList<DebugScenarioSupportAgent>? supportAgents)
+    {
+        if (supportAgents is not { Count: > 0 })
+        {
+            return 0;
+        }
+
+        var activated = 0;
+
+        foreach (var supportAgent in supportAgents)
+        {
+            if (!activeScenarioSupportAgentKeys.Add(supportAgent.Key))
+            {
+                continue;
+            }
+
+            debugControl.AddAgent(new AgentSpec(supportAgent.Type, supportAgent.Cash, supportAgent.Position));
+            activated++;
+        }
+
+        return activated;
+    }
+
+    private void ResetViewState()
+    {
+        latestTick = null;
+        currentRunSummary = null;
+        observedRunId = Guid.Empty;
+        runStartedAt = DateTimeOffset.Now;
+        lastChartUpdate = DateTimeOffset.Now;
+        chartStatePrimed = false;
+        metricsPrimed = false;
+        previousVolume = 0m;
+        pendingChartSync = null;
+        priceMetricHistory.Clear();
+        bidMetricHistory.Clear();
+        askMetricHistory.Clear();
+        volumeMetricHistory.Clear();
+        tradeHistory.Clear();
+        seenTradeIds.Clear();
+        processedTradeIds.Clear();
+        loadedHistoryTimeframes.Clear();
+        activeScenarioSupportAgentKeys.Clear();
+
+        foreach (var state in timeframeSeriesStates.Values)
+        {
+            state.Candles.Clear();
+        }
+    }
+
+    private void UpdateRunSummary()
+    {
+        var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty)
+        {
+            currentRunSummary = null;
+            observedRunId = Guid.Empty;
+            return;
+        }
+
+        if (observedRunId == runId && currentRunSummary is not null)
+        {
+            runStartedAt = currentRunSummary.StartedAt.ToLocalTime();
+            return;
+        }
+
+        currentRunSummary = SimulationHistoryReader.GetRun(runId);
+        observedRunId = runId;
+
+        if (currentRunSummary is not null)
+        {
+            runStartedAt = currentRunSummary.StartedAt.ToLocalTime();
+        }
+    }
+
+    private bool SimulationMatchesCurrentAsset()
+    {
+        if (currentRunSummary is null)
+        {
+            return CurrentAsset.IsFallback;
+        }
+
+        return string.Equals(currentRunSummary.AssetName, CurrentAsset.Draft.Name, StringComparison.Ordinal) &&
+               currentRunSummary.AssetType == CurrentAsset.Draft.AssetType;
+    }
+
+    private static SimulationConfig CreateDemoConfig(ActiveAssetView asset) =>
         new(
-            "КвантЭнерго",
-            "Демо-актив для проверки связки UI, Application и Exchange.",
-            AssetType.Stock,
-            DemoStartPrice,
+            asset.Draft.Name,
+            asset.Profile.Description,
+            asset.Draft.AssetType,
+            CalculateStartPrice(asset),
             TimeSpan.FromSeconds(1),
             [
-                new AgentSpec(AgentType.MarketMaker, 100_000m, 100m),
-                new AgentSpec(AgentType.TrendFollowing, 100_000m, 50m),
-                new AgentSpec(AgentType.CounterTrend, 100_000m, 50m),
-                new AgentSpec(AgentType.NewsDriven, 100_000m, 50m)
+                new AgentSpec(AgentType.MarketMaker, 140_000m, 160m),
+                new AgentSpec(AgentType.TrendFollowing, 110_000m, 60m),
+                new AgentSpec(AgentType.CounterTrend, 110_000m, 60m),
+                new AgentSpec(AgentType.NewsDriven, 105_000m, 55m)
             ]);
+
+    private static decimal CalculateStartPrice(ActiveAssetView asset)
+    {
+        if (asset.IsFallback)
+        {
+            return DemoStartPrice;
+        }
+
+        var basePrice = asset.Draft.AssetType switch
+        {
+            AssetType.Stock => 96m,
+            AssetType.Bond => 101m,
+            AssetType.Commodity => 88m,
+            AssetType.Crypto => 72m,
+            _ => DemoStartPrice
+        };
+
+        var adjusted = basePrice
+            + asset.Draft.GrowthPotential * 0.42m
+            + (asset.Draft.IncludeGovernmentSupport ? 4m : 0m)
+            + asset.Profile.NewsSensitivity * 10m;
+
+        return Math.Round(adjusted / 0.05m, MidpointRounding.AwayFromZero) * 0.05m;
+    }
 
     private void UpdateMetricHistory(SimulationTickResult tickResult)
     {
+        if (!metricsPrimed)
+        {
+            PrimeMetricHistory(tickResult);
+            return;
+        }
+
         var snapshot = tickResult.Snapshot;
-        var volumeDelta = Math.Max(0m, snapshot.Volume - previousVolume);
-        previousVolume = snapshot.Volume;
-
         AppendMetricValue(priceMetricHistory, snapshot.LastPrice);
-        AppendMetricValue(volumeMetricHistory, volumeDelta);
+        AppendMetricValue(bidMetricHistory, snapshot.BestBid ?? snapshot.LastPrice);
+        AppendMetricValue(askMetricHistory, snapshot.BestAsk ?? snapshot.LastPrice);
 
-        if (snapshot.BestBid is not null)
+        var newTrades = snapshot.RecentTrades
+            .Where(trade => seenTradeIds.Add(trade.Id))
+            .OrderBy(trade => trade.ExecutedAt)
+            .ToArray();
+
+        if (newTrades.Length == 0)
         {
-            AppendMetricValue(bidMetricHistory, snapshot.BestBid.Value);
+            var volumeDelta = Math.Max(0m, snapshot.Volume - previousVolume);
+            AppendMetricValue(volumeMetricHistory, volumeDelta);
+        }
+        else
+        {
+            foreach (var trade in newTrades)
+            {
+                tradeHistory.Add(trade);
+                AppendMetricValue(volumeMetricHistory, trade.Quantity);
+            }
         }
 
-        if (snapshot.BestAsk is not null)
-        {
-            AppendMetricValue(askMetricHistory, snapshot.BestAsk.Value);
-        }
-
-        foreach (var trade in snapshot.RecentTrades)
-        {
-            seenTradeIds.Add(trade.Id);
-        }
+        previousVolume = snapshot.Volume;
     }
 
     private static void AppendMetricValue(List<decimal> values, decimal value)
@@ -464,6 +1139,330 @@
         }
     }
 
+    private static List<LivePriceEvent> BuildBootstrapEvents(MarketSnapshot snapshot, DateTimeOffset receivedAt)
+    {
+        var trades = snapshot.RecentTrades
+            .OrderBy(trade => trade.ExecutedAt)
+            .Select(trade => new LivePriceEvent(trade.ExecutedAt, trade.Price))
+            .ToList();
+
+        if (trades.Count > 0)
+        {
+            return trades;
+        }
+
+        var prices = snapshot.RecentPrices.TakeLast(MetricHistoryLimit).ToArray();
+        if (prices.Length == 0)
+        {
+            return [];
+        }
+
+        var anchor = GetFallbackEventTimestamp(snapshot, receivedAt);
+        var start = anchor - TimeSpan.FromSeconds(Math.Max(0, prices.Length - 1));
+        var events = new List<LivePriceEvent>(prices.Length);
+
+        for (var index = 0; index < prices.Length; index++)
+        {
+            events.Add(new LivePriceEvent(start.AddSeconds(index), prices[index]));
+        }
+
+        return events;
+    }
+
+    private static DateTimeOffset GetFallbackEventTimestamp(MarketSnapshot snapshot, DateTimeOffset receivedAt)
+    {
+        var latestTradeTime = snapshot.RecentTrades.Count == 0
+            ? (DateTimeOffset?)null
+            : snapshot.RecentTrades.MaxBy(trade => trade.ExecutedAt)?.ExecutedAt;
+
+        return latestTradeTime ?? receivedAt;
+    }
+
+    private void ApplyLiveEventToAllTimeframes(LivePriceEvent liveEvent)
+    {
+        foreach (var timeframe in Timeframes)
+        {
+            AppendLiveEvent(timeframeSeriesStates[timeframe.Key], liveEvent);
+        }
+    }
+
+    private static TimeframeAppendResult AppendLiveEvent(TimeframeSeriesState state, LivePriceEvent liveEvent)
+    {
+        var timestamp = AlignToTimeframe(liveEvent.Timestamp, state.Definition.Duration);
+        var candles = state.Candles;
+        var price = liveEvent.Price;
+
+        if (candles.Count == 0)
+        {
+            candles.Add(new AggregatedCandle(timestamp, price, price, price, price));
+            return new TimeframeAppendResult(true, true);
+        }
+
+        var lastCandle = candles[^1];
+        if (lastCandle.Timestamp == timestamp)
+        {
+            var updated = false;
+
+            if (price != lastCandle.Close)
+            {
+                lastCandle.Close = price;
+                updated = true;
+            }
+
+            if (price > lastCandle.High)
+            {
+                lastCandle.High = price;
+                updated = true;
+            }
+
+            if (price < lastCandle.Low)
+            {
+                lastCandle.Low = price;
+                updated = true;
+            }
+
+            return new TimeframeAppendResult(updated, false);
+        }
+
+        if (timestamp > lastCandle.Timestamp)
+        {
+            candles.Add(new AggregatedCandle(timestamp, price, price, price, price));
+            return new TimeframeAppendResult(true, true);
+        }
+
+        var existingCandle = candles.FirstOrDefault(candle => candle.Timestamp == timestamp);
+        if (existingCandle is not null)
+        {
+            var updated = false;
+
+            if (price != existingCandle.Close)
+            {
+                existingCandle.Close = price;
+                updated = true;
+            }
+
+            if (price > existingCandle.High)
+            {
+                existingCandle.High = price;
+                updated = true;
+            }
+
+            if (price < existingCandle.Low)
+            {
+                existingCandle.Low = price;
+                updated = true;
+            }
+
+            return new TimeframeAppendResult(updated, false);
+        }
+
+        var insertIndex = candles.FindIndex(candle => candle.Timestamp > timestamp);
+        if (insertIndex < 0)
+        {
+            candles.Add(new AggregatedCandle(timestamp, price, price, price, price));
+        }
+        else
+        {
+            candles.Insert(insertIndex, new AggregatedCandle(timestamp, price, price, price, price));
+        }
+
+        return new TimeframeAppendResult(true, false);
+    }
+
+    private static DateTimeOffset AlignToTimeframe(DateTimeOffset timestamp, TimeSpan duration)
+    {
+        var seconds = Math.Max(1L, (long)duration.TotalSeconds);
+        var unixSeconds = timestamp.ToUnixTimeSeconds();
+        var remainder = unixSeconds % seconds;
+        if (remainder < 0)
+        {
+            remainder += seconds;
+        }
+
+        return DateTimeOffset.FromUnixTimeSeconds(unixSeconds - remainder);
+    }
+
+    private ChartSyncPayload BuildFullChartSyncPayload(bool forceScrollToRealtime)
+    {
+        var state = GetSelectedTimeframeState();
+        return new ChartSyncPayload(
+            "setData",
+            state.Definition.Key,
+            forceScrollToRealtime,
+            state.Candles.Select(ToChartCandlePoint).ToArray(),
+            null);
+    }
+
+    private ChartSyncPayload BuildIncrementalChartSyncPayload(AggregatedCandle candle, bool forceScrollToRealtime)
+    {
+        return new ChartSyncPayload(
+            "update",
+            selectedTimeframe,
+            forceScrollToRealtime,
+            null,
+            ToChartCandlePoint(candle));
+    }
+
+    private static ChartSummaryData BuildChartSummaryData(
+        TimeframeSeriesState state,
+        SimulationTickResult? tickResult,
+        DateTimeOffset updatedAt)
+    {
+        var fallbackPrice = tickResult?.Snapshot.LastPrice ?? DemoStartPrice;
+        if (state.Candles.Count == 0)
+        {
+            var fallbackText = FormatPrice(fallbackPrice);
+            return new ChartSummaryData(
+                fallbackText,
+                fallbackText,
+                fallbackText,
+                fallbackText,
+                "+0.00 (0.00%)",
+                "neutral",
+                tickResult is null ? "Торги не запущены" : "Торги запущены",
+                "Ожидание данных");
+        }
+
+        var sessionOpen = state.Candles[0].Open;
+        var sessionClose = state.Candles[^1].Close;
+        var sessionHigh = state.Candles.Max(candle => candle.High);
+        var sessionLow = state.Candles.Min(candle => candle.Low);
+        var change = sessionClose - sessionOpen;
+        var percent = sessionOpen == 0m ? 0m : change / sessionOpen * 100m;
+        var sign = change > 0m ? "+" : change < 0m ? "" : "";
+        var changeClass = change > 0m ? "positive" : change < 0m ? "negative" : "neutral";
+
+        return new ChartSummaryData(
+            FormatPrice(sessionOpen),
+            FormatPrice(sessionHigh),
+            FormatPrice(sessionLow),
+            FormatPrice(sessionClose),
+            $"{sign}{FormatPrice(change)} ({sign}{percent:0.00}%)",
+            changeClass,
+            tickResult is null ? "Торги не запущены" : "Торги запущены",
+            $"Обновлено {updatedAt.ToLocalTime():HH:mm:ss}");
+    }
+
+    private static ChartCandlePoint ToChartCandlePoint(AggregatedCandle candle)
+    {
+        var isUp = candle.Close > candle.Open;
+        var isDown = candle.Close < candle.Open;
+
+        return new ChartCandlePoint(
+            candle.Timestamp.ToUnixTimeSeconds(),
+            candle.Open,
+            candle.High,
+            candle.Low,
+            candle.Close,
+            isUp ? "#36D98A" : isDown ? "#FF6B5F" : "#B7C2D5",
+            isUp ? "#36D98A" : isDown ? "#FF6B5F" : "#A1B2CC",
+            isUp ? "#65F1AB" : isDown ? "#FF8A80" : "#D0D9E6");
+    }
+
+    private void LoadPersistedCandles(string timeframeKey, bool forceScrollToRealtime = false)
+    {
+        if (!TimeframesByKey.TryGetValue(timeframeKey, out var timeframe))
+        {
+            return;
+        }
+
+        var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty)
+        {
+            return;
+        }
+
+        if (!forceScrollToRealtime && loadedHistoryTimeframes.Contains(timeframeKey))
+        {
+            return;
+        }
+
+        var persistedCandles = CandleReader
+            .GetCandles(runId, timeframe.Duration, GetPersistedCandleLimit(timeframeKey))
+            .Select(candle => new AggregatedCandle(
+                candle.StartedAt,
+                candle.Open,
+                candle.High,
+                candle.Low,
+                candle.Close))
+            .ToArray();
+
+        if (persistedCandles.Length == 0)
+        {
+            return;
+        }
+
+        loadedHistoryTimeframes.Add(timeframeKey);
+        MergeExternalCandles(timeframeKey, persistedCandles, forceScrollToRealtime);
+    }
+
+    private static int GetPersistedCandleLimit(string timeframeKey) =>
+        timeframeKey switch
+        {
+            "10s" => 180,
+            "30s" => 180,
+            "1m" => 180,
+            "5m" => 144,
+            "15m" => 96,
+            "1h" => 72,
+            _ => 180
+        };
+
+    private void MergeExternalCandles(string timeframeKey, IEnumerable<AggregatedCandle> candles, bool forceScrollToRealtime = false)
+    {
+        if (!TimeframesByKey.ContainsKey(timeframeKey))
+        {
+            return;
+        }
+
+        var state = timeframeSeriesStates[timeframeKey];
+        var selectedTimeframeChanged = false;
+
+        foreach (var candle in candles.OrderBy(item => item.Timestamp))
+        {
+            var changed = UpsertAggregatedCandle(state, candle);
+            selectedTimeframeChanged |= changed && timeframeKey == selectedTimeframe;
+        }
+
+        if (selectedTimeframeChanged)
+        {
+            pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime);
+        }
+    }
+
+    private static bool UpsertAggregatedCandle(TimeframeSeriesState state, AggregatedCandle candle)
+    {
+        var timestamp = AlignToTimeframe(candle.Timestamp, state.Definition.Duration);
+        var existingIndex = state.Candles.FindIndex(item => item.Timestamp == timestamp);
+        if (existingIndex >= 0)
+        {
+            var existing = state.Candles[existingIndex];
+            var changed = existing.Open != candle.Open ||
+                          existing.High != candle.High ||
+                          existing.Low != candle.Low ||
+                          existing.Close != candle.Close;
+
+            existing.Open = candle.Open;
+            existing.High = candle.High;
+            existing.Low = candle.Low;
+            existing.Close = candle.Close;
+            return changed;
+        }
+
+        var insertIndex = state.Candles.FindIndex(item => item.Timestamp > timestamp);
+        var normalized = new AggregatedCandle(timestamp, candle.Open, candle.High, candle.Low, candle.Close);
+        if (insertIndex < 0)
+        {
+            state.Candles.Add(normalized);
+        }
+        else
+        {
+            state.Candles.Insert(insertIndex, normalized);
+        }
+
+        return true;
+    }
+
     private MarketMetric[] BuildMarketMetrics(SimulationTickResult? tickResult)
     {
         var snapshot = tickResult?.Snapshot;
@@ -473,7 +1472,7 @@
         var bestBid = snapshot?.BestBid;
         var bestAsk = snapshot?.BestAsk;
         var volume = snapshot?.Volume ?? 0m;
-        var tradeCount = snapshot?.RecentTrades.Count ?? 0;
+        var tradeCount = seenTradeIds.Count;
         var priceAccent = GetChangeClass(priceMetricHistory);
         var bidAccent = GetChangeClass(bidMetricHistory);
         var askAccent = GetChangeClass(askMetricHistory);
@@ -491,27 +1490,51 @@ BuildVolumeBars(volumeMetricHistory))
         ];
     }
 
+    private AssetParameter[] BuildAssetParameters()
+    {
+        var runStarted = currentRunSummary?.StartedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "ожидание запуска";
+        var sensitivity = $"{Math.Round(CurrentAsset.Profile.NewsSensitivity * 100m, 0):0}/100";
+        var keywordSummary = string.Join(", ", CurrentAsset.Profile.Keywords.Take(3));
+
+        return
+        [
+            new("Тип актива", GetAssetTypeLabel(CurrentAsset.Draft.AssetType), null),
+            new("Сектор", CurrentAsset.Draft.Industry, null),
+            new("Валюта торгов", "RUB", null),
+            new("Символ", CurrentAsset.Symbol, null),
+            new("Чувствительность к новостям", sensitivity, CurrentAsset.Profile.NewsSensitivity >= 0.7m ? "positive" : null),
+            new("Ключевые теги", string.IsNullOrWhiteSpace(keywordSummary) ? "нет данных" : keywordSummary, null),
+            new("Запуск симуляции", runStarted, null),
+            new("Статус", SimulationRunner.IsRunning ? "Торги активны" : "Ожидание запуска", SimulationRunner.IsRunning ? "positive" : null)
+        ];
+    }
+
     private static OrderBookViewData BuildOrderBookData(OrderBookSnapshot? orderBook)
     {
-        var asks = orderBook?.Asks ?? [];
-        var bids = orderBook?.Bids ?? [];
+        var asks = GetVisibleOrderBookLevels(orderBook?.Asks ?? [], reverse: true);
+        var bids = GetVisibleOrderBookLevels(orderBook?.Bids ?? [], reverse: false);
 
         return new OrderBookViewData(
             BuildOrderBookRows(asks),
-            BuildOrderBookRows(bids),
-            BuildDepthFillPath(asks, false),
-            BuildDepthLinePath(asks, false),
-            BuildDepthFillPath(bids, true),
-            BuildDepthLinePath(bids, true));
+            BuildOrderBookRows(bids));
+    }
+
+    private static OrderBookLevel[] GetVisibleOrderBookLevels(IReadOnlyList<OrderBookLevel> levels, bool reverse)
+    {
+        var visibleLevels = levels.Take(VisibleOrderBookDepth).ToArray();
+        if (reverse)
+        {
+            Array.Reverse(visibleLevels);
+        }
+
+        return visibleLevels;
     }
 
     private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels)
     {
         var maxQuantity = levels.Count == 0 ? 0m : levels.Max(level => level.Quantity);
         var total = 0m;
-
-        return levels
-            .Take(5)
+        var rows = levels
             .Select(level =>
             {
                 total += level.Quantity;
@@ -522,20 +1545,29 @@ BuildVolumeBars(volumeMetricHistory))
                     FormatQuantity(level.Quantity),
                     FormatQuantity(total),
                     depth,
-                    $"width: {depth}%");
+                    $"width: {depth}%;",
+                    false);
             })
-            .ToArray();
+            .ToList();
+
+        if (rows.Count == 0)
+        {
+            rows.Add(new OrderBookRow("—", "—", "—", 0, "width: 0%;", true));
+        }
+
+        return rows.ToArray();
     }
 
     private static TradeRow[] BuildTradeRows(IReadOnlyList<Trade> trades) =>
         trades
             .OrderByDescending(trade => trade.ExecutedAt)
-            .Take(8)
+            .Take(50)
             .Select(trade => new TradeRow(
                 trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
                 FormatPrice(trade.Price),
                 FormatQuantity(trade.Quantity),
-                FormatTradeParticipants(trade.BuyerAgentName, trade.SellerAgentName),
+                FormatAgentName(trade.BuyerAgentName),
+                FormatAgentName(trade.SellerAgentName),
                 GetTradeClass(trade)))
             .ToArray();
 
@@ -544,7 +1576,7 @@ BuildVolumeBars(volumeMetricHistory))
         var snapshot = tickResult?.Snapshot;
         if (snapshot?.BestBid is null || snapshot.BestAsk is null)
         {
-            return new SpreadData("bi bi-dash", FormatMoney(snapshot?.LastPrice ?? DemoStartPrice), "Спред недоступен");
+            return new SpreadData("bi bi-dash", "— / —", "Спред недоступен");
         }
 
         var spread = snapshot.BestAsk.Value - snapshot.BestBid.Value;
@@ -553,7 +1585,7 @@ BuildVolumeBars(volumeMetricHistory))
 
         return new SpreadData(
             spread <= 0m ? "bi bi-caret-left-fill" : "bi bi-arrows-collapse",
-            FormatMoney(snapshot.LastPrice),
+            $"{FormatMoney(snapshot.BestBid.Value)} / {FormatMoney(snapshot.BestAsk.Value)}",
             $"Спред {FormatPrice(spread)} ₽ ({spreadPercent:0.00}%)");
     }
 
@@ -572,7 +1604,7 @@ BuildVolumeBars(volumeMetricHistory))
         var askDepth = tickResult?.OrderBook.Asks.Sum(level => level.Quantity) ?? 0m;
         var totalDepth = bidDepth + askDepth;
         var liquidity = GetLiquidity(tickResult, totalDepth);
-        var elapsed = DateTimeOffset.Now - startedAt;
+        var elapsed = DateTimeOffset.Now - runStartedAt;
 
         return new StatusStripData(
             elapsed.ToString(@"hh\:mm\:ss"),
@@ -583,12 +1615,6 @@ BuildVolumeBars(volumeMetricHistory))
             liquidity.Label,
             liquidity.ClassName,
             $"{spread.Detail}; глубина {FormatQuantity(totalDepth)} шт.");
-    }
-
-    private static ClockData BuildClockData()
-    {
-        var now = DateTimeOffset.Now;
-        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
     }
 
     private static string FormatNullableMoney(decimal? value) => value is null ? "-" : FormatMoney(value.Value);
@@ -629,7 +1655,7 @@ BuildVolumeBars(volumeMetricHistory))
             return "";
         }
 
-        return string.Join(" ", BuildChartPoints(values, 6, 94, 5, 36)
+        return string.Join(" ", BuildChartPoints(values, 6, 94, 12, 30)
             .Select(point => $"{FormatSvgNumber(point.X)},{FormatSvgNumber(point.Y)}"));
     }
 
@@ -670,9 +1696,9 @@ BuildVolumeBars(volumeMetricHistory))
 maxY)
     {
         var source = values.Count == 0 ? [0m] : values.ToArray();
-        var minValue = source.Min();
-        var maxValue = source.Max();
-        var range = maxValue - minValue;
+        var average = source.Average(value => value);
+        var maxDeviation = source.Max(value => Math.Abs(value - average));
+        var range = maxDeviation * 2m;
         var width = maxX - minX;
         var height = maxY - minY;
 
@@ -685,66 +1711,23 @@ maxY)
             .Select((value, index) =>
             {
                 var x = minX + width * index / (source.Length - 1);
-                var ratio = range == 0m ? 0.5 : (double)((value - minValue) / range);
+                var ratio = range == 0m ? 0.5 : 0.5 + (double)((value - average) / range);
+                ratio = Math.Clamp(ratio, 0.18, 0.82);
                 var y = maxY - height * ratio;
                 return new Point(x, y);
             })
             .ToArray();
     }
 
-    private static string BuildDepthFillPath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
-    {
-        var linePath = BuildDepthLinePath(levels, isBid);
-        return isBid
-            ? $"{linePath} V125 H300 Z"
-            : $"{linePath} V125 H0 Z";
-    }
-
-    private static string BuildDepthLinePath(IReadOnlyList<OrderBookLevel> levels, bool isBid)
-    {
-        if (levels.Count == 0)
-        {
-            return isBid ? "M300 0 H300" : "M0 0 H0";
-        }
-
-        var rows = levels.Take(5).ToArray();
-        var rowHeight = 125d / rows.Length;
-        var maxTotal = rows.Sum(level => level.Quantity);
-        var cumulative = 0m;
-        var segments = new List<string>();
-
-        for (var index = 0; index < rows.Length; index++)
-        {
-            cumulative += rows[index].Quantity;
-            var ratio = maxTotal == 0m ? 0d : (double)(cumulative / maxTotal);
-            var x = isBid ? 286 - ratio * 226 : 14 + ratio * 226;
-            var y = index * rowHeight + rowHeight / 2;
-
-            if (index == 0)
-            {
-                segments.Add($"M{FormatSvgNumber(isBid ? 286 : 14)} {FormatSvgNumber(y)} L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
-            }
-            else
-            {
-                segments.Add($"L{FormatSvgNumber(x)} {FormatSvgNumber(y)}");
-            }
-        }
-
-        return string.Join(" ", segments);
-    }
-
     private static string GetTradeClass(Trade trade)
     {
-        if (string.Equals(trade.BuyerAgentName, "MarketMaker", StringComparison.Ordinal))
+        if (trade.BuyerAgentName.Contains("MarketMaker", StringComparison.Ordinal))
         {
             return "sell";
         }
 
         return "buy";
     }
-
-    private static string FormatTradeParticipants(string buyer, string seller) =>
-        $"{FormatAgentName(buyer)} / {FormatAgentName(seller)}";
 
     private static string FormatAgentName(string agentName)
     {
@@ -753,11 +1736,13 @@ maxY)
             return "-";
         }
 
-        var compactName = agentName switch
+        var normalized = agentName.Trim();
+        var compactName = normalized switch
         {
             "TrendFollowing" => "Trend",
             "CounterTrend" => "Counter",
             "MarketMaker" => "Maker",
+            "NewsDriven" => "News",
             _ => null
         };
 
@@ -766,15 +1751,35 @@ maxY)
             return compactName;
         }
 
-        var builder = new System.Text.StringBuilder(agentName.Length + 4);
-
-        for (var index = 0; index < agentName.Length; index++)
+        if (normalized.Contains("TrendFollowing", StringComparison.Ordinal))
         {
-            var current = agentName[index];
+            return normalized.Replace("TrendFollowing", "Trend", StringComparison.Ordinal);
+        }
+
+        if (normalized.Contains("CounterTrend", StringComparison.Ordinal))
+        {
+            return normalized.Replace("CounterTrend", "Counter", StringComparison.Ordinal);
+        }
+
+        if (normalized.Contains("MarketMaker", StringComparison.Ordinal))
+        {
+            return normalized.Replace("MarketMaker", "Maker", StringComparison.Ordinal);
+        }
+
+        if (normalized.Contains("NewsDriven", StringComparison.Ordinal))
+        {
+            return normalized.Replace("NewsDriven", "News", StringComparison.Ordinal);
+        }
+
+        var builder = new System.Text.StringBuilder(normalized.Length + 4);
+
+        for (var index = 0; index < normalized.Length; index++)
+        {
+            var current = normalized[index];
             if (index > 0 &&
                 char.IsUpper(current) &&
-                (char.IsLower(agentName[index - 1]) ||
-                 (index + 1 < agentName.Length && char.IsLower(agentName[index + 1]))))
+                (char.IsLower(normalized[index - 1]) ||
+                 (index + 1 < normalized.Length && char.IsLower(normalized[index + 1]))))
             {
                 builder.Append(' ');
             }
@@ -784,6 +1789,26 @@ maxY)
 
         return builder.ToString();
     }
+
+    private static string GetAssetTypeLabel(AssetType assetType) =>
+        assetType switch
+        {
+            AssetType.Stock => "Акция",
+            AssetType.Bond => "Облигация",
+            AssetType.Commodity => "Товар",
+            AssetType.Crypto => "Криптоактив",
+            _ => assetType.ToString()
+        };
+
+    private static string GetAssetIconClass(AssetType assetType) =>
+        assetType switch
+        {
+            AssetType.Stock => "bi-graph-up-arrow",
+            AssetType.Bond => "bi-receipt",
+            AssetType.Commodity => "bi-box-seam",
+            AssetType.Crypto => "bi-currency-bitcoin",
+            _ => "bi-lightning-charge-fill"
+        };
 
     private static (string Label, string ClassName) GetLiquidity(SimulationTickResult? tickResult, decimal totalDepth)
     {
@@ -809,253 +1834,37 @@ maxY)
         return ("Низкая", "negative");
     }
 
-    private static string GetRussianMonthName(int month) =>
-        month switch
-        {
-            1 => "января",
-            2 => "февраля",
-            3 => "марта",
-            4 => "апреля",
-            5 => "мая",
-            6 => "июня",
-            7 => "июля",
-            8 => "августа",
-            9 => "сентября",
-            10 => "октября",
-            11 => "ноября",
-            12 => "декабря",
-            _ => ""
-        };
-
     private static string FormatSvgNumber(double value) =>
         value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-
-    private static PriceChartData BuildPriceChartData(
-        SimulationTickResult? tickResult,
-        string timeframe,
-        DateTimeOffset updatedAt)
-    {
-        var prices = tickResult?.Snapshot.RecentPrices.Count > 0
-            ? tickResult.Snapshot.RecentPrices.ToArray()
-            : [DemoStartPrice];
-
-        var groups = BuildPriceGroups(prices, GetTimeframeGroupSize(timeframe));
-        var rangeLow = groups.Min(group => group.Low);
-        var rangeHigh = groups.Max(group => group.High);
-        var padding = Math.Max((rangeHigh - rangeLow) * 0.12m, 0.05m);
-        var minPrice = rangeLow - padding;
-        var maxPrice = rangeHigh + padding;
-
-        if (minPrice == maxPrice)
-        {
-            minPrice -= 0.05m;
-            maxPrice += 0.05m;
-        }
-
-        var candleStep = GetTimeframeCandleStep(timeframe);
-        var plotRight = GetChartPlotRight(groups.Length, candleStep);
-        var candles = BuildCandlePoints(groups, minPrice, maxPrice, candleStep);
-        var firstPrice = prices[0];
-        var lastPrice = tickResult?.Snapshot.LastPrice ?? prices[^1];
-        var change = lastPrice - firstPrice;
-        var percent = firstPrice == 0m ? 0m : change / firstPrice * 100m;
-        var changeClass = change >= 0m ? "positive" : "negative";
-        var sign = change >= 0m ? "+" : "";
-        var lastPriceY = ScalePrice(lastPrice, minPrice, maxPrice);
-        var priceTagX = Math.Clamp(plotRight - 66, ChartPlotLeft + 8, ChartPlotRight - 66);
-
-        return new PriceChartData(
-            candles,
-            BuildPriceLabels(minPrice, maxPrice),
-            BuildTickLabels(candles, tickResult?.Tick ?? 0),
-            BuildGridX(timeframe),
-            plotRight,
-            FormatPrice(groups[0].Open),
-            FormatPrice(groups.Max(group => group.High)),
-            FormatPrice(groups.Min(group => group.Low)),
-            FormatPrice(lastPrice),
-            $"{sign}{FormatPrice(change)} ({sign}{percent:0.00}%)",
-            changeClass,
-            FormatPrice(lastPrice),
-            lastPriceY,
-            priceTagX,
-            Math.Clamp(lastPriceY - 11, ChartPlotTop, ChartPlotBottom - 22),
-            priceTagX + 10,
-            Math.Clamp(lastPriceY + 4, ChartPlotTop + 15, ChartPlotBottom - 7),
-            tickResult is null ? "Ожидание первого тика" : $"Рынок активен · тик {tickResult.Tick}",
-            $"Обновлено {updatedAt.ToLocalTime():HH:mm:ss}");
-    }
-
-    private static PriceGroup[] BuildPriceGroups(IReadOnlyList<decimal> prices, int groupSize)
-    {
-        var groups = new List<PriceGroup>();
-
-        for (var index = 0; index < prices.Count; index += groupSize)
-        {
-            var chunk = prices.Skip(index).Take(groupSize).ToArray();
-            groups.Add(new PriceGroup(
-                chunk[0],
-                chunk.Max(),
-                chunk.Min(),
-                chunk[^1]));
-        }
-
-        return groups.ToArray();
-    }
-
-    private static CandlePoint[] BuildCandlePoints(
-        IReadOnlyList<PriceGroup> groups,
-        decimal minPrice,
-        decimal maxPrice,
-        double candleStep)
-    {
-        var bodyWidth = Math.Clamp(candleStep * 0.44, 5, 13);
-
-        return groups
-            .Select((group, index) =>
-            {
-                var x = ChartPlotLeft + candleStep * index;
-                var openY = ScalePrice(group.Open, minPrice, maxPrice);
-                var closeY = ScalePrice(group.Close, minPrice, maxPrice);
-                var bodyHeight = Math.Max(5, Math.Abs(openY - closeY));
-
-                return new CandlePoint(
-                    x,
-                    ScalePrice(group.High, minPrice, maxPrice),
-                    ScalePrice(group.Low, minPrice, maxPrice),
-                    x - bodyWidth / 2,
-                    Math.Min(openY, closeY),
-                    bodyWidth,
-                    bodyHeight,
-                    group.Close >= group.Open);
-            })
-            .ToArray();
-    }
-
-    private static AxisLabel[] BuildPriceLabels(decimal minPrice, decimal maxPrice)
-    {
-        const int labelCount = 6;
-        var labels = new AxisLabel[labelCount];
-
-        for (var index = 0; index < labelCount; index++)
-        {
-            var ratio = labelCount == 1 ? 0 : (double)index / (labelCount - 1);
-            var price = maxPrice - (maxPrice - minPrice) * (decimal)ratio;
-            var y = ChartPlotTop + ChartPlotHeight * ratio;
-            labels[index] = new AxisLabel(0, y, FormatPrice(price));
-        }
-
-        return labels;
-    }
-
-    private static AxisLabel[] BuildTickLabels(IReadOnlyList<CandlePoint> candles, int latestTick)
-    {
-        if (candles.Count == 0)
-        {
-            return [];
-        }
-
-        var labelCount = Math.Min(6, candles.Count);
-        var indexes = new List<int>(labelCount);
-
-        for (var index = 0; index < labelCount; index++)
-        {
-            var ratio = labelCount == 1 ? 0 : (double)index / (labelCount - 1);
-            var candleIndex = (int)Math.Round((candles.Count - 1) * ratio);
-            if (!indexes.Contains(candleIndex))
-            {
-                indexes.Add(candleIndex);
-            }
-        }
-
-        return indexes
-            .Select(index =>
-            {
-                var relativeTick = Math.Max(0, candles.Count - 1 - index);
-                return new AxisLabel(candles[index].X, 0, $"t-{relativeTick}");
-            })
-            .ToArray();
-    }
-
-    private static double[] BuildGridX(string timeframe)
-    {
-        var lineCount = GetTimeframeGridLineCount(timeframe);
-        var lines = new double[lineCount];
-
-        for (var index = 0; index < lineCount; index++)
-        {
-            var ratio = lineCount == 1 ? 0 : (double)index / (lineCount - 1);
-            lines[index] = ChartPlotLeft + (ChartPlotRight - ChartPlotLeft) * ratio;
-        }
-
-        return lines;
-    }
-
-    private static double GetChartPlotRight(int candleCount, double candleStep)
-    {
-        var width = Math.Max(0, candleCount - 1) * candleStep;
-        return Math.Clamp(ChartPlotLeft + width, ChartPlotLeft + 116, ChartPlotRight);
-    }
-
-    private static double ScalePrice(decimal price, decimal minPrice, decimal maxPrice)
-    {
-        var ratio = (double)((price - minPrice) / (maxPrice - minPrice));
-        return ChartPlotBottom - ChartPlotHeight * ratio;
-    }
-
-    private static int GetTimeframeGroupSize(string timeframe) =>
-        timeframe switch
-        {
-            "1м" => 1,
-            "5м" => 2,
-            "15м" => 4,
-            "1ч" => 8,
-            "4ч" => 12,
-            "1д" => 20,
-            _ => 2
-        };
-
-    private static double GetTimeframeCandleStep(string timeframe) =>
-        timeframe switch
-        {
-            "1м" => 11,
-            "5м" => 18,
-            "15м" => 26,
-            "1ч" => 36,
-            "4ч" => 48,
-            "1д" => 62,
-            _ => 18
-        };
-
-    private static int GetTimeframeGridLineCount(string timeframe) =>
-        timeframe switch
-        {
-            "1м" => 12,
-            "5м" => 10,
-            "15м" => 8,
-            "1ч" => 7,
-            "4ч" => 5,
-            "1д" => 4,
-            _ => 8
-        };
-
-    private static Microsoft.AspNetCore.Components.MarkupString SvgText(double x, double y, string text, string anchor =
-"start")
-    {
-        var markup = string.Format(
-            System.Globalization.CultureInfo.InvariantCulture,
-            "<text x=\"{0:0.##}\" y=\"{1:0.##}\" text-anchor=\"{2}\" fill=\"#8EA0BA\" font-size=\"12\" font-weight=\"560\">{3}</text>",
-            x,
-            y,
-            System.Net.WebUtility.HtmlEncode(anchor),
-            System.Net.WebUtility.HtmlEncode(text));
-
-        return new Microsoft.AspNetCore.Components.MarkupString(markup);
-    }
 
     public void Dispose()
     {
         SimulationRunner.OnTick -= HandleTick;
+        debugScenarioCts?.Cancel();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        SimulationRunner.OnTick -= HandleTick;
+        debugScenarioCts?.Cancel();
+
+        if (tradingChartModule is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (isChartRegistered)
+            {
+                await tradingChartModule.InvokeVoidAsync("dispose", chartViewport);
+            }
+
+            await tradingChartModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
     }
 
     private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string
@@ -1063,12 +1872,8 @@ Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
     private sealed record OrderBookViewData(
         IReadOnlyList<OrderBookRow> Asks,
-        IReadOnlyList<OrderBookRow> Bids,
-        string AskFillPath,
-        string AskLinePath,
-        string BidFillPath,
-        string BidLinePath);
-    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle);
+        IReadOnlyList<OrderBookRow> Bids);
+    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle, bool IsEmpty);
     private sealed record SpreadData(string Icon, string Value, string Detail);
     private sealed record StatusStripData(
         string Elapsed,
@@ -1079,32 +1884,65 @@ Projection, IReadOnlyList<BarRect> Bars);
         string Liquidity,
         string LiquidityClass,
         string LiquidityDetail);
-    private sealed record ClockData(string Time, string Date);
-    private sealed record TradeRow(string Time, string Price, string Volume, string Side, string SideClass);
-    private sealed record PriceChartData(
-        IReadOnlyList<CandlePoint> Candles,
-        IReadOnlyList<AxisLabel> PriceLabels,
-        IReadOnlyList<AxisLabel> TickLabels,
-        IReadOnlyList<double> GridX,
-        double PlotRight,
+    private sealed record TradeRow(string Time, string Price, string Volume, string Buyer, string Seller, string SideClass);
+    private sealed record ChartSummaryData(
         string Open,
         string High,
         string Low,
         string Close,
         string Change,
         string ChangeClass,
-        string LastPrice,
-        double LastPriceY,
-        double PriceTagX,
-        double PriceTagY,
-        double PriceTagTextX,
-        double PriceTagTextY,
         string MarketState,
         string UpdatedAt);
-    private sealed record PriceGroup(decimal Open, decimal High, decimal Low, decimal Close);
-    private sealed record CandlePoint(double X, double HighY, double LowY, double BodyX, double BodyY, double BodyWidth,
-double BodyHeight, bool IsUp);
-    private sealed record AxisLabel(double X, double Y, string Text);
+    private sealed record ChartSyncPayload(
+        string Action,
+        string Timeframe,
+        bool ForceScrollToRealtime,
+        IReadOnlyList<ChartCandlePoint>? Data,
+        ChartCandlePoint? Candle);
+    private sealed record ChartCandlePoint(
+        long Time,
+        decimal Open,
+        decimal High,
+        decimal Low,
+        decimal Close,
+        string Color,
+        string BorderColor,
+        string WickColor);
+    private sealed record LivePriceEvent(DateTimeOffset Timestamp, decimal Price);
+    private sealed record TimeframeDefinition(string Key, string Label, TimeSpan Duration);
+    private sealed record TimeframeAppendResult(bool Changed, bool CreatedNewBar);
+    private sealed record DebugScenarioStep(OrderSide Side, decimal Quantity, int DelayMs);
+    private sealed record DebugScenarioSupportAgent(string Key, AgentType Type, decimal Cash, decimal Position);
+    private sealed class AggregatedCandle
+    {
+        public AggregatedCandle(DateTimeOffset timestamp, decimal open, decimal high, decimal low, decimal close)
+        {
+            Timestamp = timestamp;
+            Open = open;
+            High = high;
+            Low = low;
+            Close = close;
+        }
+
+        public DateTimeOffset Timestamp { get; set; }
+        public decimal Open { get; set; }
+        public decimal High { get; set; }
+        public decimal Low { get; set; }
+        public decimal Close { get; set; }
+    }
+
+    private sealed class TimeframeSeriesState
+    {
+        public TimeframeSeriesState(TimeframeDefinition definition)
+        {
+            Definition = definition;
+        }
+
+        public TimeframeDefinition Definition { get; }
+        public List<AggregatedCandle> Candles { get; } = [];
+    }
+
     private sealed record BarRect(double X, double Y, double Width, double Height);
     private sealed record Point(double X, double Y);
 }

@@ -12,7 +12,13 @@ public interface IExchangeEngine
 
     SubmitResult SubmitManyWithResult(IEnumerable<Order> orders);
 
+    bool CancelOrder(Guid orderId);
+
+    int CancelOrdersByAgent(string agentName);
+
     MarketSnapshot GetSnapshot();
 
     OrderBookSnapshot GetOrderBookSnapshot(int depth = 5);
+
+    IReadOnlyList<Order> GetOpenOrders();
 }

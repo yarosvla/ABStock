@@ -1,0 +1,453 @@
+@page "/agents"
+@layout CreateAssetLayout
+@rendermode InteractiveServer
+@using ABStock.Application.Simulation
+@using ABStock.Shared
+@using ABStock.UI.Services
+@using static ABStock.UI.Services.AgentDisplay
+@implements IDisposable
+@inject ISimulationRunner SimulationRunner
+@inject IActiveAssetContext ActiveAssetContext
+
+<PageTitle>Агенты</PageTitle>
+
+<div class="agents-shell">
+    <TopNavigation ActivePage="Agents" ShowClock="true" />
+
+    <main class="agents-main">
+        <header class="page-heading">
+            <div>
+                <p class="breadcrumbs">
+                    <a href="/create-asset">Создание актива</a>
+                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                    <a href="/trading">Торги</a>
+                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                    <span>Агенты</span>
+                </p>
+                <h1>Торговые агенты</h1>
+                <p>Мониторинг стратегий, портфелей и решений агентов по активу @CurrentAsset.Draft.Name</p>
+            </div>
+        </header>
+
+        @if (!SimulationRunner.IsRunning || latestTick is null)
+        {
+            <section class="glass-card empty-state" aria-label="Торги не запущены">
+                <div class="empty-content">
+                    <span class="empty-icon" aria-hidden="true"><i class="bi bi-robot"></i></span>
+                    <h2>Торги не запущены</h2>
+                    <p>Агенты появятся после старта симуляции. Перейдите на экран торгов, чтобы начать.</p>
+                    <a class="start-link" href="/trading">
+                        <i class="bi bi-play-circle" aria-hidden="true"></i>
+                        Перейти к торгам
+                    </a>
+                </div>
+            </section>
+        }
+        else
+        {
+            <section class="agent-dashboard" aria-label="Мониторинг торговых агентов">
+                <aside class="dashboard-left">
+                    <section class="glass-card agent-asset-card" aria-labelledby="agent-asset-title">
+                        <div class="asset-face">
+                            <span class="asset-emblem" aria-hidden="true">
+                                <i class="bi @AssetIconClass"></i>
+                            </span>
+                            <div>
+                                <h2 id="agent-asset-title">@CurrentAsset.Draft.Name</h2>
+                                <p>@CurrentAsset.Symbol · @GetAssetTypeLabel(CurrentAsset.Draft.AssetType).ToLowerInvariant() · @CurrentAsset.Draft.Industry.ToLowerInvariant()</p>
+                            </div>
+                        </div>
+                        <dl class="asset-agent-stats">
+                            <div>
+                                <dt>Последняя цена</dt>
+                                <dd>@FormatMoney(latestTick.Snapshot.LastPrice)</dd>
+                            </div>
+                            <div>
+                                <dt>Объём</dt>
+                                <dd>@FormatQuantity(latestTick.Snapshot.Volume)</dd>
+                            </div>
+                            <div>
+                                <dt>Лучший bid / ask</dt>
+                                <dd>@FormatNullableMoney(latestTick.Snapshot.BestBid) / @FormatNullableMoney(latestTick.Snapshot.BestAsk)</dd>
+                            </div>
+                        </dl>
+                    </section>
+
+                    <section class="glass-card system-card" aria-labelledby="system-title">
+                        <h2 id="system-title">Состояние системы</h2>
+                        @foreach (var row in SystemRows)
+                        {
+                            <div class="system-row">
+                                <i class="bi @row.Icon" aria-hidden="true"></i>
+                                <span>@row.Label</span>
+                                <strong class="@row.ClassName">@row.Value</strong>
+                            </div>
+                        }
+                    </section>
+                    <section class="glass-card leaders-card" aria-labelledby="leaders-title">
+                        <div class="panel-heading">
+                            <h2 id="leaders-title">Лидеры P/L</h2>
+                            <span>@latestTick.Agents.Count агентов</span>
+                        </div>
+                        <div class="leader-list">
+                            @{ var rank = 1; }
+                            @foreach (var leader in LeaderRows)
+                            {
+                                <div>
+                                    <span>@rank</span>
+                                    <strong>@leader.Name</strong>
+                                    <em class="@leader.ClassName">@leader.Pnl</em>
+                                </div>
+                                rank++;
+                            }
+                        </div>
+                    </section>
+                </aside>
+
+                <section class="dashboard-center">
+                    <section class="summary-strip compact-summary" aria-label="Сводка по агентам">
+                        @foreach (var metric in SummaryMetrics)
+                        {
+                            <article class="glass-card summary-card @metric.Accent">
+                                <span class="summary-label">@metric.Label</span>
+                                <strong class="summary-value">@metric.Value</strong>
+                                <small class="summary-detail">@metric.Detail</small>
+                            </article>
+                        }
+                    </section>
+
+                    <section class="glass-card agents-table-card" aria-labelledby="agents-table-title">
+                        <div class="panel-heading">
+                            <h2 id="agents-table-title">Состояние агентов</h2>
+                            <span>Тик @latestTick.Tick</span>
+                        </div>
+                        <p class="table-hint"><i class="bi bi-cursor-fill" aria-hidden="true"></i> Нажмите на агента, чтобы открыть детальную статистику</p>
+                        <div class="agents-table">
+                            <div class="agents-table-head">
+                                <span>Агент</span>
+                                <span>Стратегия</span>
+                                <span>Деньги</span>
+                                <span>Позиция</span>
+                                <span>P/L</span>
+                                <span>Статус</span>
+                            </div>
+                            @foreach (var row in AgentRows)
+                            {
+                                <div class="agents-table-row @row.TypeClass">
+                                    <a class="agent-name-cell" href="/agents/@Uri.EscapeDataString(row.Name)" title="Открыть статистику агента">
+                                        <span class="agent-icon"><i class="bi @row.TypeIcon" aria-hidden="true"></i></span>
+                                        <strong>@row.Name</strong>
+                                        <i class="bi bi-chevron-right agent-open-hint" aria-hidden="true"></i>
+                                    </a>
+                                    <span>@row.Strategy</span>
+                                    <span>@row.Cash</span>
+                                    <span class="@row.PositionClass">@row.Position</span>
+                                    <strong class="@row.PnlClass">@row.Pnl</strong>
+                                    <em class="@row.StatusClass">@row.Status</em>
+                                </div>
+                            }
+                        </div>
+                    </section>
+
+                    <section class="glass-card decision-flow" aria-labelledby="flow-title">
+                        <div class="panel-heading">
+                            <h2 id="flow-title">Как агенты принимают решения</h2>
+                            <span>упрощённая схема</span>
+                        </div>
+                        <div class="flow-steps">
+                            @foreach (var step in WorkflowSteps)
+                            {
+                                <article>
+                                    <span>@step.Number</span>
+                                    <i class="bi @step.Icon" aria-hidden="true"></i>
+                                    <strong>@step.Title</strong>
+                                    <small>@step.Detail</small>
+                                </article>
+                            }
+                        </div>
+                    </section>
+                </section>
+
+                <aside class="dashboard-right">
+                    <section class="glass-card decision-feed-card" aria-labelledby="feed-title">
+                        <div class="panel-heading">
+                            <h2 id="feed-title">Лента действий</h2>
+                            <span>последние события</span>
+                        </div>
+                        <div class="decision-feed">
+                            @foreach (var item in DecisionFeed)
+                            {
+                                <article class="@item.ClassName">
+                                    <time>@item.Time</time>
+                                    <div>
+                                        <strong>@item.Agent</strong>
+                                        <span>@item.Action</span>
+                                        <small>@item.Detail</small>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    </section>
+
+                </aside>
+            </section>
+        }
+    </main>
+</div>
+
+@code {
+    private SimulationTickResult? latestTick;
+    private readonly Dictionary<string, decimal> initialPortfolios = new();
+    private readonly Dictionary<string, (decimal Cash, decimal Position)> initialStates = new();
+    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
+
+    protected override void OnInitialized()
+    {
+        SimulationRunner.OnTick += HandleTick;
+        latestTick = SimulationRunner.Current;
+
+        if (latestTick is not null)
+        {
+            CaptureInitialPortfolios(latestTick);
+        }
+    }
+
+    private void HandleTick(SimulationTickResult tickResult)
+    {
+        _ = InvokeAsync(() =>
+        {
+            CaptureInitialPortfolios(tickResult);
+            latestTick = tickResult;
+            StateHasChanged();
+        });
+    }
+
+    private void CaptureInitialPortfolios(SimulationTickResult tickResult)
+    {
+        foreach (var agent in tickResult.Agents)
+        {
+            initialPortfolios.TryAdd(agent.Name, agent.PortfolioValue);
+            initialStates.TryAdd(agent.Name, (agent.Cash, agent.Position));
+        }
+    }
+
+    public void Dispose()
+    {
+        SimulationRunner.OnTick -= HandleTick;
+    }
+
+    private SummaryMetric[] SummaryMetrics
+    {
+        get
+        {
+            if (latestTick is null) return [];
+
+            var agents = latestTick.Agents;
+            var totalPortfolio = agents.Sum(a => a.PortfolioValue);
+            var totalCash = agents.Sum(a => a.Cash);
+            var totalPosition = agents.Sum(a => a.Position);
+
+            var bestAgent = agents.MaxBy(a => a.PortfolioValue);
+            var worstAgent = agents.MinBy(a => a.PortfolioValue);
+
+            var totalInitial = agents.Sum(a => initialPortfolios.GetValueOrDefault(a.Name, a.PortfolioValue));
+            var totalPnl = totalPortfolio - totalInitial;
+            var totalPnlPercent = totalInitial > 0 ? totalPnl / totalInitial * 100m : 0m;
+
+            return
+            [
+                new("Всего агентов", agents.Count.ToString(), $"Тик {latestTick.Tick}", "volume"),
+                new("Общий портфель", FormatMoney(totalPortfolio), $"Кэш {FormatMoney(totalCash)}", totalPnl >= 0 ? "positive" : "negative"),
+                new("Общий PnL", FormatPnl(totalPnl), $"{totalPnlPercent:+0.00;-0.00}%", totalPnl >= 0 ? "positive" : "negative"),
+                new("Лучший агент", bestAgent?.Name ?? "—", bestAgent is not null ? FormatMoney(bestAgent.PortfolioValue) : "", "positive"),
+            ];
+        }
+    }
+
+    private AgentTableRow[] AgentRows =>
+        latestTick is null
+            ? []
+            : latestTick.Agents.Select(agent =>
+            {
+                var initialValue = initialPortfolios.GetValueOrDefault(agent.Name, agent.PortfolioValue);
+                var pnl = agent.PortfolioValue - initialValue;
+                var initialState = initialStates.GetValueOrDefault(agent.Name, (agent.Cash, agent.Position));
+                var isActive = agent.Cash != initialState.Cash || agent.Position != initialState.Position;
+
+                return new AgentTableRow(
+                    agent.Name,
+                    GetTypeLabel(agent.Type),
+                    GetTypeClass(agent.Type),
+                    GetTypeIcon(agent.Type),
+                    FormatMoney(agent.Cash),
+                    FormatQuantity(agent.Position) + " шт.",
+                    agent.Position >= 0 ? "positive" : "negative",
+                    FormatPnl(pnl),
+                    pnl >= 0 ? "positive" : "negative",
+                    isActive ? "Активен" : "Ожидает",
+                    isActive ? "status-active" : "status-idle");
+            }).ToArray();
+
+    private DecisionFeedItem[] DecisionFeed
+    {
+        get
+        {
+            if (latestTick is null)
+            {
+                return [];
+            }
+
+            var fromTrades = latestTick.Snapshot.RecentTrades
+                .OrderByDescending(trade => trade.ExecutedAt)
+                .Take(6)
+                .SelectMany(trade => new[]
+                {
+                    new DecisionFeedItem(
+                        trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
+                        FormatAgentName(trade.BuyerAgentName),
+                        "Покупка",
+                        $"+{FormatQuantity(trade.Quantity)} шт. по {FormatMoney(trade.Price)}",
+                        "positive"),
+                    new DecisionFeedItem(
+                        trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
+                        FormatAgentName(trade.SellerAgentName),
+                        "Продажа",
+                        $"-{FormatQuantity(trade.Quantity)} шт. по {FormatMoney(trade.Price)}",
+                        "negative")
+                })
+                .Take(6)
+                .ToArray();
+
+            if (fromTrades.Length > 0)
+            {
+                return fromTrades;
+            }
+
+            return latestTick.Agents
+                .Take(4)
+                .Select(agent => new DecisionFeedItem(
+                    DateTimeOffset.Now.ToString("HH:mm:ss"),
+                    agent.Name,
+                    "Наблюдение",
+                    GetStrategyDescription(agent.Type),
+                    GetTypeClass(agent.Type)))
+                .ToArray();
+        }
+    }
+
+    private LeaderRow[] LeaderRows =>
+        latestTick is null
+            ? []
+            : latestTick.Agents
+                .Select(agent =>
+                {
+                    var initialValue = initialPortfolios.GetValueOrDefault(agent.Name, agent.PortfolioValue);
+                    var pnl = agent.PortfolioValue - initialValue;
+                    return new LeaderRow(agent.Name, FormatPnl(pnl), pnl >= 0 ? "positive" : "negative", pnl);
+                })
+                .OrderByDescending(row => row.RawPnl)
+                .ToArray();
+
+    private SystemRow[] SystemRows =>
+    [
+        new("bi-activity", "Активных агентов", FormatQuantity(latestTick?.Agents.Count ?? 0), "positive"),
+        new("bi-arrow-repeat", "Обновление", "в реальном времени", "positive"),
+        new("bi-clock-history", "Последний цикл", DateTimeOffset.Now.ToString("HH:mm:ss"), null),
+        new("bi-diagram-3", "Источник данных", "снапшот рынка", null)
+    ];
+
+    private static WorkflowStep[] WorkflowSteps =>
+    [
+        new("1", "bi-database", "Рыночные данные", "цена, стакан, сделки"),
+        new("2", "bi-broadcast", "Сигнал", "стратегия агента"),
+        new("3", "bi-cpu", "Решение", "покупка, продажа или ожидание"),
+        new("4", "bi-file-earmark-text", "Заявка", "limit / market"),
+        new("5", "bi-graph-up-arrow", "P/L", "результат в портфеле")
+    ];
+
+    private AgentCardData[] AgentCards
+    {
+        get
+        {
+            if (latestTick is null) return [];
+
+            return latestTick.Agents.Select(agent =>
+            {
+                var initialValue = initialPortfolios.GetValueOrDefault(agent.Name, agent.PortfolioValue);
+                var pnl = agent.PortfolioValue - initialValue;
+                var pnlPercent = initialValue > 0 ? pnl / initialValue * 100m : 0m;
+                var positionValue = agent.PortfolioValue - agent.Cash;
+                var cashPct = agent.PortfolioValue > 0 ? agent.Cash / agent.PortfolioValue * 100m : 100m;
+                var posPct = 100m - cashPct;
+
+                var initialState = initialStates.GetValueOrDefault(agent.Name, (agent.Cash, agent.Position));
+                var isActive = agent.Cash != initialState.Cash || agent.Position != initialState.Position;
+                var statusLabel = isActive ? "Активен" : "Ожидает";
+                var statusClass = isActive ? "status-active" : "status-idle";
+                var statusIcon = isActive ? "bi-activity" : "bi-clock-history";
+
+                return new AgentCardData(
+                    Name: agent.Name,
+                    TypeLabel: GetTypeLabel(agent.Type),
+                    TypeClass: GetTypeClass(agent.Type),
+                    TypeIcon: GetTypeIcon(agent.Type),
+                    Cash: FormatMoney(agent.Cash),
+                    Position: FormatQuantity(agent.Position) + " шт.",
+                    Portfolio: FormatMoney(agent.PortfolioValue),
+                    PortfolioClass: pnl >= 0 ? "positive" : "negative",
+                    CashPercent: $"{Math.Clamp(cashPct, 0, 100):0}%",
+                    PositionPercent: $"{Math.Clamp(posPct, 0, 100):0}%",
+                    PnlValue: FormatPnl(pnl),
+                    PnlPercent: $"{pnlPercent:+0.00;-0.00}%",
+                    PnlClass: pnl >= 0 ? "positive" : "negative",
+                    StatusLabel: statusLabel,
+                    StatusClass: statusClass,
+                    StatusIcon: statusIcon,
+                    StrategyDescription: GetStrategyDescription(agent.Type)
+                );
+            }).ToArray();
+        }
+    }
+
+    private static string FormatAgentName(string agentName)
+    {
+        if (string.IsNullOrWhiteSpace(agentName))
+        {
+            return "-";
+        }
+
+        return agentName switch
+        {
+            "TrendFollowing" => "TrendFollowingAgent",
+            "CounterTrend" => "CounterTrendAgent",
+            "MarketMaker" => "MarketMakerAgent",
+            "NewsDriven" => "NewsDrivenAgent",
+            _ => agentName
+        };
+    }
+    private sealed record SummaryMetric(string Label, string Value, string Detail, string Accent);
+    private sealed record AgentTableRow(
+        string Name,
+        string Strategy,
+        string TypeClass,
+        string TypeIcon,
+        string Cash,
+        string Position,
+        string PositionClass,
+        string Pnl,
+        string PnlClass,
+        string Status,
+        string StatusClass);
+    private sealed record DecisionFeedItem(string Time, string Agent, string Action, string Detail, string ClassName);
+    private sealed record LeaderRow(string Name, string Pnl, string ClassName, decimal RawPnl);
+    private sealed record SystemRow(string Icon, string Label, string Value, string? ClassName);
+    private sealed record WorkflowStep(string Number, string Icon, string Title, string Detail);
+    private sealed record AgentCardData(
+        string Name, string TypeLabel, string TypeClass, string TypeIcon,
+        string Cash, string Position, string Portfolio, string PortfolioClass,
+        string CashPercent, string PositionPercent,
+        string PnlValue, string PnlPercent, string PnlClass,
+        string StatusLabel, string StatusClass, string StatusIcon,
+        string StrategyDescription);
+}
