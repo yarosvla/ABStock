@@ -5,5 +5,5 @@ namespace ABStock.AI.Services;
 
 public interface INewsProcessingService
 {
-    NewsSignal Analyze(NewsAnalysisRequest request);
+    Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default);
 }

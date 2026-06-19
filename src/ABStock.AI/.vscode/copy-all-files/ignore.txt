@@ -1,0 +1,7 @@
+# Add relative paths to ignore, one per line
+# Examples:
+# prueba\test.py
+# src\temp
+# docs\draft.md
+# *.backup
+# temp-folder
