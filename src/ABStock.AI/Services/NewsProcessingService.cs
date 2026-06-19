@@ -6,79 +6,156 @@ namespace ABStock.AI.Services;
 
 public sealed class NewsProcessingService : INewsProcessingService
 {
-    private readonly IFinBertAnalyzer _finBert = new StubFinBertAnalyzer();
-    private readonly IAspectMatcher _matcher = new ProfileAspectMatcher();
+    private readonly IFinBertAnalyzer _finBert;
+    private readonly IFactorMatcher _matcher;
 
-    internal NewsProcessingService(IFinBertAnalyzer finBert, IAspectMatcher matcher)
+    private readonly IEmbeddingService _embeddingService;
+
+    internal NewsProcessingService(IFinBertAnalyzer finBert, IFactorMatcher matcher, IEmbeddingService embeddingService)
     {
         _finBert = finBert;
         _matcher = matcher;
+        _embeddingService = embeddingService;
     }
 
-    public NewsSignal Analyze(NewsAnalysisRequest request)
+    async public Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default)
     {
-        var finBertResult = _finBert.Analyze(request.NewsText);
-        var matchResult = _matcher.Match(request.NewsText, request.Profile);
+        var newsEmbedding =
+            await _embeddingService.CreateEmbeddingAsync(
+                request.NewsText,
+                ct);
 
-        var polarity = DeterminePolarity(finBertResult, matchResult);
-        var impactScore = finBertResult.Confidence * request.Profile.NewsSensitivity * matchResult.Score;
+        var finBertResult =
+            await _finBert.AnalyzeAsync(
+                request.NewsText,
+                ct);
 
-        var explanation = BuildExplanation(finBertResult, matchResult, polarity, impactScore);
+        var matches =
+            await _matcher.MatchAsync(
+                newsEmbedding,
+                request.Profile,
+                ct);
+
+        var relevantMatches =
+            matches
+                .Where(x => x.Similarity > 0.75m)
+                .ToList();
+        /*
+        var averageSimilarity =
+            relevantMatches.Any()
+                ? relevantMatches.Average(x => x.Similarity)
+                : 0m;
+
+        var averageImportance =
+            relevantMatches.Any()
+                ? relevantMatches.Average(x => x.Factor.Importance)
+                : 0m;
+        */
+        decimal totalImpact = 0;
+
+        foreach (var match in relevantMatches)
+        {
+            var sentimentStrength =
+                finBertResult.PositiveProbability
+                - finBertResult.NegativeProbability;
+
+            if (!match.Factor.IsPositive)
+            {
+                sentimentStrength *= -1;
+            }
+
+            var contribution =
+                sentimentStrength
+                * match.Similarity
+                * match.Factor.Importance;
+
+            totalImpact += contribution;
+        }
+
+        var polarity = DeterminePolarity(finBertResult);
+        /*
+        var impactScore =
+            finBertResult.Confidence
+            * averageSimilarity
+            * averageImportance
+            * request.Profile.NewsSensitivity;
+        */
+        var impactScore =
+            totalImpact
+            * request.Profile.NewsSensitivity;
+
+        var explanation = BuildExplanation(
+            polarity,
+            finBertResult,
+            relevantMatches,
+            impactScore
+        );
 
         return new NewsSignal(
             Polarity: polarity,
             Confidence: finBertResult.Confidence,
             ImpactScore: Math.Round(impactScore, 4),
             Explanation: explanation
-        )
-        {
-            PositiveMatches = matchResult.PositiveMatches,
-            NegativeMatches = matchResult.NegativeMatches,
-            RiskMatches = matchResult.RiskMatches,
-            MatchScore = matchResult.Score,
-            Factors = matchResult.Matches
-        };
+        );
     }
 
-    private static SignalPolarity DeterminePolarity(FinBertResult finBert, AspectMatchResult match)
+    private static SignalPolarity DeterminePolarity(
+        FinBertResult result)
     {
-        var weightedNegative = match.NegativeMatches + match.RiskMatches * 0.5m;
-
-        if (match.PositiveMatches == 0 && weightedNegative == 0)
+        if (result.PositiveProbability >
+            result.NegativeProbability &&
+            result.PositiveProbability >
+            result.NeutralProbability)
         {
-            return finBert.PositiveProbability >= finBert.NegativeProbability
-                ? SignalPolarity.Positive
-                : SignalPolarity.Negative;
+            return SignalPolarity.Positive;
         }
 
-        if (match.PositiveMatches > weightedNegative)
-            return SignalPolarity.Positive;
-
-        if (weightedNegative > match.PositiveMatches)
+        if (result.NegativeProbability >
+            result.PositiveProbability &&
+            result.NegativeProbability >
+            result.NeutralProbability)
+        {
             return SignalPolarity.Negative;
+        }
 
         return SignalPolarity.Neutral;
     }
-
+    
     private static string BuildExplanation(
-        FinBertResult finBert,
-        AspectMatchResult match,
         SignalPolarity polarity,
+        FinBertResult finBert,
+        IReadOnlyList<FactorMatchResult> relevantMatches,
         decimal impactScore)
     {
-        var confidence = Math.Round(finBert.Confidence * 100, 0);
-        return $"Новость определена как {PolarityName(polarity)}. " +
-               $"Уверенность FinBERT: {confidence}%. " +
-               $"Затронуто позитивных факторов: {match.PositiveMatches}, " +
-               $"негативных факторов: {match.NegativeMatches}, " +
-               $"рисков: {match.RiskMatches}. " +
-               $"Сила влияния: {Math.Round(impactScore, 2)}.";
-    }
+        if (!relevantMatches.Any())
+        {
+            return
+                $"Signal: {polarity}. " +
+                $"FinBERT confidence: {finBert.Confidence:F2}. " +
+                $"Impact: {impactScore:F2}. " +
+                $"No sufficiently relevant business factors matched.";
+        }
 
-    private static string PolarityName(SignalPolarity polarity) => polarity switch
-    {
-        SignalPolarity.Positive => "позитивная",
-        SignalPolarity.Negative => "негативная",
-        _ => "нейтральная"
-    };
+        var factorLines =
+            relevantMatches.Select(x =>
+            {
+                var factorType =
+                    x.Factor.IsPositive
+                        ? "positive"
+                        : "negative";
+
+                return
+                    $"{x.Factor.Name} " +
+                    $"[{factorType}] " +
+                    $"importance: {x.Factor.Importance:F2}, " +
+                    $"similarity: {x.Similarity:F2}";
+            });
+
+        return
+            $"Signal: {polarity}. " +
+            $"FinBERT confidence: {finBert.Confidence:F2}. " +
+            $"Impact: {impactScore:F2}. " +
+            $"Matched factors: " +
+            $"{string.Join("; ", factorLines)}.";
+        }
 }
