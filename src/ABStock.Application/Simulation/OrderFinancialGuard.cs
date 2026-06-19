@@ -13,6 +13,9 @@ internal static class FinancialOrderSubmission
         MarketSnapshot snapshot)
     {
         var checkResult = OrderFinancialGuard.Filter(orders, agents, snapshot);
+        var financialRejectedReports = checkResult.RejectedOrders
+            .Select(rejectedOrder => CreateRejectedReport(rejectedOrder.Order, rejectedOrder.Reason))
+            .ToArray();
 
         if (checkResult.AcceptedOrders.Count == 0)
         {
@@ -20,8 +23,10 @@ internal static class FinancialOrderSubmission
                 snapshot,
                 Trades: [],
                 AcceptedOrders: [],
-                RejectedOrders: checkResult.RejectedOrders
-            );
+                RejectedOrders: checkResult.RejectedOrders)
+            {
+                OrderReports = financialRejectedReports
+            };
         }
 
         var submitResult = exchange.SubmitManyWithResult(checkResult.AcceptedOrders);
@@ -34,8 +39,24 @@ internal static class FinancialOrderSubmission
         {
             RejectedOrders = checkResult.RejectedOrders
                 .Concat(submitResult.RejectedOrders)
+                .ToArray(),
+            OrderReports = financialRejectedReports
+                .Concat(submitResult.OrderReports)
                 .ToArray()
         };
+    }
+
+    private static OrderExecutionReport CreateRejectedReport(Order? order, string reason)
+    {
+        return new OrderExecutionReport(
+            Order: order,
+            Status: OrderExecutionStatus.Rejected,
+            RequestedQuantity: order?.Quantity ?? 0m,
+            FilledQuantity: 0m,
+            RemainingQuantity: order?.Quantity ?? 0m,
+            AveragePrice: null,
+            Message: reason
+        );
     }
 }
 

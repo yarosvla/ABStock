@@ -81,6 +81,7 @@ public sealed class ExchangeEngine : IExchangeEngine
         var candidateOrders = new List<Order>();
         var acceptedOrders = new List<Order>();
         var rejectedOrders = new List<RejectedOrder>();
+        var rejectedReports = new List<OrderExecutionReport>();
 
         foreach (var order in orders)
         {
@@ -92,6 +93,7 @@ public sealed class ExchangeEngine : IExchangeEngine
             catch (Exception exception)
             {
                 rejectedOrders.Add(new RejectedOrder(order, exception.Message));
+                rejectedReports.Add(CreateRejectedReport(order, exception.Message));
             }
         }
 
@@ -106,15 +108,22 @@ public sealed class ExchangeEngine : IExchangeEngine
             catch (Exception exception)
             {
                 rejectedOrders.Add(new RejectedOrder(order, exception.Message));
+                rejectedReports.Add(CreateRejectedReport(order, exception.Message));
             }
         }
 
+        var acceptedReports = BuildExecutionReports(acceptedOrders, trades);
+
         return new SubmitResult(
-            Snapshot: GetSnapshot(),
-            Trades: trades,
-            AcceptedOrders: acceptedOrders.ToArray(),
-            RejectedOrders: rejectedOrders.ToArray()
-        );
+            GetSnapshot(),
+            trades,
+            acceptedOrders.ToArray(),
+            rejectedOrders.ToArray())
+        {
+            OrderReports = acceptedReports
+                .Concat(rejectedReports)
+                .ToArray()
+        };
     }
 
     public bool CancelOrder(Guid orderId)
@@ -269,6 +278,81 @@ public sealed class ExchangeEngine : IExchangeEngine
         TrimHistory();
 
         return trade;
+    }
+
+    private IReadOnlyList<OrderExecutionReport> BuildExecutionReports(
+        IReadOnlyList<Order> acceptedOrders,
+        IReadOnlyList<Trade> trades)
+    {
+        var openOrdersById = GetOpenOrders().ToDictionary(order => order.Id);
+
+        return acceptedOrders
+            .Select(order => BuildExecutionReport(order, trades, openOrdersById))
+            .ToArray();
+    }
+
+    private static OrderExecutionReport BuildExecutionReport(
+        Order order,
+        IReadOnlyList<Trade> trades,
+        IReadOnlyDictionary<Guid, Order> openOrdersById)
+    {
+        var orderTrades = trades
+            .Where(trade => trade.BuyOrderId == order.Id || trade.SellOrderId == order.Id)
+            .ToArray();
+
+        var filledQuantity = orderTrades.Sum(trade => trade.Quantity);
+        var openQuantity = openOrdersById.TryGetValue(order.Id, out var openOrder)
+            ? openOrder.Quantity
+            : 0m;
+        var remainingQuantity = openQuantity > 0m
+            ? openQuantity
+            : Math.Max(0m, order.Quantity - filledQuantity);
+        var averagePrice = filledQuantity > 0m
+            ? orderTrades.Sum(trade => trade.Price * trade.Quantity) / filledQuantity
+            : (decimal?)null;
+
+        return new OrderExecutionReport(
+            Order: order,
+            Status: GetExecutionStatus(order, filledQuantity, openQuantity),
+            RequestedQuantity: order.Quantity,
+            FilledQuantity: filledQuantity,
+            RemainingQuantity: remainingQuantity,
+            AveragePrice: averagePrice,
+            Message: null
+        );
+    }
+
+    private static OrderExecutionStatus GetExecutionStatus(Order order, decimal filledQuantity, decimal openQuantity)
+    {
+        if (filledQuantity >= order.Quantity)
+        {
+            return OrderExecutionStatus.Filled;
+        }
+
+        if (filledQuantity > 0m)
+        {
+            return OrderExecutionStatus.PartiallyFilled;
+        }
+
+        if (openQuantity > 0m)
+        {
+            return OrderExecutionStatus.Open;
+        }
+
+        return OrderExecutionStatus.Expired;
+    }
+
+    private static OrderExecutionReport CreateRejectedReport(Order? order, string reason)
+    {
+        return new OrderExecutionReport(
+            Order: order,
+            Status: OrderExecutionStatus.Rejected,
+            RequestedQuantity: order?.Quantity ?? 0m,
+            FilledQuantity: 0m,
+            RemainingQuantity: order?.Quantity ?? 0m,
+            AveragePrice: null,
+            Message: reason
+        );
     }
 
     private void TrimHistory()

@@ -184,6 +184,60 @@ public sealed class ExchangeEngineTests
         Assert.Equal("seller-agent", trade.SellerAgentName);
         Assert.Equal(100m, trade.Price);
         Assert.Equal(1m, trade.Quantity);
+
+        Assert.Contains(result.OrderReports, report =>
+            report.Order?.Id == CreateId(1) &&
+            report.Status == OrderExecutionStatus.Filled &&
+            report.FilledQuantity == 1m &&
+            report.RemainingQuantity == 0m);
+        Assert.Contains(result.OrderReports, report =>
+            report.Order?.Id == CreateId(3) &&
+            report.Status == OrderExecutionStatus.Rejected &&
+            report.Message is not null);
+    }
+
+    [Fact]
+    public void SubmitManyWithResult_ReportsOpenLimitOrderWhenNoVolumeIsAvailable()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        var result = exchange.SubmitManyWithResult(
+        [
+            CreateOrder(CreateId(1), OrderSide.Buy, 100m, quantity: 10m, agentName: "buyer-agent")
+        ]);
+
+        var report = Assert.Single(result.OrderReports);
+        Assert.Equal(CreateId(1), report.Order?.Id);
+        Assert.Equal(OrderExecutionStatus.Open, report.Status);
+        Assert.Equal(10m, report.RequestedQuantity);
+        Assert.Equal(0m, report.FilledQuantity);
+        Assert.Equal(10m, report.RemainingQuantity);
+        Assert.Null(report.AveragePrice);
+    }
+
+    [Fact]
+    public void SubmitManyWithResult_ReportsPartiallyFilledLimitOrderWhenOnlySomeVolumeIsAvailable()
+    {
+        var exchange = new ExchangeEngine(startPrice: 100m);
+
+        exchange.Submit(CreateOrder(CreateId(1), OrderSide.Sell, 99m, quantity: 3m, agentName: "seller-agent"));
+
+        var result = exchange.SubmitManyWithResult(
+        [
+            CreateOrder(CreateId(2), OrderSide.Buy, 100m, quantity: 10m, agentName: "buyer-agent")
+        ]);
+
+        var report = Assert.Single(result.OrderReports);
+        Assert.Equal(CreateId(2), report.Order?.Id);
+        Assert.Equal(OrderExecutionStatus.PartiallyFilled, report.Status);
+        Assert.Equal(10m, report.RequestedQuantity);
+        Assert.Equal(3m, report.FilledQuantity);
+        Assert.Equal(7m, report.RemainingQuantity);
+        Assert.Equal(99.5m, report.AveragePrice);
+
+        var restingOrder = Assert.Single(exchange.GetOpenOrders());
+        Assert.Equal(CreateId(2), restingOrder.Id);
+        Assert.Equal(7m, restingOrder.Quantity);
     }
 
     [Fact]
