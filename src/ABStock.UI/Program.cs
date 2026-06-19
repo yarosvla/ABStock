@@ -1,6 +1,8 @@
 using ABStock.AI.Extensions;
 using ABStock.Application.Extensions;
+using ABStock.Persistence.Extensions;
 using ABStock.UI.Components;
+using ABStock.UI.Services;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,14 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 // Add services to the container.
 builder.Services.AddABStockApplication();
 builder.Services.AddABStockAI(builder.Configuration);
+builder.Services.AddABStockPersistence(
+    builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
+builder.Services.AddScoped<IActiveAssetContext, ActiveAssetContext>();
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddABStockSimulationDiagnostics();
+}
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

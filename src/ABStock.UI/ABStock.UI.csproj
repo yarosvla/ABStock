@@ -10,6 +10,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ABStock.AI\ABStock.AI.csproj" />
     <ProjectReference Include="..\ABStock.Application\ABStock.Application.csproj" />
+    <ProjectReference Include="..\ABStock.Persistence\ABStock.Persistence.csproj" />
   </ItemGroup>
 
 </Project>
