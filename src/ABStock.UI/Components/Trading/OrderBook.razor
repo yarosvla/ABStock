@@ -1,0 +1,58 @@
+<section class="glass-card order-book" aria-labelledby="book-title">
+    <header class="ob-heading">
+        <div class="ob-title">
+            <h2 id="book-title">Стакан</h2>
+            <p>Глубина рынка</p>
+        </div>
+    </header>
+
+    <div class="ob-columns" aria-hidden="true">
+        <span class="ob-price">Цена&nbsp;₽</span>
+        <span class="ob-volume">Объём</span>
+        <span class="ob-total">Σ&nbsp;шт.</span>
+    </div>
+
+    <div class="ob-side ob-asks" role="rowgroup" aria-label="Заявки на продажу">
+        @foreach (var row in Data.Asks)
+        {
+            <div class="ob-row @(row.IsEmpty ? "is-empty" : null)">
+                <span class="ob-depth" style="@row.DepthStyle"></span>
+                <span class="ob-price">@row.Price</span>
+                <span class="ob-volume">@row.Volume</span>
+                <span class="ob-total">@row.Total</span>
+            </div>
+        }
+    </div>
+
+    <div class="ob-center @Data.Center.DirectionClass" aria-label="Последняя цена и спред">
+        <span class="ob-last">
+            <i class="@Data.Center.DirectionIcon" aria-hidden="true"></i>
+            @Data.Center.LastPrice
+        </span>
+        <span class="ob-spread">
+            <small>Спред</small>
+            <strong>@Data.Center.Spread</strong>
+            @if (!string.IsNullOrEmpty(Data.Center.SpreadPercent))
+            {
+                <em>@Data.Center.SpreadPercent</em>
+            }
+        </span>
+    </div>
+
+    <div class="ob-side ob-bids" role="rowgroup" aria-label="Заявки на покупку">
+        @foreach (var row in Data.Bids)
+        {
+            <div class="ob-row @(row.IsEmpty ? "is-empty" : null)">
+                <span class="ob-depth" style="@row.DepthStyle"></span>
+                <span class="ob-price">@row.Price</span>
+                <span class="ob-volume">@row.Volume</span>
+                <span class="ob-total">@row.Total</span>
+            </div>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public OrderBookViewData Data { get; set; } = default!;
+}

@@ -183,51 +183,7 @@
                 </section>
 
                 <aside class="right-column">
-                    @{
-                        var orderBook = OrderBookData;
-                        var spread = Spread;
-                    }
-                    <section class="glass-card order-book" aria-labelledby="book-title">
-                        <div class="panel-heading">
-                            <div class="book-title-block">
-                                <h2 id="book-title">Стакан</h2>
-                                <p>Лучшие цены и глубина рынка</p>
-                            </div>
-                            <div class="book-spread-meta">
-                                <strong>@spread.Value</strong>
-                                <small>@spread.Detail</small>
-                            </div>
-                        </div>
-                        <div class="book-head">
-                            <span class="book-cell-price">Цена (₽)</span>
-                            <span class="book-cell-volume">Объём (шт.)</span>
-                            <span class="book-cell-total">Сумма (шт.)</span>
-                        </div>
-
-                        <div class="book-side sells">
-                            @foreach (var row in orderBook.Asks)
-                            {
-                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
-                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                    <strong class="book-cell-price">@row.Price</strong>
-                                    <span class="book-cell-volume">@row.Volume</span>
-                                    <span class="book-cell-total">@row.Total</span>
-                                </div>
-                            }
-                        </div>
-
-                        <div class="book-side buys">
-                            @foreach (var row in orderBook.Bids)
-                            {
-                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
-                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                    <strong class="book-cell-price">@row.Price</strong>
-                                    <span class="book-cell-volume">@row.Volume</span>
-                                    <span class="book-cell-total">@row.Total</span>
-                                </div>
-                            }
-                        </div>
-                    </section>
+                    <OrderBook Data="OrderBookData" />
 
                     <section class="glass-card trades-card" aria-labelledby="trades-title">
                         <h2 id="trades-title">Последние сделки</h2>
@@ -452,9 +408,7 @@
     private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
     private MarketMetric[] MarketMetrics => BuildMarketMetrics(latestTick);
 
-    private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
-
-    private SpreadData Spread => BuildSpreadData(latestTick);
+    private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick);
 
     private StatusStripData Status => BuildStatusStripData(latestTick);
 
@@ -475,6 +429,7 @@
     private ElementReference chartViewport;
     private IJSObjectReference? tradingChartModule;
     private bool isChartRegistered;
+    private bool isChartSyncInFlight;
     private bool metricsPrimed;
     private bool chartStatePrimed;
     private ChartSyncPayload? pendingChartSync;
@@ -567,16 +522,23 @@
         UpdateMetricHistory(tickResult);
         UpdateChartSeries(tickResult, receivedAt);
         LoadPersistedCandles(selectedTimeframe);
-        _ = TrySyncChartAsync();
+
+        // The actual JS sync runs from OnAfterRenderAsync once the DOM is committed. We do
+        // NOT also fire it here: a second concurrent sync per tick replayed the same payload
+        // against Lightweight Charts and was the main source of the chart flicker.
     }
 
     private async Task TrySyncChartAsync()
     {
-        if (pendingChartSync is null)
+        // Single, re-entrancy-guarded sync path. If a new tick queues another payload while a
+        // sync is awaiting JS interop, the drain loop below applies it instead of a second
+        // overlapping invocation racing the first.
+        if (pendingChartSync is null || isChartSyncInFlight)
         {
             return;
         }
 
+        isChartSyncInFlight = true;
         try
         {
             var modulePath = Assets["Components/Pages/Trading.razor.js"];
@@ -595,9 +557,11 @@
                 isChartRegistered = true;
             }
 
-            var payload = pendingChartSync;
-            await tradingChartModule.InvokeVoidAsync("sync", chartViewport, payload);
-            pendingChartSync = null;
+            while (pendingChartSync is { } payload)
+            {
+                pendingChartSync = null;
+                await tradingChartModule.InvokeVoidAsync("sync", chartViewport, payload);
+            }
         }
         catch (JSDisconnectedException)
         {
@@ -605,6 +569,10 @@
         catch (InvalidOperationException)
         {
             // ElementReference is not ready yet; OnAfterRenderAsync will sync.
+        }
+        finally
+        {
+            isChartSyncInFlight = false;
         }
     }
 
@@ -774,7 +742,10 @@
         var selectedSeries = GetSelectedTimeframeState();
         pendingChartSync = createdBarsForSelectedTimeframe > 1
             ? BuildFullChartSyncPayload(forceScrollToRealtime: false)
-            : BuildIncrementalChartSyncPayload(selectedSeries.Candles[^1], forceScrollToRealtime: false);
+            : BuildIncrementalChartSyncPayload(
+                selectedSeries.Candles[^1],
+                forceScrollToRealtime: false,
+                isNewBar: createdBarsForSelectedTimeframe == 1);
     }
 
     private void SubmitDebugOrder()
@@ -1289,16 +1260,18 @@
             "setData",
             state.Definition.Key,
             forceScrollToRealtime,
+            IsNewBar: false,
             state.Candles.Select(ToChartCandlePoint).ToArray(),
             null);
     }
 
-    private ChartSyncPayload BuildIncrementalChartSyncPayload(AggregatedCandle candle, bool forceScrollToRealtime)
+    private ChartSyncPayload BuildIncrementalChartSyncPayload(AggregatedCandle candle, bool forceScrollToRealtime, bool isNewBar)
     {
         return new ChartSyncPayload(
             "update",
             selectedTimeframe,
             forceScrollToRealtime,
+            isNewBar,
             null,
             ToChartCandlePoint(candle));
     }
@@ -1509,53 +1482,100 @@ BuildVolumeBars(volumeMetricHistory))
         ];
     }
 
-    private static OrderBookViewData BuildOrderBookData(OrderBookSnapshot? orderBook)
+    private OrderBookViewData BuildOrderBookData(SimulationTickResult? tickResult)
     {
-        var asks = GetVisibleOrderBookLevels(orderBook?.Asks ?? [], reverse: true);
-        var bids = GetVisibleOrderBookLevels(orderBook?.Bids ?? [], reverse: false);
-
+        var orderBook = tickResult?.OrderBook;
         return new OrderBookViewData(
-            BuildOrderBookRows(asks),
-            BuildOrderBookRows(bids));
+            BuildOrderBookSide(orderBook?.Asks ?? [], isAsk: true),
+            BuildOrderBookSide(orderBook?.Bids ?? [], isAsk: false),
+            BuildOrderBookCenter(tickResult));
     }
 
-    private static OrderBookLevel[] GetVisibleOrderBookLevels(IReadOnlyList<OrderBookLevel> levels, bool reverse)
+    // Levels arrive best-first from the engine (asks ascending, bids descending). We accumulate
+    // depth outward from the best price so the cumulative total and the depth bar grow away from
+    // the spread, then reverse the asks so the best ask sits at the bottom next to the divider.
+    private static OrderBookRow[] BuildOrderBookSide(IReadOnlyList<OrderBookLevel> levels, bool isAsk)
     {
         var visibleLevels = levels.Take(VisibleOrderBookDepth).ToArray();
-        if (reverse)
+        if (visibleLevels.Length == 0)
         {
-            Array.Reverse(visibleLevels);
+            return [new OrderBookRow("—", "—", "—", 0, "width: 0%;", true)];
         }
 
-        return visibleLevels;
+        var cumulative = 0m;
+        var totals = new decimal[visibleLevels.Length];
+        for (var index = 0; index < visibleLevels.Length; index++)
+        {
+            cumulative += visibleLevels[index].Quantity;
+            totals[index] = cumulative;
+        }
+
+        var maxCumulative = cumulative;
+        var rows = new OrderBookRow[visibleLevels.Length];
+        for (var index = 0; index < visibleLevels.Length; index++)
+        {
+            var level = visibleLevels[index];
+            var depth = CalculateDepth(totals[index], maxCumulative);
+            rows[index] = new OrderBookRow(
+                FormatPrice(level.Price),
+                FormatQuantity(level.Quantity),
+                FormatQuantity(totals[index]),
+                depth,
+                $"width: {depth}%;",
+                false);
+        }
+
+        if (isAsk)
+        {
+            Array.Reverse(rows);
+        }
+
+        return rows;
     }
 
-    private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels)
+    private OrderBookCenter BuildOrderBookCenter(SimulationTickResult? tickResult)
     {
-        var maxQuantity = levels.Count == 0 ? 0m : levels.Max(level => level.Quantity);
-        var total = 0m;
-        var rows = levels
-            .Select(level =>
-            {
-                total += level.Quantity;
-                var depth = CalculateDepth(level.Quantity, maxQuantity);
-
-                return new OrderBookRow(
-                    FormatPrice(level.Price),
-                    FormatQuantity(level.Quantity),
-                    FormatQuantity(total),
-                    depth,
-                    $"width: {depth}%;",
-                    false);
-            })
-            .ToList();
-
-        if (rows.Count == 0)
+        var snapshot = tickResult?.Snapshot;
+        if (snapshot is null)
         {
-            rows.Add(new OrderBookRow("—", "—", "—", 0, "width: 0%;", true));
+            return new OrderBookCenter("—", "neutral", "bi bi-dash", "—", string.Empty, false);
         }
 
-        return rows.ToArray();
+        var direction = "neutral";
+        var directionIcon = "bi bi-dash";
+        if (priceMetricHistory.Count >= 2)
+        {
+            var previous = priceMetricHistory[^2];
+            if (snapshot.LastPrice > previous)
+            {
+                direction = "up";
+                directionIcon = "bi bi-caret-up-fill";
+            }
+            else if (snapshot.LastPrice < previous)
+            {
+                direction = "down";
+                directionIcon = "bi bi-caret-down-fill";
+            }
+        }
+
+        var spread = "—";
+        var spreadPercent = string.Empty;
+        if (snapshot.BestBid is { } bestBid && snapshot.BestAsk is { } bestAsk)
+        {
+            var spreadValue = bestAsk - bestBid;
+            var mid = (bestAsk + bestBid) / 2m;
+            var percent = mid == 0m ? 0m : spreadValue / mid * 100m;
+            spread = $"{FormatPrice(spreadValue)} ₽";
+            spreadPercent = $"{percent:0.00}%";
+        }
+
+        return new OrderBookCenter(
+            FormatPrice(snapshot.LastPrice),
+            direction,
+            directionIcon,
+            spread,
+            spreadPercent,
+            true);
     }
 
     private static TradeRow[] BuildTradeRows(IReadOnlyList<Trade> trades) =>
@@ -1870,10 +1890,6 @@ maxY)
     private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string
 Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
-    private sealed record OrderBookViewData(
-        IReadOnlyList<OrderBookRow> Asks,
-        IReadOnlyList<OrderBookRow> Bids);
-    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle, bool IsEmpty);
     private sealed record SpreadData(string Icon, string Value, string Detail);
     private sealed record StatusStripData(
         string Elapsed,
@@ -1898,6 +1914,7 @@ Projection, IReadOnlyList<BarRect> Bars);
         string Action,
         string Timeframe,
         bool ForceScrollToRealtime,
+        bool IsNewBar,
         IReadOnlyList<ChartCandlePoint>? Data,
         ChartCandlePoint? Candle);
     private sealed record ChartCandlePoint(

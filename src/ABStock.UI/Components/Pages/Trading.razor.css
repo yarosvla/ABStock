@@ -3873,3 +3873,105 @@
         display: none;
     }
 }
+
+/* ================================================================
+   Unified "order-book" design language
+   Brighter green/red accents, tabular monospace numerics and
+   sharper inner corners — applied across the whole trading screen
+   so every panel reads in the same style as the order book.
+   ================================================================ */
+
+.trading-shell {
+    /* Adopt the order-book accent palette site-wide (these tokens
+       cascade into every panel and child component). */
+    --accent-green: #4fe3a3;
+    --accent-red: #ff8076;
+}
+
+/* Sharper corners on every panel (overrides the earlier scoped 8px rule).
+   The order book sets its own, slightly softer radius in its component CSS. */
+.glass-card {
+    border-radius: var(--app-radius);
+}
+
+/* Numeric readouts → tabular monospace for a trading-terminal feel. */
+.metric-card strong,
+.chart-header dt,
+.chart-header dd,
+.status-metric strong,
+.status-range strong,
+.market-active {
+    font-family: var(--app-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+}
+
+/* Metric value adopts its accent colour (the card already tints the border). */
+.metric-card.positive strong {
+    color: var(--accent-green);
+}
+
+.metric-card.negative strong {
+    color: var(--accent-red);
+}
+
+/* Micro-labels everywhere → the order book's quiet, tightly-tracked uppercase caption. */
+.metric-card span,
+.parameter-list dt,
+.status-metric small,
+.chart-header dt,
+.trade-head {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--app-label);
+}
+
+/* Card headings get the same quiet divider as the order book's column-header row. */
+.parameter-card h2,
+.trades-card h2 {
+    margin-bottom: 2px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--app-border);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #eef4fb;
+}
+
+/* Inner data surfaces (trade rows, status tiles) become navy "book" rows:
+   deep gradient fill, thin desaturated border, consistent radius. */
+.trade-row {
+    border-radius: var(--app-radius-sm);
+    border: 1px solid var(--app-border);
+    background: var(--app-panel-inset);
+}
+
+.status-metric {
+    padding: 9px 11px;
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    background: var(--app-panel-inset);
+}
+
+.metric-card {
+    background: var(--app-panel-inset);
+}
+
+.timeframe-row button,
+.portfolio-button,
+.status-cta {
+    border-radius: var(--app-radius-sm);
+}
+
+.portfolio-button .bi {
+    border-radius: var(--app-radius-sm);
+}
+
+/* The chart canvas sits on the same deep-navy field as the book sides. */
+.chart-stage {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 30%),
+        rgba(9, 17, 31, 0.55);
+}
