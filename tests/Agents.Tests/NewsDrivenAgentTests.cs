@@ -138,4 +138,58 @@ public sealed class NewsDrivenAgentTests
         Assert.Equal(TradeAction.Hold, decision.Action);
         Assert.Empty(decision.Orders);
     }
+
+    [Fact]
+    public void Decide_Hold_OnWeakSignal()
+    {
+        var agent = new NewsDrivenAgent(10000m);
+        var snapshot = CreateSnapshot(bestBid: 99m, bestAsk: 101m);
+        var weak = new NewsSignal(SignalPolarity.Positive, Confidence: 0.2m, ImpactScore: 0.2m, Explanation: "weak");
+
+        var decision = agent.Decide(snapshot, weak);
+
+        Assert.Equal(TradeAction.Hold, decision.Action);
+        Assert.Empty(decision.Orders);
+    }
+
+    [Fact]
+    public void Decide_Hold_WhenImpactScoreTooLow()
+    {
+        var agent = new NewsDrivenAgent(10000m);
+        var snapshot = CreateSnapshot(bestBid: 99m, bestAsk: 101m);
+        var lowImpact = new NewsSignal(SignalPolarity.Positive, Confidence: 0.9m, ImpactScore: 0.05m, Explanation: "low impact");
+
+        var decision = agent.Decide(snapshot, lowImpact);
+
+        Assert.Equal(TradeAction.Hold, decision.Action);
+        Assert.Empty(decision.Orders);
+    }
+
+    [Fact]
+    public void Decide_ScalesQuantityWithSignalStrength()
+    {
+        var agent = new NewsDrivenAgent(100000m);
+        var snapshot = CreateSnapshot(bestBid: 99m, bestAsk: 101m);
+        var moderate = new NewsSignal(SignalPolarity.Positive, Confidence: 0.5m, ImpactScore: 0.5m, Explanation: "moderate");
+        var strong = new NewsSignal(SignalPolarity.Positive, Confidence: 1m, ImpactScore: 1m, Explanation: "strong");
+
+        var moderateQty = Assert.Single(agent.Decide(snapshot, moderate).Orders).Quantity;
+        var strongQty = Assert.Single(agent.Decide(snapshot, strong).Orders).Quantity;
+
+        Assert.True(strongQty > moderateQty);
+    }
+
+    [Theory]
+    [InlineData(0, 0.1, 5)]
+    [InlineData(1, 1.1, 5)]
+    [InlineData(1, 0.1, 0.5)]
+    public void Constructor_Throws_OnInvalidParameters(double baseQuantity, double minStrength, double maxMultiplier)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new NewsDrivenAgent(
+                10000m,
+                baseQuantity: (decimal)baseQuantity,
+                minStrength: (decimal)minStrength,
+                maxMultiplier: (decimal)maxMultiplier));
+    }
 }
