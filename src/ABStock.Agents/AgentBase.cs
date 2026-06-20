@@ -9,6 +9,9 @@ public abstract class AgentBase : ITradeAgent
 
     protected AgentBase(string name, AgentType type, decimal initialCash, decimal initialPosition = 0)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(initialCash);
+        ArgumentOutOfRangeException.ThrowIfNegative(initialPosition);
+
         State = new AgentState
         {
             AgentName = name,
