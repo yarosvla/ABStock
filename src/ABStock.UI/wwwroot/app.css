@@ -75,6 +75,17 @@ h1:focus {
     --app-negative: #ff6b5f;
     --app-warning: #ffb14d;
     --app-shadow: 0 18px 44px rgba(2, 8, 19, 0.34);
+
+    /* Order-book design language, shared across the trading screen */
+    --app-radius: 5px;
+    --app-radius-sm: 5px;
+    --app-up: #4fe3a3;
+    --app-down: #ff8076;
+    --app-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    --app-label: rgba(191, 208, 229, 0.55);
+    --app-panel-inset:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+        rgba(11, 21, 36, 0.82);
 }
 
 html,
@@ -104,6 +115,11 @@ body {
         var(--app-surface);
     box-shadow: var(--app-shadow);
     backdrop-filter: blur(18px);
+}
+
+/* Sharper corners across the trading screen, matching the order-book aesthetic. */
+.trading-shell .glass-card {
+    border-radius: var(--app-radius);
 }
 
 .create-asset-shell .glass-card::before,
