@@ -3975,3 +3975,12 @@
         linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 30%),
         rgba(9, 17, 31, 0.55);
 }
+
+/* Единый чёрно-серый фон как у стакана (--app-surface) для всех карточек
+   страницы торгов: переопределяет синеватые фоны asset/parameter/chart/
+   trades/status/metric, делая их одинаковыми со стаканом. */
+.trading-shell .glass-card {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 38%),
+        var(--app-surface);
+}
