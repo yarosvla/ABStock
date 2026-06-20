@@ -64,6 +64,20 @@
                         </div>
                     }
                 </section>
+
+                <section class="glass-card notification-card" aria-labelledby="notifications-title">
+                    <div class="panel-heading">
+                        <h2 id="notifications-title">Уведомления</h2>
+                        <span>3 канала</span>
+                    </div>
+                    @foreach (var item in NotificationItems)
+                    {
+                        <div class="notification-row">
+                            <span>@item.Label</span>
+                            <strong class="@item.ClassName">@item.Value</strong>
+                        </div>
+                    }
+                </section>
             </aside>
 
             <section class="profile-content">
@@ -154,20 +168,6 @@
                             }
                         }
                     </div>
-                </section>
-
-                <section class="glass-card notification-card" aria-labelledby="notifications-title">
-                    <div class="panel-heading">
-                        <h2 id="notifications-title">Уведомления</h2>
-                        <span>3 канала</span>
-                    </div>
-                    @foreach (var item in NotificationItems)
-                    {
-                        <div class="notification-row">
-                            <span>@item.Label</span>
-                            <strong class="@item.ClassName">@item.Value</strong>
-                        </div>
-                    }
                 </section>
             </aside>
         </section>

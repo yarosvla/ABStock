@@ -192,9 +192,10 @@
                             @if (isOptionalOpen)
                             {
                                 <div class="optional-panel">
-                                    <div class="field-group compact">
+                                    <div class="field-group compact param-row">
                                         <label id="industry-label">Сектор</label>
-                                        <button class="select-control small" type="button" aria-labelledby="industry-label" aria-expanded="@isIndustryOpen" @onclick="ToggleIndustry">
+                                        <button class="select-control small with-lead" type="button" aria-labelledby="industry-label" aria-expanded="@isIndustryOpen" @onclick="ToggleIndustry">
+                                            <span class="select-lead" aria-hidden="true"><i class="bi bi-diagram-3"></i></span>
                                             <span>@selectedIndustry</span>
                                             <i class="bi bi-chevron-down chevron @(isIndustryOpen ? "open" : null)" aria-hidden="true"></i>
                                         </button>
@@ -211,15 +212,31 @@
                                         }
                                     </div>
 
-                                    <label class="toggle-row">
-                                        <input type="checkbox" @bind="includeGovernmentSupport" @bind:after="SyncDraftState" />
-                                        <span>Учитывать государственную поддержку</span>
+                                    <label class="param-row switch-row @(includeGovernmentSupport ? "on" : null)">
+                                        <span class="switch-copy">
+                                            <span class="switch-lead" aria-hidden="true"><i class="bi bi-bank"></i></span>
+                                            <span class="switch-text">
+                                                <strong>Государственная поддержка</strong>
+                                                <small>Учитывать в оценке факторов роста</small>
+                                            </span>
+                                        </span>
+                                        <input type="checkbox" class="switch-input" @bind="includeGovernmentSupport" @bind:after="SyncDraftState" />
+                                        <span class="switch-toggle" aria-hidden="true"></span>
                                     </label>
 
-                                    <label class="range-row">
-                                        <span>Потенциал роста</span>
-                                        <strong>@growthPotential%</strong>
+                                    <label class="param-row range-row" style="--val:@(growthPotential)%">
+                                        <span class="range-head">
+                                            <span class="range-title">
+                                                <span class="range-lead" aria-hidden="true"><i class="bi bi-graph-up-arrow"></i></span>
+                                                Потенциал роста
+                                            </span>
+                                            <strong>@growthPotential%</strong>
+                                        </span>
                                         <input type="range" min="0" max="100" step="1" @bind="growthPotential" @bind:after="SyncDraftState" />
+                                        <span class="range-scale" aria-hidden="true">
+                                            <span>0%</span>
+                                            <span>100%</span>
+                                        </span>
                                     </label>
                                 </div>
                             }
@@ -246,35 +263,35 @@
 
                 @if (!isProfileGenerated && !isGenerating)
                 {
-                    <aside class="glass-card ai-preview-card" aria-label="Предпросмотр AI-профиля">
-                        <div class="preview-title-row">
-                            <div>
-                                <span>ABStock AI Core v2.3</span>
-                                <h2>Предпросмотр профиля</h2>
-                            </div>
-                            <div class="preview-orbit" aria-hidden="true">
-                                <i class="bi bi-stars"></i>
-                            </div>
+                    <aside class="glass-card ai-preview-card" aria-label="Живой предпросмотр актива">
+                        <div class="preview-eyebrow">
+                            <span>ABStock AI Core v2.3</span>
+                            <span class="preview-live-badge">
+                                <i class="bi bi-broadcast" aria-hidden="true"></i>
+                                Live
+                            </span>
                         </div>
 
-                        <dl class="preview-metrics">
-                            <div>
-                                <dt>Актив</dt>
-                                <dd>@DisplayAssetName</dd>
+                        <div class="live-asset-card">
+                            <div class="asset-head">
+                                <span class="asset-emblem live-emblem" aria-hidden="true">
+                                    <i class="bi @selectedAssetType.IconClass"></i>
+                                </span>
+                                <div>
+                                    <h3>@DisplayAssetName</h3>
+                                    <div class="asset-meta">
+                                        <span>@selectedAssetType.Name</span>
+                                        <span>@selectedIndustry</span>
+                                        <span>RUB</span>
+                                    </div>
+                                    <p class="asset-state @(CanGenerate ? "ready" : "draft")">
+                                        <i class="bi @(CanGenerate ? "bi-check-circle-fill" : "bi-pencil")" aria-hidden="true"></i>
+                                        @(CanGenerate ? "Готов к генерации" : "Черновик заполняется")
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <dt>Тип</dt>
-                                <dd>@selectedAssetType.Name</dd>
-                            </div>
-                            <div>
-                                <dt>Сектор</dt>
-                                <dd>@selectedIndustry</dd>
-                            </div>
-                            <div>
-                                <dt>Источник</dt>
-                                <dd>Ввод пользователя</dd>
-                            </div>
-                        </dl>
+                            <p class="asset-description">@DescriptionPreview</p>
+                        </div>
 
                         <div class="preview-readiness" style="--ready:@(CompletedRequiredFields * 50)%">
                             <div>
@@ -283,11 +300,6 @@
                             </div>
                             <span aria-hidden="true"><i></i></span>
                         </div>
-
-                        <section class="preview-summary">
-                            <h3>Будущий профиль</h3>
-                            <p>@DescriptionPreview</p>
-                        </section>
 
                         <ul class="preview-usage-list" aria-label="Модули использования">
                             <li>
@@ -407,7 +419,7 @@
                                     <h3>Чувствительность к новостям</h3>
                                 </div>
                                 <div class="news-score-layout">
-                                    <div class="news-gauge" aria-label="86 из 100, высокая чувствительность">
+                                    <div class="news-gauge" aria-label="@($"{NewsSensitivityScore} из 100, {NewsSensitivityLabel.ToLower()} чувствительность")">
                                         <svg viewBox="0 0 180 170" aria-hidden="true">
                                             <defs>
                                                 <linearGradient id="newsGaugeGradient"
@@ -425,13 +437,14 @@
                                                   pathLength="100" />
 
                                             <path class="news-gauge-value"
+                                                  style="--gauge:@NewsSensitivityScore"
                                                   d="M36 126 A62 62 0 1 1 144 126"
                                                   pathLength="100" />
 
                                         </svg>
 
                                         <div class="news-gauge-score">
-                                            <strong>@NewsSensitivityScore</strong>
+                                            <strong class="gauge-count">@NewsSensitivityScore</strong>
                                             <span>/100</span>
                                         </div>
 
