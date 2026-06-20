@@ -308,6 +308,8 @@ public sealed class SimulationRunnerIntegrationTests
         public MarketSnapshot GetSnapshot() => _snapshot;
 
         public OrderBookSnapshot GetOrderBookSnapshot(int depth = 5) => new([], []);
+
+        public IReadOnlyList<Order> GetOpenOrders() => [];
     }
 
     private sealed class RecordingAgentFactory : IAgentFactory
