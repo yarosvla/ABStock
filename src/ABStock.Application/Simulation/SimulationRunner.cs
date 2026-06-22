@@ -182,6 +182,8 @@ public sealed class SimulationRunner : ISimulationRunner
         var news = _pendingNews;
         _pendingNews = null;
 
+        AgentReservations.Refresh(_exchange, _agents);
+
         var allOrders = _agents
             .SelectMany(a => a.Decide(snapshot, news).Orders)
             .ToList();
