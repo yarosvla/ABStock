@@ -14,6 +14,7 @@ public static class AgentDisplay
         AgentType.CounterTrend => "Контртрендовый",
         AgentType.MarketMaker => "Маркетмейкер",
         AgentType.NewsDriven => "Новостной",
+        AgentType.SentimentFlow => "Рыночное настроение",
         _ => type.ToString()
     };
 
@@ -23,6 +24,7 @@ public static class AgentDisplay
         AgentType.CounterTrend => "type-counter",
         AgentType.MarketMaker => "type-maker",
         AgentType.NewsDriven => "type-news",
+        AgentType.SentimentFlow => "type-flow",
         _ => ""
     };
 
@@ -32,6 +34,7 @@ public static class AgentDisplay
         AgentType.CounterTrend => "bi-arrow-down-up",
         AgentType.MarketMaker => "bi-arrows-expand",
         AgentType.NewsDriven => "bi-newspaper",
+        AgentType.SentimentFlow => "bi-activity",
         _ => "bi-robot"
     };
 
@@ -41,6 +44,7 @@ public static class AgentDisplay
         AgentType.CounterTrend => "Торгует против основного движения. Покупает просадки, продаёт на пиках.",
         AgentType.MarketMaker => "Обеспечивает ликвидность. Одновременно выставляет заявки на покупку и продажу вокруг текущей цены.",
         AgentType.NewsDriven => "Реагирует на внешние новости. Покупает при позитивном сигнале, продаёт при негативном.",
+        AgentType.SentimentFlow => "Совокупный внешний поток заявок: задаёт фоновое рыночное настроение и направление цены.",
         _ => ""
     };
 

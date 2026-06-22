@@ -15,11 +15,6 @@ builder.Services.AddABStockPersistence(
     builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
 builder.Services.AddScoped<IActiveAssetContext, ActiveAssetContext>();
 
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddABStockSimulationDiagnostics();
-}
-
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

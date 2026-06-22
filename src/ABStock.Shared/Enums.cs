@@ -5,7 +5,8 @@ public enum AgentType
     TrendFollowing,
     CounterTrend,
     MarketMaker,
-    NewsDriven
+    NewsDriven,
+    SentimentFlow
 }
 
 public enum TradeAction

@@ -1,19 +1,28 @@
-﻿@page "/Error"
+@page "/Error"
+@layout CreateAssetLayout
 @using System.Diagnostics
 
 <PageTitle>Ошибка</PageTitle>
 
-<h1 class="text-danger">Ошибка</h1>
-<h2 class="text-danger">Не удалось обработать запрос.</h2>
+<div class="status-page">
+    <section class="status-card">
+        <span class="status-emblem" aria-hidden="true">
+            <i class="bi bi-exclamation-triangle"></i>
+        </span>
+        <h1>Не удалось обработать запрос</h1>
+        <p class="status-text">Произошла непредвиденная ошибка. Попробуйте повторить действие — подробности доступны в логах приложения.</p>
 
-@if (ShowRequestId)
-{
-    <p>
-        <strong>ID запроса:</strong> <code>@RequestId</code>
-    </p>
-}
+        @if (ShowRequestId)
+        {
+            <p class="status-meta">ID запроса: <code>@RequestId</code></p>
+        }
 
-<p>Подробности доступны в логах приложения.</p>
+        <a class="status-button" href="/create-asset">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            На главную
+        </a>
+    </section>
+</div>
 
 @code{
     [CascadingParameter]

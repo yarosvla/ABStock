@@ -12,6 +12,7 @@ public sealed class AgentFactory : IAgentFactory
             AgentType.CounterTrend   => new CounterTrendAgent(spec.InitialCash, spec.InitialPosition),
             AgentType.MarketMaker    => new MarketMakerAgent(spec.InitialCash, spec.InitialPosition),
             AgentType.NewsDriven     => new NewsDrivenAgent(spec.InitialCash, spec.InitialPosition),
+            AgentType.SentimentFlow  => new SentimentFlowAgent(spec.InitialCash, spec.InitialPosition),
             _ => throw new ArgumentOutOfRangeException(nameof(spec.Type))
         }).ToList();
 }
