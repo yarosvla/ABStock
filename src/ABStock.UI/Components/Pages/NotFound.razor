@@ -1,8 +1,19 @@
-﻿@page "/not-found"
-@layout MainLayout
+@page "/not-found"
+@layout CreateAssetLayout
 
 <PageTitle>Страница не найдена</PageTitle>
 
-<h1>Страница не найдена</h1>
-<p>Такого раздела в ABStock нет. Вернитесь к созданию актива.</p>
-<a class="btn btn-primary" href="/create-asset">Создание актива</a>
+<div class="status-page">
+    <section class="status-card">
+        <span class="status-emblem" aria-hidden="true">
+            <i class="bi bi-compass"></i>
+        </span>
+        <p class="status-code">404</p>
+        <h1>Страница не найдена</h1>
+        <p class="status-text">Такого раздела в ABStock нет. Вернитесь к созданию актива и продолжите работу.</p>
+        <a class="status-button" href="/create-asset">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            Создание актива
+        </a>
+    </section>
+</div>

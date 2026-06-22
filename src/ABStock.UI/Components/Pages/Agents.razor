@@ -87,7 +87,7 @@
                     <section class="glass-card leaders-card" aria-labelledby="leaders-title">
                         <div class="panel-heading">
                             <h2 id="leaders-title">Лидеры P/L</h2>
-                            <span>@latestTick.Agents.Count агентов</span>
+                            <span>@VisibleAgents.Count агентов</span>
                         </div>
                         <div class="leader-list">
                             @{ var rank = 1; }
@@ -202,6 +202,13 @@
     private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
     private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
 
+    // The SentimentFlow driver is an ambient price engine, not a real participant —
+    // hide it everywhere agents are listed so the dashboard shows only the strategies.
+    private IReadOnlyList<AgentSnapshot> VisibleAgents =>
+        latestTick is null
+            ? []
+            : latestTick.Agents.Where(agent => agent.Type != AgentType.SentimentFlow).ToArray();
+
     protected override void OnInitialized()
     {
         SimulationRunner.OnTick += HandleTick;
@@ -243,7 +250,7 @@
         {
             if (latestTick is null) return [];
 
-            var agents = latestTick.Agents;
+            var agents = VisibleAgents;
             var totalPortfolio = agents.Sum(a => a.PortfolioValue);
             var totalCash = agents.Sum(a => a.Cash);
             var totalPosition = agents.Sum(a => a.Position);
@@ -268,7 +275,7 @@
     private AgentTableRow[] AgentRows =>
         latestTick is null
             ? []
-            : latestTick.Agents.Select(agent =>
+            : VisibleAgents.Select(agent =>
             {
                 var initialValue = initialPortfolios.GetValueOrDefault(agent.Name, agent.PortfolioValue);
                 var pnl = agent.PortfolioValue - initialValue;
@@ -299,6 +306,8 @@
             }
 
             var fromTrades = latestTick.Snapshot.RecentTrades
+                .Where(trade => trade.BuyerAgentName != AgentNames.SentimentFlow
+                             && trade.SellerAgentName != AgentNames.SentimentFlow)
                 .OrderByDescending(trade => trade.ExecutedAt)
                 .Take(6)
                 .SelectMany(trade => new[]
@@ -324,7 +333,7 @@
                 return fromTrades;
             }
 
-            return latestTick.Agents
+            return VisibleAgents
                 .Take(4)
                 .Select(agent => new DecisionFeedItem(
                     DateTimeOffset.Now.ToString("HH:mm:ss"),
@@ -339,7 +348,7 @@
     private LeaderRow[] LeaderRows =>
         latestTick is null
             ? []
-            : latestTick.Agents
+            : VisibleAgents
                 .Select(agent =>
                 {
                     var initialValue = initialPortfolios.GetValueOrDefault(agent.Name, agent.PortfolioValue);
@@ -351,7 +360,7 @@
 
     private SystemRow[] SystemRows =>
     [
-        new("bi-activity", "Активных агентов", FormatQuantity(latestTick?.Agents.Count ?? 0), "positive"),
+        new("bi-activity", "Активных агентов", FormatQuantity(VisibleAgents.Count), "positive"),
         new("bi-arrow-repeat", "Обновление", "в реальном времени", "positive"),
         new("bi-clock-history", "Последний цикл", DateTimeOffset.Now.ToString("HH:mm:ss"), null),
         new("bi-diagram-3", "Источник данных", "снапшот рынка", null)
@@ -372,7 +381,7 @@
         {
             if (latestTick is null) return [];
 
-            return latestTick.Agents.Select(agent =>
+            return VisibleAgents.Select(agent =>
             {
                 var initialValue = initialPortfolios.GetValueOrDefault(agent.Name, agent.PortfolioValue);
                 var pnl = agent.PortfolioValue - initialValue;
