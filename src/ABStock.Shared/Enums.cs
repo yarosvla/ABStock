@@ -28,6 +28,16 @@ public enum OrderType
     Market
 }
 
+public enum OrderExecutionStatus
+{
+    Open,
+    PartiallyFilled,
+    Filled,
+    Expired,
+    Rejected,
+    Cancelled
+}
+
 public enum SignalPolarity
 {
     Positive,
