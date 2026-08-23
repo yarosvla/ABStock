@@ -24,9 +24,9 @@ public class CounterTrendAgent : AgentBase
             {
                 var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
                 return new AgentDecision(State.AgentName, TradeAction.Buy,
-                    "No price history, placing initial buy", [order]);
+                    "истории цены ещё нет — открываю первую покупку", [order]);
             }
-            return HoldDecision("No price history and insufficient funds");
+            return HoldDecision("истории цены ещё нет, денег на вход не хватает");
         }
 
         var lastPrice = snapshot.RecentPrices[^1];
@@ -36,16 +36,16 @@ public class CounterTrendAgent : AgentBase
         {
             var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
-                $"Price dropped {prevPrice:F2} -> {lastPrice:F2}, buying dip", [order]);
+                $"цена ушла вниз {prevPrice:F2} → {lastPrice:F2} — покупаю просадку", [order]);
         }
 
         if (lastPrice >= prevPrice && CanSell(_orderQuantity))
         {
             var order = CreateLimitOrder(OrderSide.Sell, sellPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
-                $"Price rose {prevPrice:F2} -> {lastPrice:F2}, selling peak", [order]);
+                $"цена ушла вверх {prevPrice:F2} → {lastPrice:F2} — продаю на пике", [order]);
         }
 
-        return HoldDecision("Insufficient funds/position");
+        return HoldDecision("не хватает денег или позиции для сделки");
     }
 }
