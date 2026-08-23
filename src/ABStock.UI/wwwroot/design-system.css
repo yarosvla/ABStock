@@ -1,0 +1,260 @@
+/* ============================================================================
+   ABStock Design System v2.0 — «Инструмент»
+   Монохром · стекло только на плавающих слоях · плоский фон
+   Единственный источник значений. Ни макет, ни .razor.css не объявляет свой hex.
+   ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ---------- 1. ГРАФИТ ---------- */
+  --gph-950: #08090B;   /* фон документа */
+  --gph-900: #0C0D0F;   /* базовый слой */
+  --gph-850: #101113;   /* ПАНЕЛЬ (основная рабочая поверхность) */
+  --gph-800: #141618;   /* вложенная поверхность */
+  --gph-750: #191B1E;   /* строка hover, инпут */
+  --gph-700: #1F2225;   /* строка выбранная */
+  --gph-600: #292C30;
+  --gph-500: #383C41;   /* скроллбар, непрозрачные бордюры */
+  --gph-400: #4A4F55;
+
+  /* ---------- 2. ТЕКСТ ---------- */
+  --text-1: #F0F1F2;
+  --text-2: #A8ACB1;
+  --text-3: #7C8288;
+  --text-4: #4E545A;
+
+  /* ---------- 3. АКЦЕНТ — МОНОХРОМ ----------
+     Акцент — не цвет, а СВЕТ. Первичное действие = светлая заливка.       */
+  --acc-400: #F6F7F8;   /* hover заливки */
+  --acc-500: #E9EBEE;   /* PRIMARY заливка */
+  --acc-600: #CFD3D8;   /* active / pressed */
+  --acc-ink:  #0C0D0F;  /* текст поверх светлой заливки */
+  --acc-soft: rgba(255, 255, 255, 0.075);  /* фон выбранного состояния */
+  --acc-line: rgba(255, 255, 255, 0.28);   /* кромка активного элемента */
+  --focus:    rgba(255, 255, 255, 0.85);   /* кольцо фокуса */
+
+  /* ---------- 4. РЫНОК — приглушённый, «печатный», не неон ---------- */
+  --up-400:  #59BE93;
+  --up-500:  #3FA37A;
+  --up-700:  #2A6E53;
+  --up-soft: rgba(63, 163, 122, 0.14);
+  --up-bar:  rgba(63, 163, 122, 0.16);
+
+  --down-400:  #E3767F;
+  --down-500:  #D2555F;
+  --down-700:  #93373F;
+  --down-soft: rgba(210, 85, 95, 0.14);
+  --down-bar:  rgba(210, 85, 95, 0.16);
+
+  --warn-500: #C99A4E;
+  --warn-soft: rgba(201, 154, 78, 0.14);
+
+  /* ---------- 5. АГЕНТЫ — низкая насыщенность, «чернила» ---------- */
+  --agent-trend:   #8E96C4;
+  --agent-counter: #6FA5A8;
+  --agent-mm:      #A8A17A;
+  --agent-news:    #C08E63;
+
+  /* ---------- 6. ЛИНИИ ---------- */
+  --line-1: rgba(255, 255, 255, 0.055);  /* разделители внутри панели */
+  --line-2: rgba(255, 255, 255, 0.085);  /* кромка панели */
+  --line-3: rgba(255, 255, 255, 0.16);   /* hover / активная кромка */
+
+  /* ---------- 7. СПЕЙСИНГ (шаг 4) ---------- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --s-14: 56px; --s-18: 72px;
+
+  /* ---------- 8. РАДИУСЫ — сдержанные ---------- */
+  --r-xs: 4px;
+  --r-sm: 6px;    /* инпут, кнопка sm, чип */
+  --r-md: 8px;    /* кнопка, вложенная поверхность */
+  --r-lg: 12px;   /* ПАНЕЛЬ */
+  --r-xl: 16px;   /* модалка */
+  --r-pill: 999px;
+
+  /* ---------- 9. ТЕНИ — только у того, что реально висит ---------- */
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --sh-md: 0 8px 24px -12px rgba(0, 0, 0, 0.65);
+  --sh-lg: 0 24px 56px -24px rgba(0, 0, 0, 0.78);
+
+  /* ---------- 10. ТИПОГРАФИКА ---------- */
+  --font-ui:  'Golos Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  --t-display: 600 30px/36px var(--font-ui);
+  --t-h1:      600 22px/28px var(--font-ui);
+  --t-h2:      600 16px/22px var(--font-ui);
+  --t-h3:      600 14px/20px var(--font-ui);
+  --t-body:    400 14px/20px var(--font-ui);
+  --t-body-sm: 400 13px/18px var(--font-ui);
+  --t-caption: 400 12px/16px var(--font-ui);
+  --t-micro:   500 11px/14px var(--font-ui);
+
+  --n-hero: 500 34px/38px var(--font-num);
+  --n-lg:   500 20px/24px var(--font-num);
+  --n-md:   400 14px/20px var(--font-num);
+  --n-sm:   400 12px/16px var(--font-num);
+  --n-xs:   400 11px/14px var(--font-num);
+
+  /* ---------- 11. ПЛОТНОСТЬ ---------- */
+  --h-nav: 56px;
+  --h-ctl-lg: 40px;
+  --h-ctl-md: 32px;
+  --h-ctl-sm: 26px;
+  --h-thead: 28px;      /* шапка таблицы */
+  --h-row: 32px;        /* строка таблицы */
+  --h-row-dense: 26px;  /* строка стакана / ленты */
+  --h-row-tall: 46px;   /* строка с объяснением в две строки */
+  --rail-left: 280px;      /* левый рельс */
+  --rail-right: 340px;     /* правый рельс */
+  --rail-right-md: 300px;  /* правый рельс при <1440 */
+  --center-min: 600px;     /* ориентир минимума центра */
+  --bp-md: 1440px;
+  --bp-sm: 1280px;
+  --page-max: 1680px;
+  --page-pad: 28px;
+  --gutter: 16px;
+
+  /* ---------- 12. ДВИЖЕНИЕ ---------- */
+  --d-instant: 100ms;
+  --d-fast:    160ms;
+  --d-base:    220ms;
+  --d-slow:    340ms;
+  --d-shimmer: 1400ms;
+  --d-pulse:   2400ms;
+  --e-out:   cubic-bezier(0.2, 0.8, 0.2, 1);
+  --e-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-exit:  cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---------- 13. СТЕКЛО — только плавающие слои ---------- */
+  --glass-blur: 20px;
+  --glass-sat:  120%;
+  --glass-tint: rgba(16, 17, 19, 0.72);
+  --overlay-tint: rgba(8, 9, 11, 0.66);
+  --overlay-blur: 6px;
+
+  --z-bg: 0; --z-content: 1; --z-nav: 100; --z-dropdown: 200; --z-modal: 300; --z-toast: 400;
+}
+
+/* ============================================================================
+   БАЗА
+   ============================================================================ */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--gph-950);
+  color: var(--text-2);
+  font: var(--t-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+h1, h2, h3, h4 { margin: 0; color: var(--text-1); letter-spacing: -0.015em; }
+h1 { font: var(--t-h1); }
+h2 { font: var(--t-h2); }
+h3 { font: var(--t-h3); }
+
+.num      { font: var(--n-md); font-variant-numeric: tabular-nums; color: var(--text-1); }
+.num-hero { font: var(--n-hero); font-variant-numeric: tabular-nums; color: var(--text-1); letter-spacing: -0.02em; }
+.num-lg   { font: var(--n-lg); font-variant-numeric: tabular-nums; color: var(--text-1); letter-spacing: -0.01em; }
+.num-sm   { font: var(--n-sm); font-variant-numeric: tabular-nums; }
+.label    { font: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+.up { color: var(--up-500); } .down { color: var(--down-500); }
+
+/* ============================================================================
+   ФОН — плоский. Никаких пятен, никакой ауры.
+   ============================================================================ */
+.app-bg {
+  position: fixed; inset: 0; z-index: var(--z-bg); pointer-events: none;
+  background:
+    radial-gradient(140% 90% at 50% -20%, #121417 0%, var(--gph-950) 58%);
+}
+.app-bg__noise {
+  position: absolute; inset: 0; opacity: 0.022; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================================
+   ПОВЕРХНОСТИ
+   .panel — рабочая поверхность страницы. НЕПРОЗРАЧНАЯ. Без блюра.
+   .glass — ТОЛЬКО плавающие слои: шапка, дропдаун, модалка, тултип, тост.
+   ============================================================================ */
+.panel {
+  background: var(--gph-850);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+}
+.panel--quiet { background: transparent; border-color: var(--line-1); box-shadow: none; }
+.panel__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-3); padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line-1);
+}
+.panel__body { padding: var(--s-5); }
+.panel__body--flush { padding: 0; }
+
+.surface { background: var(--gph-800); border: 1px solid var(--line-1); border-radius: var(--r-md); }
+
+.glass {
+  background: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.07), var(--sh-lg);
+}
+.glass--nav {
+  border-radius: 0; border-width: 0 0 1px 0;
+  box-shadow: none;
+}
+.overlay {
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  background: var(--overlay-tint);
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+}
+
+/* хайрлайн-группировка: разделять линиями, а не вкладывать коробки в коробки */
+.hairline-top { border-top: 1px solid var(--line-1); }
+.hairline-left { border-left: 1px solid var(--line-1); }
+
+/* ============================================================================
+   ДВИЖЕНИЕ
+   ============================================================================ */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise var(--d-slow) var(--e-enter) both; }
+.rise-1{animation-delay:30ms}.rise-2{animation-delay:60ms}.rise-3{animation-delay:90ms}
+.rise-4{animation-delay:120ms}.rise-5{animation-delay:150ms}.rise-6{animation-delay:180ms}
+
+@keyframes tick-up   { 0%{background:var(--up-soft)}   100%{background:transparent} }
+@keyframes tick-down { 0%{background:var(--down-soft)} 100%{background:transparent} }
+.tick-up   { animation: tick-up   var(--d-slow) var(--e-exit); }
+.tick-down { animation: tick-down var(--d-slow) var(--e-exit); }
+
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.5} }
+.status-dot--live { animation: pulse-dot var(--d-pulse) ease-in-out infinite; }
+
+@keyframes shimmer { from { background-position: -180% 0; } to { background-position: 180% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.075) 50%, rgba(255,255,255,0.035) 100%);
+  background-size: 180% 100%;
+  animation: shimmer var(--d-shimmer) linear infinite;
+  border-radius: var(--r-sm);
+}
+
+/* ============================================================================
+   ФОКУС, СКРОЛЛБАР, ВЫДЕЛЕНИЕ
+   ============================================================================ */
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
+::selection { background: rgba(255,255,255,0.14); color: var(--text-1); }
+* { scrollbar-width: thin; scrollbar-color: var(--gph-500) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--gph-500); border-radius: var(--r-pill); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
