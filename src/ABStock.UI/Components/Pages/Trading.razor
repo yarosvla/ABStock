@@ -99,17 +99,29 @@
         _ => "tone-flat"
     };
 
-    // Дельта со знаком; минус — U+2212, а не дефис (раздел 10).
-    static string Signed(decimal value) => value > 0m
-        ? "+" + FormatQuantity(value)
-        : value < 0m
-            ? "\u2212" + FormatQuantity(Math.Abs(value))
-            : FormatQuantity(0m);
+    // ── Разрядность по таблице раздела 10. Формат «N» берёт групповой
+    //    разделитель из культуры — узкий неразрывный пробел (Program.cs).
+
+    /// <summary>Деньги агента, капитал: 0 знаков — 149 864.</summary>
+    static string Money0(decimal value) => Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("N0");
+
+    /// <summary>Объём сессии, сделки, тики: 0 знаков.</summary>
+    static string Count0(decimal value) => Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("N0");
+
+    // Знак обязателен у величин, которые могут быть отрицательными.
+    // Минус — U+2212, а не дефис. Ноль пишется без знака.
+    static string Sign(decimal value) => value > 0m ? "+" : value < 0m ? "\u2212" : "";
+
+    /// <summary>P/L: ровно 2 знака со знаком — +31,90.</summary>
+    static string Pnl2(decimal value) =>
+        Sign(value) + Math.Abs(value).ToString("N2");
+
+    /// <summary>Позиция: 0 знаков со знаком — +3 900 / −1 200.</summary>
+    static string Position0(decimal value) =>
+        Sign(value) + Math.Round(Math.Abs(value), 0, MidpointRounding.AwayFromZero).ToString("N0");
 
     static string DeltaTone(decimal value) =>
         value > 0m ? "tone-up" : value < 0m ? "tone-down" : "tone-flat";
-
-    static string Dash(decimal? value) => value is null ? "—" : FormatPrice(value.Value);
 }
 
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
@@ -166,27 +178,22 @@
                     <ChildContent>
                         <dl class="kv">
                             <div class="kv__row">
-                                <dt>Цена открытия</dt>
-                                <dd class="num-sm">@chart.Open <span class="unit">₽</span></dd>
-                            </div>
-                            <div class="kv__row">
                                 <dt>Сделок</dt>
-                                <dd class="num-sm">@status.TradeCount</dd>
+                                <dd class="num-sm">@Count0(seenTradeIds.Count)</dd>
                             </div>
                             <div class="kv__row">
                                 <dt>Шаг симуляции</dt>
-                                <dd class="num-sm">@(latestTick is null ? "—" : latestTick.Tick.ToString())</dd>
+                                <dd class="num-sm">@(latestTick is null ? "—" : Count0(latestTick.Tick))</dd>
                             </div>
                             <div class="kv__row">
-                                <dt>Ликвидность</dt>
-                                <dd class="num-sm">@status.Liquidity</dd>
+                                <dt>Новостей</dt>
+                                <dd class="num-sm">@Count0(0)</dd>
                             </div>
                         </dl>
                     </ChildContent>
                 </Panel>
 
                 <Panel Title="События сессии" Class="rise rise-2" Flush="true">
-                    <Meta><span class="num-sm">0</span></Meta>
                     <ChildContent>
                         <EmptyState IconName="news"
                                     Title="Новостей ещё не было"
@@ -219,17 +226,12 @@
 
                     <div class="strip">
                         <div class="strip__item"><span class="strip__label">откр</span><span class="num-sm">@chart.Open</span></div>
+                        <span class="strip__sep strip--optional" aria-hidden="true"></span>
+                        <div class="strip__item strip--optional"><span class="strip__label">макс</span><span class="num-sm">@chart.High</span></div>
+                        <span class="strip__sep strip--optional" aria-hidden="true"></span>
+                        <div class="strip__item strip--optional"><span class="strip__label">мин</span><span class="num-sm">@chart.Low</span></div>
                         <span class="strip__sep" aria-hidden="true"></span>
-                        <div class="strip__item"><span class="strip__label">макс</span><span class="num-sm">@chart.High</span></div>
-                        <span class="strip__sep" aria-hidden="true"></span>
-                        <div class="strip__item"><span class="strip__label">мин</span><span class="num-sm">@chart.Low</span></div>
-                        <span class="strip__sep" aria-hidden="true"></span>
-                        <div class="strip__item"><span class="strip__label">bid</span><span class="num-sm tone-up">@Dash(snapshot?.BestBid)</span></div>
-                        <div class="strip__item"><span class="strip__label">ask</span><span class="num-sm tone-down">@Dash(snapshot?.BestAsk)</span></div>
-                        <span class="strip__sep" aria-hidden="true"></span>
-                        <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@FormatQuantity(snapshot?.Volume ?? 0m)</span></div>
-                        <span class="strip__sep" aria-hidden="true"></span>
-                        <div class="strip__item"><span class="strip__label">участников</span><span class="num-sm">@status.Participants</span></div>
+                        <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@Count0(snapshot?.Volume ?? 0m)</span></div>
                     </div>
                 </section>
 
@@ -324,15 +326,14 @@
                                 {
                                     Type = g.Key,
                                     Count = g.Count(),
-                                    Cash = g.Sum(a => a.Cash),
-                                    Position = g.Sum(a => a.Position),
-                                    Value = g.Sum(a => a.PortfolioValue),
-                                    Pnl = g.Sum(a => a.PortfolioValue - a.InitialPortfolioValue),
+                                    Cash = Math.Round(g.Sum(a => a.Cash), 0, MidpointRounding.AwayFromZero),
+                                    Position = Math.Round(g.Sum(a => a.Position), 0, MidpointRounding.AwayFromZero),
+                                    Pnl = Math.Round(g.Sum(a => a.PortfolioValue - a.InitialPortfolioValue), 2, MidpointRounding.AwayFromZero),
                                     Decision = g
                                         .Select(a => decisionsByAgent.GetValueOrDefault(a.Name))
                                         .FirstOrDefault(d => d is not null)
                                 })
-                                .OrderByDescending(g => g.Value)
+                                .OrderByDescending(g => g.Cash)
                                 .ToArray();
 
                             <div class="agents-wrap">
@@ -359,9 +360,9 @@
                                                 </span>
                                                 </span>
                                             </th>
-                                            <td class="agents__c-num num-sm">@FormatQuantity(g.Cash)</td>
-                                            <td class="agents__c-num num-sm @(g.Position > 0m ? "tone-up" : g.Position < 0m ? "tone-down" : null)">@FormatQuantity(g.Position)</td>
-                                            <td class="agents__c-num num-sm @DeltaTone(g.Pnl)">@Signed(g.Pnl)</td>
+                                            <td class="agents__c-num num-sm">@Money0(g.Cash)</td>
+                                            <td class="agents__c-num num-sm @DeltaTone(g.Position)">@Position0(g.Position)</td>
+                                            <td class="agents__c-num num-sm @DeltaTone(g.Pnl)">@Pnl2(g.Pnl)</td>
                                             <td class="agents__c-why">
                                                 @if (g.Decision is null)
                                                 {
@@ -381,9 +382,9 @@
                                 <tfoot>
                                     <tr>
                                         <th scope="row" class="agents__c-name">Итого · @agents.Count @Plural(agents.Count, "агент", "агента", "агентов")</th>
-                                        <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Cash))</td>
-                                        <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Position))</td>
-                                        <td class="agents__c-num num-sm @DeltaTone(agents.Sum(a => a.PortfolioValue - a.InitialPortfolioValue))">@Signed(agents.Sum(a => a.PortfolioValue - a.InitialPortfolioValue))</td>
+                                        <td class="agents__c-num num-sm">@Money0(groups.Sum(g => g.Cash))</td>
+                                        <td class="agents__c-num num-sm @DeltaTone(groups.Sum(g => g.Position))">@Position0(groups.Sum(g => g.Position))</td>
+                                        <td class="agents__c-num num-sm @DeltaTone(groups.Sum(g => g.Pnl))">@Pnl2(groups.Sum(g => g.Pnl))</td>
                                         <td class="agents__c-why">@string.Join(" + ", groups.Select(g => g.Count))</td>
                                     </tr>
                                 </tfoot>
@@ -522,7 +523,6 @@
     private const int VisibleOrderBookDepth = 50;
 
     private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
-    private string AssetIconClass => GetAssetIconClass(CurrentAsset.Draft.AssetType);
     private MarketMetric[] MarketMetrics => BuildMarketMetrics(latestTick);
 
     private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
@@ -1592,9 +1592,23 @@ BuildVolumeBars(volumeMetricHistory))
             BuildOrderBookRows(bids));
     }
 
+    /// <summary>
+    /// Схлопывает уровни, которые человек видит как одну цену: внутренняя
+    /// точность выше двух знаков, поэтому без агрегации в стакане появляются
+    /// несколько строк подряд с одинаковой ценой (раздел 11).
+    /// </summary>
+    private static OrderBookLevel[] AggregateByDisplayPrice(IReadOnlyList<OrderBookLevel> levels) =>
+        levels
+            .GroupBy(level => Math.Round(level.Price, 2, MidpointRounding.AwayFromZero))
+            .Select(group => new OrderBookLevel(
+                group.Key,
+                group.Sum(level => level.Quantity),
+                group.Sum(level => level.OrdersCount)))
+            .ToArray();
+
     private static OrderBookLevel[] GetVisibleOrderBookLevels(IReadOnlyList<OrderBookLevel> levels, bool reverse)
     {
-        var visibleLevels = levels.Take(VisibleOrderBookDepth).ToArray();
+        var visibleLevels = AggregateByDisplayPrice(levels).Take(VisibleOrderBookDepth).ToArray();
         if (reverse)
         {
             Array.Reverse(visibleLevels);
@@ -1613,7 +1627,7 @@ BuildVolumeBars(volumeMetricHistory))
 
                 return new OrderBookRow(
                     FormatPrice(level.Price),
-                    FormatQuantity(level.Quantity),
+                    level.Quantity.ToString("N1"),
                     level.OrdersCount.ToString(),
                     depth,
                     $"width: {depth}%;",
@@ -1636,7 +1650,7 @@ BuildVolumeBars(volumeMetricHistory))
             .Select(trade => new TradeRow(
                 trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
                 FormatPrice(trade.Price),
-                FormatQuantity(trade.Quantity),
+                trade.Quantity.ToString("N1"),
                 FormatAgentName(trade.BuyerAgentName),
                 FormatAgentName(trade.SellerAgentName),
                 GetTradeClass(trade)))
@@ -1647,7 +1661,7 @@ BuildVolumeBars(volumeMetricHistory))
         var snapshot = tickResult?.Snapshot;
         if (snapshot?.BestBid is null || snapshot.BestAsk is null)
         {
-            return new SpreadData("bi bi-dash", "— / —", "Спред недоступен");
+            return new SpreadData("— / —", "Спред недоступен");
         }
 
         var spread = snapshot.BestAsk.Value - snapshot.BestBid.Value;
@@ -1655,7 +1669,6 @@ BuildVolumeBars(volumeMetricHistory))
         var spreadPercent = mid == 0m ? 0m : spread / mid * 100m;
 
         return new SpreadData(
-            spread <= 0m ? "bi bi-caret-left-fill" : "bi bi-arrows-collapse",
             $"{FormatMoney(snapshot.BestBid.Value)} / {FormatMoney(snapshot.BestAsk.Value)}",
             $"Спред {FormatPrice(spread)} ₽ ({spreadPercent:0.00}%)");
     }
@@ -1871,16 +1884,6 @@ maxY)
             _ => assetType.ToString()
         };
 
-    private static string GetAssetIconClass(AssetType assetType) =>
-        assetType switch
-        {
-            AssetType.Stock => "bi-graph-up-arrow",
-            AssetType.Bond => "bi-receipt",
-            AssetType.Commodity => "bi-box-seam",
-            AssetType.Crypto => "bi-currency-bitcoin",
-            _ => "bi-lightning-charge-fill"
-        };
-
     private static (string Label, string ClassName) GetLiquidity(SimulationTickResult? tickResult, decimal totalDepth)
     {
         if (tickResult?.Snapshot.BestBid is null || tickResult.Snapshot.BestAsk is null)
@@ -1945,7 +1948,7 @@ Projection, IReadOnlyList<BarRect> Bars);
         IReadOnlyList<OrderBookRow> Asks,
         IReadOnlyList<OrderBookRow> Bids);
     private sealed record OrderBookRow(string Price, string Volume, string Orders, int Depth, string DepthStyle, bool IsEmpty);
-    private sealed record SpreadData(string Icon, string Value, string Detail);
+    private sealed record SpreadData(string Value, string Detail);
     private sealed record StatusStripData(
         string Elapsed,
         string TradeCount,
