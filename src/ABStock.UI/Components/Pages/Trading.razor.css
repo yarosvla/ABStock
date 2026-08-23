@@ -149,14 +149,18 @@
 
 .quote__stale { font: var(--t-caption); color: var(--text-3); }
 
+/* 9.0: строка показателей НИКОГДА не переносится на второй ряд.
+   nowrap делает это структурной гарантией, а не пожеланием: если места мало,
+   уходят наименее важные метрики (.strip--optional), а не появляется второй ряд. */
 .strip {
     flex: 1;
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: var(--s-2) var(--s-5);
+    flex-wrap: nowrap;
+    gap: var(--s-4);
     padding-bottom: var(--s-2);
     min-width: 0;
+    overflow: hidden;
 }
 
 .strip__item { display: flex; align-items: baseline; gap: var(--s-2); }
@@ -164,7 +168,14 @@
 .strip__item .num-sm { color: var(--text-1); }
 .strip__item .num-sm.tone-up { color: var(--up-500); }
 .strip__item .num-sm.tone-down { color: var(--down-500); }
-.strip__sep { width: 1px; height: var(--s-3); background: var(--line-2); }
+.strip__sep { width: 1px; flex: none; height: var(--s-3); background: var(--line-2); }
+.strip__item { flex: none; }
+
+/* макс и мин читаются с графика; откр держит дельту, объём обязателен
+   по разделу 16.2 — поэтому в тесноте уходят первые два. */
+@media (max-width: 1599px) {
+    .strip--optional { display: none; }
+}
 
 /* тон значения — рыночная семантика */
 .tone-up { color: var(--up-500); }
@@ -277,12 +288,15 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--s-4);
+    margin-top: var(--s-3);
     padding-top: var(--s-2);
+    border-top: 1px solid var(--line-1);
     color: var(--text-4);
 }
 
 .chart-foot__credit { font: var(--t-caption); color: var(--text-4); text-decoration: none; }
 .chart-foot__credit:hover { color: var(--text-3); }
+.chart-foot .num-xs { color: var(--text-4); }
 
 /* ============================================================================
    Таблица агентов — строка 46px под две строки «действие + объяснение»
@@ -303,20 +317,26 @@
     border-bottom: 1px solid var(--line-1);
 }
 
+.agents thead th.agents__c-num { text-align: right; }
+
 .agents tbody tr { border-bottom: 1px solid var(--line-1); }
 .agents tbody tr:hover { background: var(--gph-750); }
 .agents td, .agents tbody th { height: var(--h-row-tall); padding: 0; vertical-align: middle; }
 
 .agents__c-name { width: 200px; }
 .agents__c-num { width: 130px; text-align: right; }
-.agents__c-why { padding-left: var(--s-6); min-width: 0; }
+.agents td.agents__c-why,
+.agents th.agents__c-why,
+.agents tfoot .agents__c-why { padding-left: var(--s-6); min-width: 0; }
 
 /* Колонка объяснения не должна схлопываться: она — причина этой компоновки.
    На узких экранах ужимаются имя и числа, а не объяснение. */
 @media (max-width: 1599px) {
     .agents__c-name { width: 164px; }
     .agents__c-num { width: 92px; }
-    .agents__c-why { padding-left: var(--s-4); }
+    .agents td.agents__c-why,
+    .agents th.agents__c-why,
+    .agents tfoot .agents__c-why { padding-left: var(--s-4); }
 }
 
 .agents tbody .agents__c-name { text-align: left; font-weight: inherit; }

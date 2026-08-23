@@ -27,13 +27,29 @@ const priceFormatter = new Intl.NumberFormat("ru-RU", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
 });
+// lightweight-charts трактует любой timestamp как UTC и подписывает ось в UTC.
+// Чтобы ось совпадала с часами приложения, сдвигаем метку на локальное смещение
+// один раз — при нормализации точки. После сдвига значение «уже локальное»,
+// поэтому и форматтер подписи работает в UTC, иначе сдвиг применился бы дважды.
 const timeFormatter = new Intl.DateTimeFormat("ru-RU", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit"
+    second: "2-digit",
+    timeZone: "UTC"
 });
+
+function toLocalChartTime(utcSeconds) {
+    const seconds = Number(utcSeconds);
+    if (!Number.isFinite(seconds)) {
+        return utcSeconds;
+    }
+
+    // getTimezoneOffset отдаёт минуты, которые надо прибавить к локальному
+    // времени, чтобы получить UTC — значит вычитаем их, чтобы получить локальное.
+    return seconds - new Date(seconds * 1000).getTimezoneOffset() * 60;
+}
 
 function getTimeframeOptions(timeframe) {
     return timeframeConfig[timeframe] ?? defaultTimeframe;
@@ -73,7 +89,7 @@ function normalizePoint(point) {
     // Цвет свечи задаётся темой серии (раздел 11), а не полями точки:
     // payload несёт наследные значения, которые палитре не соответствуют.
     return {
-        time: point.time ?? point.Time,
+        time: toLocalChartTime(point.time ?? point.Time),
         open: point.open ?? point.Open,
         high: point.high ?? point.High,
         low: point.low ?? point.Low,
@@ -272,7 +288,12 @@ function ensureViewport(controller, { forceScrollToRealtime = false, fitContent 
         rightOffset: getDynamicRightOffset(count, options)
     });
 
-    if (fitContent || !controller.hasViewport) {
+    // Пока свечей меньше, чем помещается на холсте, ряд растягивается на всю
+    // ширину: полупустой график с прижатым вправо рядом — дефект (раздел 11).
+    const capacity = getCanvasSize(controller.surface).width / Math.max(controller.barSpacing, 1);
+    const underfilled = count < capacity;
+
+    if (fitContent || underfilled || !controller.hasViewport) {
         controller.hasViewport = true;
         timeScale.fitContent();
 

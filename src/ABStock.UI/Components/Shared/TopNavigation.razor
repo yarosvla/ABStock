@@ -131,12 +131,9 @@
 
     public void Dispose() => SimulationRunner.OnTick -= HandleSimulationTick;
 
-    private readonly List<NotificationModel> Notifications =
-    [
-        new("Рынок запущен", "Торговая сессия начата.", "10:00", "play", false),
-        new("Маркет-мейкер", "Агент начал выставлять заявки.", "10:05", "users", false),
-        new("Контр-тренд", "Превышен лимит позиций.", "12:30", "alert", true)
-    ];
+    // Источника уведомлений в MVP нет, поэтому список пуст: раздел 16 запрещает
+    // изобретать функциональность, а раздел 14 требует честного пустого состояния.
+    private readonly List<NotificationModel> Notifications = [];
 
     private sealed record NavSection(string Key, string Href, string Title);
 
