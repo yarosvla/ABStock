@@ -48,7 +48,7 @@ public class MarketMakerAgent : AgentBase
         return new AgentDecision(
             State.AgentName,
             TradeAction.Hold,
-            $"держу спред: лестница ликвидности на {LadderLevels} уровня вокруг {snapshot.LastPrice:F2}",
+            $"держу спред вокруг {snapshot.LastPrice:F2}, лестница на {LadderLevels} уровня",
             orders
         );
     }
