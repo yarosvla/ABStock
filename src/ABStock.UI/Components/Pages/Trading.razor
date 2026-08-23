@@ -431,9 +431,11 @@
                                     }
                                 </div>
 
+                                @* Спред и мид считаются по ОТОБРАЖАЕМЫМ ценам стакана,
+                                   иначе строка спреда противоречит строкам над и под ней. *@
                                 <div class="book__spread">
-                                    <span>спред <span class="num-sm">@(snapshot?.BestAsk is { } a2 && snapshot.BestBid is { } b2 ? FormatPrice(a2 - b2) : "—") ₽</span></span>
-                                    <span>мид <span class="num-sm">@(snapshot?.BestAsk is { } a3 && snapshot.BestBid is { } b3 ? FormatPrice((a3 + b3) / 2m) : "—") ₽</span></span>
+                                    <span>спред <span class="num-sm">@(book.BestAsk is { } ba && book.BestBid is { } bb ? FormatPrice(ba - bb) : "—") ₽</span></span>
+                                    <span>мид <span class="num-sm">@(book.BestAsk is { } ma && book.BestBid is { } mb ? FormatPrice((ma + mb) / 2m) : "—") ₽</span></span>
                                 </div>
 
                                 <div class="book__side">
@@ -615,8 +617,13 @@
         if (SimulationRunner.IsRunning)
         {
             await SimulationRunner.StopAsync();
-            ResetViewState();
         }
+
+        // Новый запуск — новый период. Счётчики страницы обнуляются вместе с биржей.
+        // Раньше сброс происходил только при замене ИДУЩЕЙ симуляции, поэтому после
+        // «остановить → запустить» рядом оказывались метрики разных запусков: биржа
+        // считала объём с нуля, а сделки, свечи и лента оставались от прошлого прогона.
+        ResetViewState();
 
         await SimulationRunner.StartAsync(CreateDemoConfig(CurrentAsset));
         UpdateRunSummary();
@@ -1584,31 +1591,26 @@ BuildVolumeBars(volumeMetricHistory))
 
     private static OrderBookViewData BuildOrderBookData(OrderBookSnapshot? orderBook)
     {
-        var asks = GetVisibleOrderBookLevels(orderBook?.Asks ?? [], reverse: true);
-        var bids = GetVisibleOrderBookLevels(orderBook?.Bids ?? [], reverse: false);
+        var asks = GetVisibleOrderBookLevels(orderBook?.Asks ?? [], reverse: true, isAsk: true);
+        var bids = GetVisibleOrderBookLevels(orderBook?.Bids ?? [], reverse: false, isAsk: false);
+
+        // Асксы перевёрнуты по убыванию — лучший в конце; биды по убыванию — лучший первый.
+        var bestAsk = asks.Length == 0 ? (decimal?)null : asks[^1].Price;
+        var bestBid = bids.Length == 0 ? (decimal?)null : bids[0].Price;
 
         return new OrderBookViewData(
+            bestBid,
+            bestAsk,
             BuildOrderBookRows(asks),
             BuildOrderBookRows(bids));
     }
 
-    /// <summary>
-    /// Схлопывает уровни, которые человек видит как одну цену: внутренняя
-    /// точность выше двух знаков, поэтому без агрегации в стакане появляются
-    /// несколько строк подряд с одинаковой ценой (раздел 11).
-    /// </summary>
-    private static OrderBookLevel[] AggregateByDisplayPrice(IReadOnlyList<OrderBookLevel> levels) =>
-        levels
-            .GroupBy(level => Math.Round(level.Price, 2, MidpointRounding.AwayFromZero))
-            .Select(group => new OrderBookLevel(
-                group.Key,
-                group.Sum(level => level.Quantity),
-                group.Sum(level => level.OrdersCount)))
-            .ToArray();
-
-    private static OrderBookLevel[] GetVisibleOrderBookLevels(IReadOnlyList<OrderBookLevel> levels, bool reverse)
+    private static OrderBookLevel[] GetVisibleOrderBookLevels(
+        IReadOnlyList<OrderBookLevel> levels,
+        bool reverse,
+        bool isAsk)
     {
-        var visibleLevels = AggregateByDisplayPrice(levels).Take(VisibleOrderBookDepth).ToArray();
+        var visibleLevels = OrderBookDisplay.Aggregate(levels, isAsk).Take(VisibleOrderBookDepth).ToArray();
         if (reverse)
         {
             Array.Reverse(visibleLevels);
@@ -1945,6 +1947,8 @@ maxY)
 Projection, IReadOnlyList<BarRect> Bars);
     private sealed record AssetParameter(string Label, string Value, string? ValueClass);
     private sealed record OrderBookViewData(
+        decimal? BestBid,
+        decimal? BestAsk,
         IReadOnlyList<OrderBookRow> Asks,
         IReadOnlyList<OrderBookRow> Bids);
     private sealed record OrderBookRow(string Price, string Volume, string Orders, int Depth, string DepthStyle, bool IsEmpty);
