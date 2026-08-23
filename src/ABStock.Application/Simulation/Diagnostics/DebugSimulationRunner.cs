@@ -86,6 +86,7 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
 
             _exchange = _exchangeEngineFactory.Create(config.StartPrice);
             _agents = _agentFactory.Create(config.Agents).ToList();
+            SetInitialPortfolioValue(_agents, config.StartPrice);
             var startedAt = DateTimeOffset.UtcNow;
             _currentRunId = _marketHistoryStore.StartRun(config, startedAt);
             _tick = 0;
@@ -179,12 +180,15 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
             _agents.Add(agent);
 
             var marketSnapshot = _exchange.GetSnapshot();
+            SetInitialPortfolioValue([agent], marketSnapshot.LastPrice);
             agentSnapshot = new AgentSnapshot(
                 agent.State.AgentName,
                 agent.State.AgentType,
                 agent.State.Cash,
                 agent.State.Position,
-                agent.State.GetPortfolioValue(marketSnapshot.LastPrice));
+                agent.State.GetPortfolioValue(marketSnapshot.LastPrice),
+                agent.State.InitialCash,
+                agent.State.InitialPortfolioValue);
             tickResult = CreateTickResultLocked(marketSnapshot);
         }
 
@@ -338,6 +342,14 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
         }
     }
 
+    private static void SetInitialPortfolioValue(IReadOnlyList<ITradeAgent> agents, decimal price)
+    {
+        foreach (var agent in agents)
+        {
+            agent.State.InitialPortfolioValue = agent.State.GetPortfolioValue(price);
+        }
+    }
+
     private static IReadOnlyList<AgentSnapshot> GetAgentSnapshots(
         IReadOnlyList<ITradeAgent> agents,
         decimal lastPrice) =>
@@ -346,6 +358,8 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
             agent.State.AgentType,
             agent.State.Cash,
             agent.State.Position,
-            agent.State.GetPortfolioValue(lastPrice)
+            agent.State.GetPortfolioValue(lastPrice),
+            agent.State.InitialCash,
+            agent.State.InitialPortfolioValue
         )).ToArray();
 }

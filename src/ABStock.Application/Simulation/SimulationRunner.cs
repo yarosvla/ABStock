@@ -87,6 +87,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
 
             var exchange = _exchangeEngineFactory.Create(config.StartPrice);
             var agents = _agentFactory.Create(config.Agents).ToList();
+            SetInitialPortfolioValue(agents, config.StartPrice);
             var startedAt = DateTimeOffset.UtcNow;
 
             _exchange = exchange;
@@ -183,12 +184,15 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             _agents.Add(agent);
 
             var marketSnapshot = _exchange.GetSnapshot();
+            SetInitialPortfolioValue([agent], marketSnapshot.LastPrice);
             agentSnapshot = new AgentSnapshot(
                 agent.State.AgentName,
                 agent.State.AgentType,
                 agent.State.Cash,
                 agent.State.Position,
-                agent.State.GetPortfolioValue(marketSnapshot.LastPrice));
+                agent.State.GetPortfolioValue(marketSnapshot.LastPrice),
+                agent.State.InitialCash,
+                agent.State.InitialPortfolioValue);
             tickResult = CreateTickResultLocked(marketSnapshot);
         }
 
@@ -342,6 +346,14 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
         }
     }
 
+    private static void SetInitialPortfolioValue(IReadOnlyList<ITradeAgent> agents, decimal price)
+    {
+        foreach (var agent in agents)
+        {
+            agent.State.InitialPortfolioValue = agent.State.GetPortfolioValue(price);
+        }
+    }
+
     private static IReadOnlyList<AgentSnapshot> GetAgentSnapshots(
         IReadOnlyList<ITradeAgent> agents,
         decimal lastPrice) =>
@@ -350,6 +362,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             a.State.AgentType,
             a.State.Cash,
             a.State.Position,
-            a.State.GetPortfolioValue(lastPrice)
+            a.State.GetPortfolioValue(lastPrice),
+            a.State.InitialCash,
+            a.State.InitialPortfolioValue
         )).ToArray();
 }

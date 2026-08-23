@@ -14,7 +14,9 @@ public abstract class AgentBase : ITradeAgent
             AgentName = name,
             AgentType = type,
             Cash = initialCash,
-            Position = initialPosition
+            Position = initialPosition,
+            InitialCash = initialCash,
+            InitialPosition = initialPosition
         };
     }
 

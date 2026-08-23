@@ -7,7 +7,9 @@ public record AgentSnapshot(
     AgentType Type,
     decimal Cash,
     decimal Position,
-    decimal PortfolioValue
+    decimal PortfolioValue,
+    decimal InitialCash,
+    decimal InitialPortfolioValue
 );
 
 public record SimulationTickResult(
