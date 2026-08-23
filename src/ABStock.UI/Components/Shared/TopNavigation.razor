@@ -2,91 +2,89 @@
 @implements IDisposable
 @inject ISimulationRunner SimulationRunner
 
-<nav class="top-navigation" aria-label="Основная навигация">
-    <a class="brand" href="/" aria-label="ABStock">
-        <span class="brand-mark" aria-hidden="true">
-            <img src="images/abstock-logo.png" alt="" />
-        </span>
-        <span class="brand-name">ABStock</span>
-    </a>
+@* Оболочка приложения — раздел 13. Шапка 56px, стекло (под ней реально
+   проезжает контент), нижняя кромка --line-1. Активный раздел — --text-1
+   плюс светлая линия 2px снизу. *@
 
-    <div class="nav-links" aria-label="Разделы">
-        <a class="@(ActivePage == "CreateAsset" ? "active" : "")" href="/create-asset">Создание актива</a>
-        <a class="@(ActivePage == "Trading" ? "active" : "")" href="/trading">Торги</a>
-        <a class="@(ActivePage == "News" ? "active" : "")" href="/news">Новости</a>
-        <a class="@(ActivePage == "Agents" ? "active" : "")" href="/agents">Агенты</a>
-        <a class="@(ActivePage == "Profile" ? "active" : "")" href="/profile">Профиль</a>
+<nav class="topnav glass glass--nav" aria-label="Основная навигация">
+    <div class="topnav__left">
+        <a class="topnav__brand" href="/">ABStock</a>
+
+        <div class="topnav__links">
+            @foreach (var item in Sections)
+            {
+                var isActive = item.Key == ActivePage;
+                <a class="topnav__link @(isActive ? "is-active" : null)"
+                   href="@item.Href"
+                   aria-current="@(isActive ? "page" : null)">
+                    @item.Title
+                    @if (isActive)
+                    {
+                        <span class="topnav__underline" aria-hidden="true"></span>
+                    }
+                </a>
+            }
+        </div>
     </div>
 
-    <div class="nav-actions">
-        <span class="market-status @(IsTradingActive ? "is-running" : "is-stopped")">
-            <span aria-hidden="true"></span>@MarketStatusLabel
-        </span>
+    <div class="topnav__right">
+        <StatusDot Tone="@(IsTradingActive ? "up" : "muted")" Live="IsTradingActive">@MarketStatusLabel</StatusDot>
+
         @if (ShowClock)
         {
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
-            <span class="date-chip">@Clock.Date</span>
+            <span class="topnav__clock num-sm">@Clock</span>
         }
 
-        <div class="notification-wrapper">
-            <button class="icon-button" type="button" aria-label="Уведомления" @onclick="ToggleNotifications">
-                <i class="bi bi-bell" aria-hidden="true"></i>
+        <div class="topnav__bell">
+            <button class="topnav__icon-button" type="button"
+                    aria-label="@NotificationSummaryText"
+                    aria-expanded="@(IsNotificationsOpen ? "true" : "false")"
+                    @onclick="ToggleNotifications">
+                <Icon Name="bell" Size="16" />
                 @if (UnreadNotificationsCount > 0)
                 {
-                    <span class="notification-badge">@UnreadNotificationsCount</span>
+                    <span class="topnav__unread" aria-hidden="true"></span>
                 }
             </button>
         </div>
 
-        <a class="icon-button" href="/profile" aria-label="Настройки">
-            <i class="bi bi-gear" aria-hidden="true"></i>
-        </a>
-        <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">
+        <a class="topnav__avatar" href="/profile" aria-label="Профиль пользователя">
             <span>@AvatarInitials</span>
-            @if (ActivePage == "CreateAsset")
-            {
-                <i class="bi bi-chevron-down" aria-hidden="true"></i>
-            }
         </a>
     </div>
 </nav>
 
 @if (IsNotificationsOpen)
 {
-    <div class="notification-layer" @onclick="CloseNotifications">
-        <div class="notification-dropdown glass-card" @onclick:stopPropagation="true">
-            <div class="notification-header">
+    <div class="notif-layer" @onclick="CloseNotifications">
+        <div class="notif glass" role="dialog" aria-label="Уведомления" @onclick:stopPropagation="true">
+            <div class="notif__head">
                 <div>
                     <h3>Уведомления</h3>
-                    <span>@NotificationSummaryText</span>
+                    <span class="notif__summary">@NotificationSummaryText</span>
                 </div>
-                <button class="mark-all-read" @onclick="ClearNotifications">Очистить</button>
+                <AppButton Variant="ghost" Size="26" OnClick="ClearNotifications">Очистить</AppButton>
             </div>
-            <div class="notification-list">
-                @if (Notifications.Any())
+
+            <div class="notif__list">
+                @if (Notifications.Count > 0)
                 {
                     @foreach (var notification in Notifications)
                     {
-                        <div class="notification-item @(notification.IsRead ? "read" : "unread")">
-                            <span class="notification-accent" aria-hidden="true"></span>
-                            <i class="bi @notification.Icon" aria-hidden="true"></i>
-                            <div class="notification-content">
-                                <div class="notification-title-row">
-                                    <strong>@notification.Title</strong>
-                                    @if (!notification.IsRead)
-                                    {
-                                        <span class="notification-pill">Новое</span>
-                                    }
-                                </div>
+                        <div class="notif__item @(notification.IsRead ? null : "is-unread")">
+                            <span class="notif__dot" aria-hidden="true"></span>
+                            <Icon Name="@notification.Icon" Size="16" />
+                            <div class="notif__body">
+                                <strong>@notification.Title</strong>
                                 <p>@notification.Message</p>
-                                <small>@notification.Time</small>
                             </div>
+                            <span class="notif__time num-xs">@notification.Time</span>
                         </div>
                     }
                 }
                 else
                 {
-                    <div class="notification-empty">Нет новых уведомлений</div>
+                    <EmptyState IconName="bell" Title="Уведомлений нет" />
                 }
             </div>
         </div>
@@ -98,9 +96,22 @@
     [Parameter] public bool ShowClock { get; set; } = false;
     [Parameter] public string AvatarInitials { get; set; } = "АК";
 
-    private bool IsNotificationsOpen { get; set; } = false;
+    // Ровно пять разделов — раздел 16.
+    private static readonly NavSection[] Sections =
+    [
+        new("CreateAsset", "/create-asset", "Создание актива"),
+        new("Trading", "/trading", "Торги"),
+        new("News", "/news", "Новости"),
+        new("Agents", "/agents", "Агенты"),
+        new("Profile", "/profile", "Профиль")
+    ];
+
+    private bool IsNotificationsOpen { get; set; }
     private bool IsTradingActive => SimulationRunner.IsRunning;
-    private string MarketStatusLabel => IsTradingActive ? "Торги запущены" : "Торги не запущены";
+    private string MarketStatusLabel => IsTradingActive ? "Торги активны" : "Торги остановлены";
+    private string Clock => DateTimeOffset.Now.ToString("HH:mm:ss");
+    private int UnreadNotificationsCount => Notifications.Count(n => !n.IsRead);
+
     private string NotificationSummaryText => UnreadNotificationsCount switch
     {
         0 => "Нет новых событий",
@@ -108,69 +119,31 @@
         _ => $"{UnreadNotificationsCount} новых событий"
     };
 
-    protected override void OnInitialized()
-    {
-        SimulationRunner.OnTick += HandleSimulationTick;
-    }
+    protected override void OnInitialized() => SimulationRunner.OnTick += HandleSimulationTick;
 
-    private void ToggleNotifications()
-    {
-        IsNotificationsOpen = !IsNotificationsOpen;
-    }
+    private void ToggleNotifications() => IsNotificationsOpen = !IsNotificationsOpen;
 
-    private void CloseNotifications()
-    {
-        IsNotificationsOpen = false;
-    }
+    private void CloseNotifications() => IsNotificationsOpen = false;
 
-    private int UnreadNotificationsCount => Notifications.Count(n => !n.IsRead);
+    private void ClearNotifications() => Notifications.Clear();
 
-    private void ClearNotifications()
-    {
-        Notifications.Clear();
-    }
+    private void HandleSimulationTick(SimulationTickResult tick) => _ = InvokeAsync(StateHasChanged);
 
-    private void HandleSimulationTick(SimulationTickResult tick)
-    {
-        _ = InvokeAsync(StateHasChanged);
-    }
+    public void Dispose() => SimulationRunner.OnTick -= HandleSimulationTick;
 
-    public void Dispose()
-    {
-        SimulationRunner.OnTick -= HandleSimulationTick;
-    }
+    private readonly List<NotificationModel> Notifications =
+    [
+        new("Рынок запущен", "Торговая сессия начата.", "10:00", "play", false),
+        new("Маркет-мейкер", "Агент начал выставлять заявки.", "10:05", "users", false),
+        new("Контр-тренд", "Превышен лимит позиций.", "12:30", "alert", true)
+    ];
 
-    private List<NotificationModel> Notifications = new()
-    {
-        new NotificationModel { Title = "Рынок запущен", Message = "Торговая сессия успешно начата.", Time = "10:00", Icon = "bi-play-circle", IsRead = false },
-        new NotificationModel { Title = "Агент MarketMaker", Message = "Агент начал выставлять заявки.", Time = "10:05", Icon = "bi-robot", IsRead = false },
-        new NotificationModel { Title = "Риск-менеджмент", Message = "Превышен лимит позиций для CounterTrend.", Time = "12:30", Icon = "bi-exclamation-triangle", IsRead = true }
-    };
+    private sealed record NavSection(string Key, string Href, string Title);
 
-    private sealed class NotificationModel
-    {
-        public string Title { get; set; } = "";
-        public string Message { get; set; } = "";
-        public string Time { get; set; } = "";
-        public string Icon { get; set; } = "";
-        public bool IsRead { get; set; } = false;
-    }
-
-    private ClockData Clock => BuildClockData();
-
-    private static ClockData BuildClockData()
-    {
-        var now = DateTimeOffset.Now;
-        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
-    }
-
-    private static string GetRussianMonthName(int month) => month switch
-    {
-        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
-        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
-        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
-        _ => ""
-    };
-
-    private sealed record ClockData(string Time, string Date);
+    private sealed record NotificationModel(
+        string Title,
+        string Message,
+        string Time,
+        string Icon,
+        bool IsRead);
 }
