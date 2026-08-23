@@ -1,0 +1,41 @@
+@* Панель — рабочая поверхность страницы. Непрозрачная, без стекла (раздел 6, 9.7). *@
+
+<section class="ui-panel @(Quiet ? "ui-panel--quiet" : null) @Class" aria-labelledby="@(Title is null ? null : HeadingId)">
+    @if (Title is not null || Meta is not null || Head is not null)
+    {
+        <div class="ui-panel__head">
+            @if (Head is not null)
+            {
+                @Head
+            }
+            else
+            {
+                <h2 id="@HeadingId">@Title</h2>
+                @if (Meta is not null)
+                {
+                    <span class="ui-panel__meta">@Meta</span>
+                }
+            }
+        </div>
+    }
+    <div class="ui-panel__body @(Flush ? "ui-panel__body--flush" : null)">
+        @ChildContent
+    </div>
+</section>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public RenderFragment? Meta { get; set; }
+    [Parameter] public RenderFragment? Head { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Без внутренних отступов — под таблицу и плотные списки.</summary>
+    [Parameter] public bool Flush { get; set; }
+
+    /// <summary>Группировка без коробки: прозрачный фон, только кромка.</summary>
+    [Parameter] public bool Quiet { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    private readonly string HeadingId = $"panel-{Guid.NewGuid():N}";
+}

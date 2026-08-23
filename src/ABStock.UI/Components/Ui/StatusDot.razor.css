@@ -1,0 +1,27 @@
+.ui-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.ui-status__dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: var(--r-pill);
+    background: var(--text-3);
+}
+
+.ui-status__dot--up           { background: var(--up-500); }
+.ui-status__dot--down         { background: var(--down-500); }
+.ui-status__dot--warn         { background: var(--warn-500); }
+.ui-status__dot--muted        { background: var(--text-3); }
+.ui-status__dot--agent-trend  { background: var(--agent-trend); }
+.ui-status__dot--agent-counter{ background: var(--agent-counter); }
+.ui-status__dot--agent-mm     { background: var(--agent-mm); }
+.ui-status__dot--agent-news   { background: var(--agent-news); }
+
+.ui-status__label {
+    font: var(--t-caption);
+    color: var(--text-2);
+}

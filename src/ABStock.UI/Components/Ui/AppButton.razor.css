@@ -1,0 +1,76 @@
+.ui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    background: transparent;
+    font-family: var(--font-ui);
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background var(--d-instant) var(--e-out),
+                border-color var(--d-instant) var(--e-out),
+                color var(--d-instant) var(--e-out);
+}
+
+/* ---------- размеры 26 / 32 / 40 ---------- */
+.ui-btn--26 { height: var(--h-ctl-sm); padding: 0 var(--s-3); border-radius: var(--r-sm); font-size: 12px; }
+.ui-btn--32 { height: var(--h-ctl-md); padding: 0 14px; }
+.ui-btn--40 { height: var(--h-ctl-lg); padding: 0 var(--s-4); font-size: 14px; }
+
+/* ---------- варианты ---------- */
+.ui-btn--primary {
+    background: var(--acc-500);
+    color: var(--acc-ink);
+    font-weight: 600;
+}
+.ui-btn--primary:hover  { background: var(--acc-400); }
+.ui-btn--primary:active { background: var(--acc-600); }
+
+.ui-btn--secondary {
+    border-color: var(--line-2);
+    color: var(--text-1);
+}
+.ui-btn--secondary:hover  { background: var(--acc-soft); border-color: var(--line-3); }
+.ui-btn--secondary:active { background: var(--gph-700); }
+
+.ui-btn--ghost { color: var(--text-2); }
+.ui-btn--ghost:hover  { color: var(--text-1); }
+.ui-btn--ghost:active { color: var(--text-2); }
+
+.ui-btn--danger {
+    border-color: var(--down-500);
+    color: var(--down-500);
+}
+.ui-btn--danger:hover { background: var(--down-soft); }
+
+/* ---------- состояния ---------- */
+.ui-btn:disabled {
+    background: var(--gph-700);
+    border-color: transparent;
+    color: var(--text-4);
+    cursor: not-allowed;
+}
+
+.ui-btn--loading { cursor: progress; }
+
+.ui-btn__spinner {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    border-radius: var(--r-pill);
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    animation: ui-btn-spin var(--d-slow) linear infinite;
+}
+
+@keyframes ui-btn-spin { to { transform: rotate(360deg); } }
+
+/* иконка-кнопка: квадрат 32×32 (sm 26), только глиф */
+.ui-btn--icon.ui-btn--32 { width: var(--h-ctl-md); padding: 0; }
+.ui-btn--icon.ui-btn--26 { width: var(--h-ctl-sm); padding: 0; }

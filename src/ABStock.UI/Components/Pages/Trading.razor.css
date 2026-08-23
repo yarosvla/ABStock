@@ -368,7 +368,7 @@
 
 .book__head .label:first-child { flex: 1; }
 .book__c-vol { width: 88px; text-align: right; }
-.book__c-sum { width: 66px; text-align: right; }
+.book__c-orders { width: 66px; text-align: right; }
 
 .book__row {
     position: relative;
@@ -381,7 +381,7 @@
 .book__row > span:not(.book__bar) { position: relative; }
 .book__c-price { flex: 1; }
 .book__row .book__c-vol { color: var(--text-2); }
-.book__row .book__c-sum { color: var(--text-3); }
+.book__row .book__c-orders { color: var(--text-3); }
 .book__row.is-empty { color: var(--text-4); }
 
 .book__bar {

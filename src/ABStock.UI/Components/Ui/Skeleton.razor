@@ -1,0 +1,12 @@
+@* Скелетон — раздел 9.16. Форма повторяет реальный контент. *@
+
+<div class="skeleton ui-skeleton" style="@Style" aria-hidden="true"></div>
+
+@code {
+    [Parameter] public string Width { get; set; } = "100%";
+    [Parameter] public string Height { get; set; } = "12px";
+    [Parameter] public string? Radius { get; set; }
+
+    private string Style =>
+        $"width:{Width};height:{Height}" + (Radius is null ? "" : $";border-radius:{Radius}");
+}

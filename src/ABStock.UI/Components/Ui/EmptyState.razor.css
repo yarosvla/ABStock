@@ -1,0 +1,26 @@
+.ui-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--s-2);
+    padding: var(--s-5) var(--s-5) var(--s-6);
+    text-align: center;
+    color: var(--text-3);
+}
+
+.ui-empty ::deep .ui-icon { color: var(--text-3); }
+
+.ui-empty h3 {
+    margin: 0;
+    font: var(--t-h3);
+    color: var(--text-1);
+    letter-spacing: -0.015em;
+}
+
+.ui-empty__text {
+    margin: 0;
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.ui-empty__action { margin-top: var(--s-1); }

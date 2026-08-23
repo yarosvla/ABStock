@@ -418,7 +418,7 @@
                                 <div class="book__head">
                                     <span class="label">Цена</span>
                                     <span class="label book__c-vol">Объём</span>
-                                    <span class="label book__c-sum">Сумма</span>
+                                    <span class="label book__c-orders">Заявок</span>
                                 </div>
 
                                 <div class="book__side">
@@ -428,7 +428,7 @@
                                             <span class="book__bar book__bar--ask" style="@row.DepthStyle" aria-hidden="true"></span>
                                             <span class="num-sm book__c-price tone-down">@row.Price</span>
                                             <span class="num-sm book__c-vol">@row.Volume</span>
-                                            <span class="num-sm book__c-sum">@row.Total</span>
+                                            <span class="num-sm book__c-orders">@row.Orders</span>
                                         </div>
                                     }
                                 </div>
@@ -445,7 +445,7 @@
                                             <span class="book__bar book__bar--bid" style="@row.DepthStyle" aria-hidden="true"></span>
                                             <span class="num-sm book__c-price tone-up">@row.Price</span>
                                             <span class="num-sm book__c-vol">@row.Volume</span>
-                                            <span class="num-sm book__c-sum">@row.Total</span>
+                                            <span class="num-sm book__c-orders">@row.Orders</span>
                                         </div>
                                     }
                                 </div>
@@ -1609,17 +1609,15 @@ BuildVolumeBars(volumeMetricHistory))
     private static OrderBookRow[] BuildOrderBookRows(IReadOnlyList<OrderBookLevel> levels)
     {
         var maxQuantity = levels.Count == 0 ? 0m : levels.Max(level => level.Quantity);
-        var total = 0m;
         var rows = levels
             .Select(level =>
             {
-                total += level.Quantity;
                 var depth = CalculateDepth(level.Quantity, maxQuantity);
 
                 return new OrderBookRow(
                     FormatPrice(level.Price),
                     FormatQuantity(level.Quantity),
-                    FormatQuantity(total),
+                    level.OrdersCount.ToString(),
                     depth,
                     $"width: {depth}%;",
                     false);
@@ -1949,7 +1947,7 @@ Projection, IReadOnlyList<BarRect> Bars);
     private sealed record OrderBookViewData(
         IReadOnlyList<OrderBookRow> Asks,
         IReadOnlyList<OrderBookRow> Bids);
-    private sealed record OrderBookRow(string Price, string Volume, string Total, int Depth, string DepthStyle, bool IsEmpty);
+    private sealed record OrderBookRow(string Price, string Volume, string Orders, int Depth, string DepthStyle, bool IsEmpty);
     private sealed record SpreadData(string Icon, string Value, string Detail);
     private sealed record StatusStripData(
         string Elapsed,

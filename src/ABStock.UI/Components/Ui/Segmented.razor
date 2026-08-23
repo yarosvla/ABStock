@@ -1,0 +1,23 @@
+@typeparam TValue
+
+@* Segmented control (таймфреймы) — раздел 9.5.
+   Активный сегмент — --gph-600, НЕ светлая заливка: свет зарезервирован
+   за первичным действием. *@
+
+<div class="ui-seg" role="group" aria-label="@Label">
+    @foreach (var item in Items)
+    {
+        var isActive = EqualityComparer<TValue>.Default.Equals(item.Value, Value);
+        <button type="button"
+                class="ui-seg__item @(isActive ? "is-active" : null)"
+                aria-pressed="@(isActive ? "true" : "false")"
+                @onclick="() => ValueChanged.InvokeAsync(item.Value)">@item.Label</button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SegmentedItem<TValue>> Items { get; set; } = [];
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+    [Parameter] public string? Label { get; set; }
+}

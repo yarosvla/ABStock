@@ -1,0 +1,63 @@
+@* Кнопка — раздел 9.2. Primary = светлая заливка (акцент как свет, не как цвет).
+   Размеры 26/32/40. Loading не меняет ширину кнопки. *@
+
+@if (Href is null)
+{
+    <button type="@Type"
+            class="@CssClass"
+            disabled="@(Disabled || Loading)"
+            @onclick="OnClick"
+            @attributes="Extra">
+        @Inner
+    </button>
+}
+else
+{
+    <a href="@Href" class="@CssClass" @attributes="Extra">@Inner</a>
+}
+
+@code {
+    [Parameter] public string Variant { get; set; } = "secondary";
+    [Parameter] public int Size { get; set; } = 32;
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string Type { get; set; } = "button";
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? Extra { get; set; }
+
+    private string CssClass =>
+        $"ui-btn ui-btn--{Variant} ui-btn--{Size}{(Loading ? " ui-btn--loading" : "")} {Class}".TrimEnd();
+
+    private RenderFragment Inner => builder =>
+    {
+        var seq = 0;
+        if (Loading)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "ui-btn__spinner");
+            builder.AddAttribute(seq++, "aria-hidden", "true");
+            builder.CloseElement();
+        }
+        else if (Icon is not null)
+        {
+            builder.OpenComponent<Icon>(seq++);
+            builder.AddComponentParameter(seq++, nameof(Components.Ui.Icon.Name), Icon);
+            builder.AddComponentParameter(seq++, nameof(Components.Ui.Icon.Size), Size >= 40 ? 18 : 16);
+            builder.CloseComponent();
+        }
+
+        if (ChildContent is not null)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "ui-btn__label");
+            builder.AddContent(seq++, ChildContent);
+            builder.CloseElement();
+        }
+    };
+}
