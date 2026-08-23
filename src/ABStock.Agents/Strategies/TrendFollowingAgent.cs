@@ -36,14 +36,14 @@ public class TrendFollowingAgent : AgentBase
         {
             var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
-                $"цена растёт {prevPrice:F2} → {lastPrice:F2} — иду за движением", [order]);
+                $"цена растёт {DescribeMove(prevPrice, lastPrice)} — иду за движением", [order]);
         }
 
         if (lastPrice < prevPrice && CanSell(_orderQuantity))
         {
             var order = CreateLimitOrder(OrderSide.Sell, sellPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
-                $"цена падает {prevPrice:F2} → {lastPrice:F2} — выхожу из позиции", [order]);
+                $"цена падает {DescribeMove(prevPrice, lastPrice)} — выхожу из позиции", [order]);
         }
 
         return HoldDecision("не хватает денег или позиции для сделки");

@@ -11,6 +11,12 @@ const FOLLOW_THRESHOLD_PX = 24;
 // скрывается, чтобы не наезжать на метку текущей цены.
 const PRICE_LABEL_GUARD_PX = 14;
 
+// Предел ширины свечи. Без него fitContent() растягивает несколько свечей
+// на треть панели, и график перестаёт читаться как свечной. При нехватке
+// данных ряд прижимается вправо, слева остаётся пустота — так делают
+// реальные терминалы, и это не дефект (DESIGN.md 11).
+const MAX_BAR_SPACING_PX = 14;
+
 const controllers = new WeakMap();
 
 const timeframeConfig = {
@@ -258,6 +264,18 @@ function handleVisibleRangeChange(controller, range) {
     toggleLiveReset(controller);
 }
 
+// fitContent() подбирает barSpacing под весь диапазон и на малом числе баров
+// выдаёт огромные тела. Возвращаем ширину в предел, сохраняя правый край.
+function clampBarSpacing(controller) {
+    const timeScale = controller.chart.timeScale();
+    const current = timeScale.options().barSpacing;
+
+    if (typeof current === "number" && current > MAX_BAR_SPACING_PX) {
+        timeScale.applyOptions({ barSpacing: MAX_BAR_SPACING_PX });
+        controller.barSpacing = MAX_BAR_SPACING_PX;
+    }
+}
+
 function toggleLiveReset(controller) {
     if (!controller.liveButton) {
         return;
@@ -288,14 +306,10 @@ function ensureViewport(controller, { forceScrollToRealtime = false, fitContent 
         rightOffset: getDynamicRightOffset(count, options)
     });
 
-    // Пока свечей меньше, чем помещается на холсте, ряд растягивается на всю
-    // ширину: полупустой график с прижатым вправо рядом — дефект (раздел 11).
-    const capacity = getCanvasSize(controller.surface).width / Math.max(controller.barSpacing, 1);
-    const underfilled = count < capacity;
-
-    if (fitContent || underfilled || !controller.hasViewport) {
+    if (fitContent || !controller.hasViewport) {
         controller.hasViewport = true;
         timeScale.fitContent();
+        clampBarSpacing(controller);
 
         if (forceScrollToRealtime || controller.followRealtime) {
             requestAnimationFrame(() => timeScale.scrollToRealTime());

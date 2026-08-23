@@ -36,14 +36,14 @@ public class CounterTrendAgent : AgentBase
         {
             var order = CreateLimitOrder(OrderSide.Buy, buyPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
-                $"цена ушла вниз {prevPrice:F2} → {lastPrice:F2} — покупаю просадку", [order]);
+                $"цена ушла вниз {DescribeMove(prevPrice, lastPrice)} — покупаю просадку", [order]);
         }
 
         if (lastPrice >= prevPrice && CanSell(_orderQuantity))
         {
             var order = CreateLimitOrder(OrderSide.Sell, sellPrice, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
-                $"цена ушла вверх {prevPrice:F2} → {lastPrice:F2} — продаю на пике", [order]);
+                $"цена ушла вверх {DescribeMove(prevPrice, lastPrice)} — продаю на пике", [order]);
         }
 
         return HoldDecision("не хватает денег или позиции для сделки");
