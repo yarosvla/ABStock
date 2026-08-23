@@ -1,7 +1,7 @@
 @* Панель — рабочая поверхность страницы. Непрозрачная, без стекла (раздел 6, 9.7). *@
 
 <section class="ui-panel @(Quiet ? "ui-panel--quiet" : null) @Class" aria-labelledby="@(Title is null ? null : HeadingId)">
-    @if (Title is not null || Meta is not null || Head is not null)
+    @if (Title is not null || MetaContent is not null || Head is not null)
     {
         <div class="ui-panel__head">
             @if (Head is not null)
@@ -11,9 +11,9 @@
             else
             {
                 <h2 id="@HeadingId">@Title</h2>
-                @if (Meta is not null)
+                @if (MetaContent is not null)
                 {
-                    <span class="ui-panel__meta">@Meta</span>
+                    <span class="ui-panel__meta">@MetaContent</span>
                 }
             }
         </div>
@@ -25,7 +25,12 @@
 
 @code {
     [Parameter] public string? Title { get; set; }
-    [Parameter] public RenderFragment? Meta { get; set; }
+    /// <summary>
+    /// Мета-строка справа в шапке панели. Имя намеренно не «Meta»:
+    /// оно совпало бы с пустым html-элементом &lt;meta&gt;, и внутри блока @@if
+    /// парсер Razor принимал бы тег за самозакрывающийся.
+    /// </summary>
+    [Parameter] public RenderFragment? MetaContent { get; set; }
     [Parameter] public RenderFragment? Head { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
 

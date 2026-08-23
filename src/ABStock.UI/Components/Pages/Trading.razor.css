@@ -487,3 +487,113 @@
     margin-top: var(--s-1);
     border-top: 1px solid var(--line-1);
 }
+
+/* ============================================================================
+   Состав агентов перед запуском — артборд 03. Показывается, пока торги
+   остановлены: состав задаётся до старта сессии (раздел 16.1).
+   ============================================================================ */
+.compose-wrap { padding: 0 var(--s-5) var(--s-3); }
+
+.compose {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.compose thead th {
+    height: var(--h-thead);
+    padding: 0;
+    text-align: left;
+    font-weight: inherit;
+    border-bottom: 1px solid var(--line-1);
+}
+
+.compose thead th.compose__c-count,
+.compose thead th.compose__c-cap,
+.compose thead th.compose__c-total { text-align: right; }
+
+.compose tbody tr { border-bottom: 1px solid var(--line-1); }
+.compose td, .compose tbody th { height: var(--h-row-tall); padding: 0; vertical-align: middle; }
+.compose tbody th { text-align: left; font-weight: inherit; color: var(--text-1); }
+
+/* ноль агентов типа — допустимое состояние, строка остаётся, значения гаснут */
+.compose tbody tr.is-off td,
+.compose tbody tr.is-off th { color: var(--text-4); }
+.compose tbody tr.is-off .compose__c-total { color: var(--text-4); }
+
+.compose__c-type { width: 200px; }
+.compose__c-count { width: 120px; text-align: right; }
+.compose__c-cap { width: 160px; text-align: right; }
+.compose__c-total { width: 150px; text-align: right; }
+.compose td.compose__c-why,
+.compose th.compose__c-why { padding-left: var(--s-6); }
+
+.compose__cell { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.compose__c-total { color: var(--text-1); }
+.compose__c-why { color: var(--text-3); font: var(--t-caption); }
+
+.compose tfoot th, .compose tfoot td {
+    height: var(--h-row);
+    padding: 0;
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.compose tfoot th { text-align: left; font-weight: inherit; }
+.compose tfoot .num-sm { color: var(--text-2); }
+
+.compose__warn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    color: var(--warn-500);
+}
+
+/* степпер количества — две иконки-кнопки 26 и моно-значение между ними */
+.stepper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--s-2);
+}
+
+.stepper__value {
+    min-width: var(--s-5);
+    text-align: center;
+    color: var(--text-1);
+}
+
+/* поле ввода — раздел 9.3 */
+.field {
+    width: 100%;
+    height: var(--h-ctl-md);
+    padding: 0 10px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    background: var(--gph-750);
+    color: var(--text-1);
+    font: var(--n-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.field::placeholder { color: var(--text-4); }
+
+.field:focus-visible {
+    outline: none;
+    border-color: var(--acc-line);
+    box-shadow: 0 0 0 2px var(--acc-soft);
+}
+
+.field.is-error { border-color: var(--down-500); }
+
+.field__error {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--s-1);
+    margin-top: var(--s-1);
+    font: var(--t-caption);
+    color: var(--down-500);
+    text-align: right;
+}
