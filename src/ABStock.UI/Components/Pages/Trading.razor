@@ -33,6 +33,7 @@
     var trades = RecentTrades;
     var agents = latestTick?.Agents ?? [];
     var isStale = latestTick is not null && (DateTimeOffset.Now - lastChartUpdate).TotalSeconds > 5;
+    var startBlocked = !IsCompositionValid;
 
     static string Tone(string? changeClass) => changeClass switch
     {
@@ -163,7 +164,9 @@
                 }
                 else
                 {
-                    <AppButton Variant="primary" Icon="play" OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
+                    <AppButton Variant="primary" Icon="play"
+                               Disabled="startBlocked"
+                               OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
                 }
             </div>
         </header>
@@ -174,7 +177,7 @@
             @* ─────────── ЛЕВЫЙ РЕЛЬС ─────────── *@
             <div class="rail rail--left">
                 <Panel Title="Сессия" Class="rise rise-1">
-                    <Meta><span class="num-sm">@CurrentAsset.Symbol</span></Meta>
+                    <MetaContent><span class="num-sm">@CurrentAsset.Symbol</span></MetaContent>
                     <ChildContent>
                         <dl class="kv">
                             <div class="kv__row">
@@ -285,9 +288,117 @@
                     </ChildContent>
                 </Panel>
 
+                @* Торги остановлены — состав задаётся до старта (артборд 03, раздел 16.1) *@
+                @if (!isRunning)
+                {
+                    <Panel Title="Состав агентов перед запуском" Class="rise rise-3" Flush="true">
+                        <MetaContent>четыре типа стратегий</MetaContent>
+                        <ChildContent>
+                            <div class="compose-wrap">
+                                <table class="compose">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col" class="label compose__c-type">Тип</th>
+                                            <th scope="col" class="label compose__c-count">Количество</th>
+                                            <th scope="col" class="label compose__c-cap">Капитал агента, ₽</th>
+                                            <th scope="col" class="label compose__c-total">Всего капитала</th>
+                                            <th scope="col" class="label compose__c-why">Поведение</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in agentComposition)
+                                        {
+                                            var isOff = row.Count == 0;
+                                            var capitalError = HasCapitalError(row);
+                                            var typeLabel = AgentDisplay.GetTypeLabel(row.Type);
+                                            var lessLabel = "Убрать агента: " + typeLabel;
+                                            var moreLabel = "Добавить агента: " + typeLabel;
+                                            var capitalLabel = "Капитал агента: " + typeLabel;
+                                            var atMin = row.Count <= 0;
+                                            var atMax = row.Count >= MaxAgentsPerType;
+                                            var rowClass = isOff ? "is-off" : null;
+                                            var fieldClass = capitalError ? "field is-error" : "field";
+                                            var invalidFlag = capitalError ? "true" : null;
+                                            <tr class="@rowClass">
+                                                <th scope="row" class="compose__c-type">
+                                                    <span class="compose__cell">
+                                                        <StatusDot Tone="@AgentTone(row.Type)" />
+                                                        <span>@typeLabel</span>
+                                                    </span>
+                                                </th>
+                                                <td class="compose__c-count">
+                                                    <span class="stepper">
+                                                        <AppButton Variant="secondary" Size="26" Icon="minus"
+                                                                   Class="ui-btn--icon"
+                                                                   Disabled="atMin"
+                                                                   OnClick="@(() => ChangeAgentCount(row, -1))"
+                                                                   aria-label="@lessLabel" />
+                                                        <span class="num-sm stepper__value">@row.Count</span>
+                                                        <AppButton Variant="secondary" Size="26" Icon="plus"
+                                                                   Class="ui-btn--icon"
+                                                                   Disabled="atMax"
+                                                                   OnClick="@(() => ChangeAgentCount(row, 1))"
+                                                                   aria-label="@moreLabel" />
+                                                    </span>
+                                                </td>
+                                                <td class="compose__c-cap">
+                                                    <input class="@fieldClass"
+                                                           type="number" min="1" step="1000"
+                                                           aria-label="@capitalLabel"
+                                                           aria-invalid="@invalidFlag"
+                                                           @bind="row.Capital" @bind:event="oninput" />
+                                                    @if (capitalError)
+                                                    {
+                                                        <span class="field__error">
+                                                            <Icon Name="alert" Size="14" />
+                                                            <span>Капитал должен быть больше нуля</span>
+                                                        </span>
+                                                    }
+                                                </td>
+                                                <td class="compose__c-total num-sm">@Money0(row.TotalCapital)</td>
+                                                <td class="compose__c-why">@row.Behaviour</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr>
+                                            <th scope="row" class="compose__c-type">Итого</th>
+                                            <td class="compose__c-count num-sm">@TotalAgentCount</td>
+                                            <td class="compose__c-cap"></td>
+                                            <td class="compose__c-total num-sm">@Money0(TotalCompositionCapital)</td>
+                                            <td class="compose__c-why">
+                                                @if (TotalAgentCount < MinTotalAgents)
+                                                {
+                                                    <span class="compose__warn">
+                                                        <Icon Name="alert" Size="14" />
+                                                        <span>Нужен хотя бы один агент</span>
+                                                    </span>
+                                                }
+                                                else if (TotalAgentCount > MaxTotalAgents)
+                                                {
+                                                    <span class="compose__warn">
+                                                        <Icon Name="alert" Size="14" />
+                                                        <span>Не больше @MaxTotalAgents агентов в сессии</span>
+                                                    </span>
+                                                }
+                                                else
+                                                {
+                                                    <text>Новостной агент активируется после первой новости в сессии</text>
+                                                }
+                                            </td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </ChildContent>
+                    </Panel>
+                }
+
                 @* Агенты: действие и объяснение — то, ради чего выбрана эта компоновка *@
+                @if (isRunning)
+                {
                 <Panel Title="Агенты" Class="rise rise-3" Flush="true">
-                    <Meta>
+                    <MetaContent>
                         @if (isRunning)
                         {
                             <text>@agents.Count в работе · @chart.UpdatedAt.ToLowerInvariant()</text>
@@ -296,7 +407,7 @@
                         {
                             <text>торги остановлены</text>
                         }
-                    </Meta>
+                    </MetaContent>
                     <ChildContent>
                         @if (latestTick is null)
                         {
@@ -393,6 +504,8 @@
                         }
                     </ChildContent>
                 </Panel>
+
+                }
             </div>
 
             @* ─────────── ПРАВЫЙ РЕЛЬС ─────────── *@
@@ -406,7 +519,9 @@
                                         Title="Заявок нет"
                                         Description="Торги остановлены — агенты сняли открытые заявки. Стакан наполнится после запуска сессии.">
                                 <Action>
-                                    <AppButton Variant="primary" Icon="play" OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
+                                    <AppButton Variant="primary" Icon="play"
+                               Disabled="startBlocked"
+                               OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
                                 </Action>
                             </EmptyState>
                         }
@@ -455,7 +570,7 @@
                 </Panel>
 
                 <Panel Title="Лента сделок" Class="tape-panel rise rise-3" Flush="true">
-                    <Meta>
+                    <MetaContent>
                         @if (trades.Length == 0)
                         {
                             <text>нет сделок</text>
@@ -464,7 +579,7 @@
                         {
                             <text>последние <span class="num-sm">@trades.Length</span></text>
                         }
-                    </Meta>
+                    </MetaContent>
                     <ChildContent>
                         <div class="tape">
                             <div class="tape__list">
@@ -625,7 +740,7 @@
         // считала объём с нуля, а сделки, свечи и лента оставались от прошлого прогона.
         ResetViewState();
 
-        await SimulationRunner.StartAsync(CreateDemoConfig(CurrentAsset));
+        await SimulationRunner.StartAsync(CreateSessionConfig(CurrentAsset));
         UpdateRunSummary();
     }
 
@@ -644,6 +759,7 @@
         latestTick = tickResult;
         lastChartUpdate = receivedAt;
         UpdateRunSummary();
+        SyncCompositionFromRun(tickResult);
         UpdateMetricHistory(tickResult);
         UpdateChartSeries(tickResult, receivedAt);
         LoadPersistedCandles(selectedTimeframe);
@@ -1137,19 +1253,96 @@
                currentRunSummary.AssetType == CurrentAsset.Draft.AssetType;
     }
 
-    private static SimulationConfig CreateDemoConfig(ActiveAssetView asset) =>
+    private const int MaxAgentsPerType = 8;
+    private const int MinTotalAgents = 1;
+    private const int MaxTotalAgents = 32;
+
+    // Значения по умолчанию — ровно те, что были зашиты в конфиг до появления
+    // формы, чтобы поведение без вмешательства пользователя не изменилось.
+    // Стартовая позиция задаётся типом и в UI не выводится: её изменение
+    // поехало бы в базу расчёта P/L.
+    private readonly AgentCompositionRow[] agentComposition =
+    [
+        new(AgentType.TrendFollowing, 110_000m, 60m, "идёт за импульсом по двум средним"),
+        new(AgentType.CounterTrend, 110_000m, 60m, "торгует откаты к средней"),
+        new(AgentType.MarketMaker, 140_000m, 160m, "держит заявки по обе стороны"),
+        new(AgentType.NewsDriven, 105_000m, 55m, "ждёт первую новость, до неё неактивен")
+    ];
+
+    private Guid syncedCompositionRunId = Guid.Empty;
+
+    private int TotalAgentCount => agentComposition.Sum(row => row.Count);
+
+    private decimal TotalCompositionCapital => agentComposition.Sum(row => row.TotalCapital);
+
+    // Ноль агентов типа — допустимо, поэтому капитал проверяется только у тех
+    // строк, которые реально попадут в сессию.
+    private static bool HasCapitalError(AgentCompositionRow row) => row.Count > 0 && row.Capital <= 0m;
+
+    private bool IsCompositionValid =>
+        TotalAgentCount >= MinTotalAgents &&
+        TotalAgentCount <= MaxTotalAgents &&
+        agentComposition.All(row => row.Count >= 0 && row.Count <= MaxAgentsPerType && !HasCapitalError(row));
+
+    private void ChangeAgentCount(AgentCompositionRow row, int delta) =>
+        row.Count = Math.Clamp(row.Count + delta, 0, MaxAgentsPerType);
+
+    /// <summary>
+    /// Приводит форму к составу, которым реально идёт сессия: после перезагрузки
+    /// страницы посреди прогона форма иначе показывала бы значения по умолчанию,
+    /// а не то, чем торгуют на экране.
+    /// </summary>
+    private void SyncCompositionFromRun(SimulationTickResult tickResult)
+    {
+        var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty || syncedCompositionRunId == runId)
+        {
+            return;
+        }
+
+        syncedCompositionRunId = runId;
+
+        foreach (var row in agentComposition)
+        {
+            var live = tickResult.Agents.Where(agent => agent.Type == row.Type).ToArray();
+            row.Count = live.Length;
+
+            if (live.Length > 0)
+            {
+                row.Capital = Math.Round(live[0].InitialCash, 0, MidpointRounding.AwayFromZero);
+            }
+        }
+    }
+
+    private SimulationConfig CreateSessionConfig(ActiveAssetView asset) =>
         new(
             asset.Draft.Name,
             asset.Profile.Description,
             asset.Draft.AssetType,
             CalculateStartPrice(asset),
             TimeSpan.FromSeconds(1),
-            [
-                new AgentSpec(AgentType.MarketMaker, 140_000m, 160m),
-                new AgentSpec(AgentType.TrendFollowing, 110_000m, 60m),
-                new AgentSpec(AgentType.CounterTrend, 110_000m, 60m),
-                new AgentSpec(AgentType.NewsDriven, 105_000m, 55m)
-            ]);
+            agentComposition
+                .Where(row => row.Count > 0)
+                .SelectMany(row => Enumerable.Repeat(
+                    new AgentSpec(row.Type, row.Capital, row.DefaultPosition),
+                    row.Count))
+                .ToArray());
+
+    private sealed class AgentCompositionRow(
+        AgentType type,
+        decimal capital,
+        decimal defaultPosition,
+        string behaviour)
+    {
+        public AgentType Type { get; } = type;
+        public decimal DefaultPosition { get; } = defaultPosition;
+        public string Behaviour { get; } = behaviour;
+
+        public int Count { get; set; } = 1;
+        public decimal Capital { get; set; } = capital;
+
+        public decimal TotalCapital => Count * Capital;
+    }
 
     private static decimal CalculateStartPrice(ActiveAssetView asset)
     {
