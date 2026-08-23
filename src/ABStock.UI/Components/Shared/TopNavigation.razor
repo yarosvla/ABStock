@@ -119,7 +119,16 @@
         _ => $"{UnreadNotificationsCount} новых событий"
     };
 
-    protected override void OnInitialized() => SimulationRunner.OnTick += HandleSimulationTick;
+    protected override void OnInitialized()
+    {
+        SimulationRunner.OnTick += HandleSimulationTick;
+
+        // После остановки тики прекращаются, поэтому одной подписки на OnTick
+        // мало: статус навсегда застывал бы на «Торги активны».
+        SimulationRunner.OnStateChanged += HandleStateChanged;
+    }
+
+    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void ToggleNotifications() => IsNotificationsOpen = !IsNotificationsOpen;
 
@@ -129,7 +138,11 @@
 
     private void HandleSimulationTick(SimulationTickResult tick) => _ = InvokeAsync(StateHasChanged);
 
-    public void Dispose() => SimulationRunner.OnTick -= HandleSimulationTick;
+    public void Dispose()
+    {
+        SimulationRunner.OnTick -= HandleSimulationTick;
+        SimulationRunner.OnStateChanged -= HandleStateChanged;
+    }
 
     // Источника уведомлений в MVP нет, поэтому список пуст: раздел 16 запрещает
     // изобретать функциональность, а раздел 14 требует честного пустого состояния.
