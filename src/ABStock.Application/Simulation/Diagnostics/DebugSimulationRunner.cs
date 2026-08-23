@@ -86,6 +86,7 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
 
             _exchange = _exchangeEngineFactory.Create(config.StartPrice);
             _agents = _agentFactory.Create(config.Agents).ToList();
+            EnsureUniqueAgentNames(_agents);
             SetInitialPortfolioValue(_agents, config.StartPrice);
             var startedAt = DateTimeOffset.UtcNow;
             _currentRunId = _marketHistoryStore.StartRun(config, startedAt);
@@ -297,9 +298,12 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
         return tickResult;
     }
 
-    private string GetUniqueAgentNameLocked(string agentName)
+    private string GetUniqueAgentNameLocked(string agentName) =>
+        GetUniqueAgentName(_agents, agentName);
+
+    private static string GetUniqueAgentName(IReadOnlyList<ITradeAgent> existing, string agentName)
     {
-        if (_agents.All(agent => !string.Equals(agent.State.AgentName, agentName, StringComparison.Ordinal)))
+        if (existing.All(agent => !string.Equals(agent.State.AgentName, agentName, StringComparison.Ordinal)))
         {
             return agentName;
         }
@@ -311,9 +315,27 @@ public sealed class DebugSimulationRunner : ISimulationRunner, ISimulationDebugC
             candidate = $"{agentName}{index}";
             index++;
         }
-        while (_agents.Any(agent => string.Equals(agent.State.AgentName, candidate, StringComparison.Ordinal)));
+        while (existing.Any(agent => string.Equals(agent.State.AgentName, candidate, StringComparison.Ordinal)));
 
         return candidate;
+    }
+
+    /// <summary>
+    /// Имя агента зашито константой в классе стратегии, поэтому несколько
+    /// агентов одного типа получают одно имя. По имени агенты сопоставляются
+    /// в ApplyTradesToAgents, OrderFinancialGuard и AgentReservations —
+    /// на дубликатах ToDictionary бросает исключение, а резервы и сделки
+    /// достались бы не тому агенту. Разводим имена сразу при создании.
+    /// </summary>
+    private static void EnsureUniqueAgentNames(IReadOnlyList<ITradeAgent> agents)
+    {
+        var named = new List<ITradeAgent>(agents.Count);
+
+        foreach (var agent in agents)
+        {
+            agent.State.AgentName = GetUniqueAgentName(named, agent.State.AgentName);
+            named.Add(agent);
+        }
     }
 
     private static void ApplyTradesToAgents(
