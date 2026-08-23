@@ -21,407 +21,469 @@
 
 <PageTitle>Торги</PageTitle>
 
+@{
+    // Локальные хелперы разметки. Бизнес-логика и форматирование живут в @code —
+    // здесь только сопоставление значения с токеном оформления.
+    var isRunning = SimulationRunner.IsRunning;
+    var snapshot = latestTick?.Snapshot;
+    var chart = ChartSummary;
+    var book = OrderBookData;
+    var spread = Spread;
+    var status = Status;
+    var trades = RecentTrades;
+    var agents = latestTick?.Agents ?? [];
+    var isStale = latestTick is not null && (DateTimeOffset.Now - lastChartUpdate).TotalSeconds > 5;
+
+    static string Tone(string? changeClass) => changeClass switch
+    {
+        "positive" => "up",
+        "negative" => "down",
+        _ => "flat"
+    };
+
+    static string AgentTone(AgentType type) => type switch
+    {
+        AgentType.TrendFollowing => "agent-trend",
+        AgentType.CounterTrend => "agent-counter",
+        AgentType.MarketMaker => "agent-mm",
+        AgentType.NewsDriven => "agent-news",
+        _ => "muted"
+    };
+
+    static string NameTone(string agentName) =>
+        agentName.Contains("Trend", StringComparison.Ordinal) &&
+        !agentName.Contains("Counter", StringComparison.Ordinal) ? "agent-trend"
+        : agentName.Contains("Counter", StringComparison.Ordinal) ? "agent-counter"
+        : agentName.Contains("Maker", StringComparison.Ordinal) ? "agent-mm"
+        : agentName.Contains("News", StringComparison.Ordinal) ? "agent-news"
+        : "muted";
+
+    static string Kind(AgentType type) => type switch
+    {
+        AgentType.TrendFollowing => "трендовая стратегия",
+        AgentType.CounterTrend => "контр-трендовая стратегия",
+        AgentType.MarketMaker => "маркет-мейкинг",
+        AgentType.NewsDriven => "новостная стратегия",
+        _ => "стратегия"
+    };
+
+    // Счётная форма: 1 агент · 2 агента · 5 агентов.
+    static string Plural(int count, string one, string few, string many)
+    {
+        var mod100 = count % 100;
+        if (mod100 is >= 11 and <= 14)
+        {
+            return many;
+        }
+
+        return (count % 10) switch
+        {
+            1 => one,
+            2 or 3 or 4 => few,
+            _ => many
+        };
+    }
+
+    // Действие агента словами. Инфинитива нет — это констатация, не кнопка.
+    static string ActionLabel(TradeAction action) => action switch
+    {
+        TradeAction.Buy => "покупает",
+        TradeAction.Sell => "продаёт",
+        _ => "держит позицию"
+    };
+
+    static string ActionTone(TradeAction action) => action switch
+    {
+        TradeAction.Buy => "tone-up",
+        TradeAction.Sell => "tone-down",
+        _ => "tone-flat"
+    };
+
+    static string Dash(decimal? value) => value is null ? "—" : FormatPrice(value.Value);
+}
+
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
+
 <div class="trading-shell">
     <TopNavigation ActivePage="Trading" ShowClock="true" />
 
-    <main class="trading-main">
-        <header class="page-heading">
-            <div>
-                <p class="breadcrumbs">
-                    <a href="/create-asset">Создание актива</a>
-                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
-                    <span>Торги</span>
+    <main class="trading-page">
+
+        @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
+        <nav class="crumbs" aria-label="Навигационная цепочка">
+            <a href="/create-asset">Активы</a>
+            <Icon Name="chevron-right" Size="14" />
+            <span class="crumbs__asset">@CurrentAsset.Draft.Name<Icon Name="chevron-down" Size="14" /></span>
+            <Icon Name="chevron-right" Size="14" />
+            <span class="crumbs__current">Торги</span>
+        </nav>
+
+        @* ── PageHeader: H1 + одна строка контекста · до двух действий ───────── *@
+        <header class="page-head">
+            <div class="page-head__title">
+                <h1>Торги</h1>
+                <p class="page-head__context">
+                    @if (isRunning)
+                    {
+                        <text>Сессия идёт <span class="num-sm">@status.Elapsed</span> · агентов в работе <span class="num-sm">@agents.Count</span></text>
+                    }
+                    else
+                    {
+                        <text>Сессия остановлена · состав агентов задаётся до запуска</text>
+                    }
                 </p>
-                <h1>Экран торгов</h1>
-                <p>Следите за ценой, ликвидностью и последними сделками по активу @CurrentAsset.Draft.Name</p>
+            </div>
+            <div class="page-head__actions">
+                <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
+                @if (isRunning)
+                {
+                    <AppButton Variant="primary" OnClick="SimulationRunner.StopAsync">Остановить торги</AppButton>
+                }
+                else
+                {
+                    <AppButton Variant="primary" Icon="play" OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
+                }
             </div>
         </header>
 
-        <section class="trading-grid" aria-label="Рабочее место трейдера">
-            <div class="market-workspace">
-                <aside class="left-column">
-                    <section class="glass-card asset-card" aria-labelledby="asset-title">
-                        <div class="asset-head">
-                            <span class="asset-emblem" aria-hidden="true">
-                                <i class="bi @AssetIconClass"></i>
-                            </span>
-                            <div>
-                                <h2 id="asset-title">@CurrentAsset.Draft.Name</h2>
-                                <div class="asset-meta">
-                                    <span>@CurrentAsset.Symbol</span>
-                                    <span>@GetAssetTypeLabel(CurrentAsset.Draft.AssetType)</span>
-                                    <span>@CurrentAsset.Draft.Industry</span>
-                                </div>
-                                <p class="asset-state">
-                                    <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
-                                    @(CurrentAsset.IsFallback ? "Демо-контекст" : "Актив синхронизирован")
-                                </p>
+        @* ── Рабочая область: рельс 280 · центр · рельс 340 ──────────────────── *@
+        <div class="workspace">
+
+            @* ─────────── ЛЕВЫЙ РЕЛЬС ─────────── *@
+            <div class="rail rail--left">
+                <Panel Title="Сессия" Class="rise rise-1">
+                    <Meta><span class="num-sm">@CurrentAsset.Symbol</span></Meta>
+                    <ChildContent>
+                        <dl class="kv">
+                            <div class="kv__row">
+                                <dt>Цена открытия</dt>
+                                <dd class="num-sm">@chart.Open <span class="unit">₽</span></dd>
                             </div>
-                        </div>
-                        <p class="asset-description">@CurrentAsset.Profile.Description</p>
-                    </section>
-
-                    <section class="glass-card parameter-card" aria-labelledby="parameters-title">
-                        <h2 id="parameters-title">Параметры актива</h2>
-                        <dl class="parameter-list">
-                            @foreach (var parameter in AssetParameters)
-                            {
-                                <div>
-                                    <dt>@parameter.Label</dt>
-                                    <dd class="@parameter.ValueClass">@parameter.Value</dd>
-                                </div>
-                            }
+                            <div class="kv__row">
+                                <dt>Сделок</dt>
+                                <dd class="num-sm">@status.TradeCount</dd>
+                            </div>
+                            <div class="kv__row">
+                                <dt>Шаг симуляции</dt>
+                                <dd class="num-sm">@(latestTick is null ? "—" : latestTick.Tick.ToString())</dd>
+                            </div>
+                            <div class="kv__row">
+                                <dt>Ликвидность</dt>
+                                <dd class="num-sm">@status.Liquidity</dd>
+                            </div>
                         </dl>
-                    </section>
-                </aside>
+                    </ChildContent>
+                </Panel>
 
-                <section class="center-column">
-                    <div class="metrics-strip" aria-label="Ключевые рыночные показатели">
-                        @foreach (var metric in MarketMetrics)
-                        {
-                            <article class="glass-card metric-card @metric.Accent">
-                                <span>@metric.Label</span>
-                                <strong>@metric.Value</strong>
-                                <small>@metric.Detail</small>
-                                @if (metric.Accent == "volume")
-                                {
-                                    <svg class="volume-bars" viewBox="0 0 96 42" aria-hidden="true">
-                                        @foreach (var bar in metric.Bars)
-                                        {
-                                            <rect x="@bar.X" y="@bar.Y" width="@bar.Width" height="@bar.Height" rx="2" />
-                                        }
-                                    </svg>
-                                }
-                                else
-                                {
-                                    <svg class="sparkline-chart" viewBox="0 0 96 42" aria-hidden="true">
-                                        <polygon points="@metric.Projection" />
-                                        <polyline points="@metric.Sparkline" />
-                                    </svg>
-                                }
-                            </article>
-                        }
+                <Panel Title="События сессии" Class="rise rise-2" Flush="true">
+                    <Meta><span class="num-sm">0</span></Meta>
+                    <ChildContent>
+                        <EmptyState IconName="news"
+                                    Title="Новостей ещё не было"
+                                    Description="Рынок идёт на решениях трендового, контр-трендового агентов и маркет-мейкера. Новостной агент ждёт сигнала.">
+                            <Action>
+                                <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
+                            </Action>
+                        </EmptyState>
+                    </ChildContent>
+                </Panel>
+            </div>
+
+            @* ─────────── ЦЕНТР ─────────── *@
+            <div class="center">
+
+                @* Одна главная метрика + компактная строка показателей (раздел 9.1) *@
+                <section class="quote rise rise-1" aria-label="Текущая цена и показатели">
+                    <div class="quote__price">
+                        <div class="num-hero @(isStale ? "is-stale" : null)">@chart.Close <span class="unit">₽</span></div>
+                        <div class="quote__delta tone-@Tone(chart.ChangeClass)">
+                            <span class="num-sm">
+                                @(chart.ChangeClass == "positive" ? "↗" : chart.ChangeClass == "negative" ? "↘" : "·") @chart.Change
+                            </span>
+                            @if (isStale)
+                            {
+                                <span class="quote__stale">нет обновлений</span>
+                            }
+                        </div>
                     </div>
 
-                    @{
-                        var chartData = ChartSummary;
-                    }
-                    <section class="glass-card chart-card" aria-labelledby="chart-title">
-                        <div class="chart-toolbar">
-                            <div class="chart-topline">
-                                <div class="timeframe-row" aria-label="Таймфрейм">
-                                    @foreach (var item in Timeframes)
-                                    {
-                                        <button class="@(item.Key == selectedTimeframe ? "active" : null)" type="button"
-                                                @onclick="() => SelectTimeframe(item.Key)">@item.Label</button>
-                                    }
-                                </div>
-                                <span class="market-active"><i class="bi bi-record-circle"
-                                                                   aria-hidden="true"></i>@chartData.MarketState</span>
-                            </div>
+                    <div class="strip">
+                        <div class="strip__item"><span class="strip__label">откр</span><span class="num-sm">@chart.Open</span></div>
+                        <span class="strip__sep" aria-hidden="true"></span>
+                        <div class="strip__item"><span class="strip__label">макс</span><span class="num-sm">@chart.High</span></div>
+                        <span class="strip__sep" aria-hidden="true"></span>
+                        <div class="strip__item"><span class="strip__label">мин</span><span class="num-sm">@chart.Low</span></div>
+                        <span class="strip__sep" aria-hidden="true"></span>
+                        <div class="strip__item"><span class="strip__label">bid</span><span class="num-sm tone-up">@Dash(snapshot?.BestBid)</span></div>
+                        <div class="strip__item"><span class="strip__label">ask</span><span class="num-sm tone-down">@Dash(snapshot?.BestAsk)</span></div>
+                        <span class="strip__sep" aria-hidden="true"></span>
+                        <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@FormatQuantity(snapshot?.Volume ?? 0m)</span></div>
+                        <span class="strip__sep" aria-hidden="true"></span>
+                        <div class="strip__item"><span class="strip__label">участников</span><span class="num-sm">@status.Participants</span></div>
+                    </div>
+                </section>
 
-                            <div class="chart-header">
-                                <h2 id="chart-title">@CurrentAsset.Draft.Name · @selectedTimeframe · @CurrentAsset.Symbol</h2>
-                                <dl>
-                                    <div>
-                                        <dt>ОТКР</dt>
-                                        <dd>@chartData.Open</dd>
-                                    </div>
-                                    <div>
-                                        <dt>МАКС</dt>
-                                        <dd>@chartData.High</dd>
-                                    </div>
-                                    <div>
-                                        <dt>МИН</dt>
-                                        <dd>@chartData.Low</dd>
-                                    </div>
-                                    <div>
-                                        <dt>ЗАКР</dt>
-                                        <dd>@chartData.Close</dd>
-                                    </div>
-                                    <div>
-                                        <dt></dt>
-                                        <dd class="@chartData.ChangeClass">@chartData.Change</dd>
-                                    </div>
-                                </dl>
-                            </div>
+                @* Главная панель экрана — график *@
+                <Panel Class="chart-panel rise rise-2" Flush="true">
+                    <Head>
+                        <div class="chart-panel__id">
+                            <h2>@CurrentAsset.Draft.Name</h2>
+                            <span class="chip num-sm">@CurrentAsset.Symbol</span>
+                            <StatusDot Tone="@(isRunning ? "up" : "muted")" Live="isRunning">@(isRunning ? "Торги активны" : "Торги остановлены")</StatusDot>
                         </div>
-
-                        <div class="chart-stage-shell">
-                            <button class="chart-live-reset" type="button" hidden>
-                                <i class="bi bi-broadcast-pin" aria-hidden="true"></i>
-                                Live
-                            </button>
-                            <div class="chart-stage"
-                                 @ref="chartViewport"
-                                 tabindex="0"
+                        <Segmented TValue="string"
+                                   Label="Таймфрейм"
+                                   Items="@(Timeframes.Select(t => new SegmentedItem<string>(t.Key, t.Label)).ToArray())"
+                                   Value="@selectedTimeframe"
+                                   ValueChanged="SelectTimeframe" />
+                    </Head>
+                    <ChildContent>
+                        <div class="chart-body">
+                            <div class="chart-stage" @ref="chartViewport" tabindex="0"
                                  aria-label="Свечной график цены @CurrentAsset.Draft.Name">
-                                <div class="chart-surface" role="img" aria-label="Биржевой график цены @CurrentAsset.Draft.Name"></div>
-                                <div class="chart-hover-legend" aria-live="polite">
-                                    <span class="chart-hover-time" data-role="time">Нет данных</span>
+                                <div class="chart-surface" role="img"
+                                     aria-label="Биржевой график цены @CurrentAsset.Draft.Name"></div>
+
+                                <div class="chart-hover-legend glass" aria-live="polite">
+                                    <span class="chart-hover-time num-xs" data-role="time">Нет данных</span>
                                     <div class="chart-hover-values">
-                                        <span><small>O</small><strong data-role="open">-</strong></span>
-                                        <span><small>H</small><strong data-role="high">-</strong></span>
-                                        <span><small>L</small><strong data-role="low">-</strong></span>
-                                        <span><small>C</small><strong data-role="close">-</strong></span>
+                                        <span><small>откр</small><strong class="num-sm" data-role="open">—</strong></span>
+                                        <span><small>макс</small><strong class="num-sm" data-role="high">—</strong></span>
+                                        <span><small>мин</small><strong class="num-sm" data-role="low">—</strong></span>
+                                        <span><small>закр</small><strong class="num-sm" data-role="close">—</strong></span>
                                     </div>
                                 </div>
+
+                                <button class="chart-live-reset" type="button" hidden>
+                                    <Icon Name="activity" Size="14" />
+                                    <span>К текущей цене</span>
+                                </button>
+
                                 <div class="chart-empty-state">Нет данных</div>
                             </div>
+
+                            <footer class="chart-foot">
+                                <a class="chart-foot__credit" href="https://www.tradingview.com/"
+                                   target="_blank" rel="noreferrer noopener">
+                                    TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc.
+                                </a>
+                                <span class="num-xs">@chart.UpdatedAt</span>
+                            </footer>
                         </div>
+                    </ChildContent>
+                </Panel>
 
-                        <footer class="chart-footer">
-                            <a class="chart-attribution"
-                               href="https://www.tradingview.com/"
-                               target="_blank"
-                               rel="noreferrer noopener">
-                                TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc.
-                            </a>
-                            <span>@chartData.UpdatedAt</span>
-                        </footer>
-                    </section>
-                </section>
-
-                <aside class="right-column">
-                    @{
-                        var orderBook = OrderBookData;
-                        var spread = Spread;
-                    }
-                    <section class="glass-card order-book" aria-labelledby="book-title">
-                        <div class="panel-heading">
-                            <div class="book-title-block">
-                                <h2 id="book-title">Стакан</h2>
-                                <p>Лучшие цены и глубина рынка</p>
-                            </div>
-                            <div class="book-spread-meta">
-                                <strong>@spread.Value</strong>
-                                <small>@spread.Detail</small>
-                            </div>
-                        </div>
-                        <div class="book-head">
-                            <span class="book-cell-price">Цена (₽)</span>
-                            <span class="book-cell-volume">Объём (шт.)</span>
-                            <span class="book-cell-total">Сумма (шт.)</span>
-                        </div>
-
-                        <div class="book-side sells">
-                            @foreach (var row in orderBook.Asks)
-                            {
-                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
-                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                    <strong class="book-cell-price">@row.Price</strong>
-                                    <span class="book-cell-volume">@row.Volume</span>
-                                    <span class="book-cell-total">@row.Total</span>
-                                </div>
-                            }
-                        </div>
-
-                        <div class="book-side buys">
-                            @foreach (var row in orderBook.Bids)
-                            {
-                                <div class="book-row @(row.IsEmpty ? "empty" : null)">
-                                    <span class="book-row-depth" style="@row.DepthStyle"></span>
-                                    <strong class="book-cell-price">@row.Price</strong>
-                                    <span class="book-cell-volume">@row.Volume</span>
-                                    <span class="book-cell-total">@row.Total</span>
-                                </div>
-                            }
-                        </div>
-                    </section>
-
-                    <section class="glass-card trades-card" aria-labelledby="trades-title">
-                        <h2 id="trades-title">Последние сделки</h2>
-                        <div class="trade-head">
-                            <span>Время</span>
-                            <span>Цена (₽)</span>
-                            <span>Объём (шт.)</span>
-                            <span>Контрагенты</span>
-                        </div>
-                        <div class="trade-list">
-                            @foreach (var trade in RecentTrades)
-                            {
-                                <div class="trade-row @trade.SideClass">
-                                    <span>@trade.Time</span>
-                                    <strong>@trade.Price</strong>
-                                    <span>@trade.Volume</span>
-                                    <div class="trade-participants" title="@($"{trade.Buyer} / {trade.Seller}")">
-                                        <span>@trade.Buyer</span>
-                                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
-                                        <span>@trade.Seller</span>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-                    </section>
-                </aside>
-
-                @{
-                    var status = Status;
-                }
-                <section class="glass-card status-strip" aria-label="Показатели рынка">
-                    <div class="status-metric">
-                        <small>С момента запуска</small>
-                        <strong class="positive">@status.Elapsed</strong>
-                    </div>
-                    <div class="status-metric">
-                        <small>Количество сделок</small>
-                        <strong>@status.TradeCount</strong>
-                    </div>
-                    <div class="status-metric">
-                        <small>Участников</small>
-                        <strong>@status.Participants</strong>
-                    </div>
-                    <div class="status-metric status-range">
-                        <small>Дневной диапазон</small>
-                        <strong>@status.Range</strong>
-                        <div class="range-track" aria-hidden="true">
-                            <span></span>
-                            <i style="@status.RangeMarkerStyle"></i>
-                        </div>
-                    </div>
-                    <div class="status-metric status-liquidity">
-                        <small>Ликвидность</small>
-                        <strong class="@status.LiquidityClass">@status.Liquidity</strong>
-                        <span>@status.LiquidityDetail</span>
-                    </div>
-
-                    <a class="portfolio-button status-cta" href="/news">
-                        <i class="bi bi-newspaper" aria-hidden="true"></i>
-                        <div>
-                            <strong>Добавить новость</strong>
-                            <span>Передать live-сигнал в симуляцию</span>
-                        </div>
-                    </a>
-                </section>
-
-                @if (DebugControl is not null)
-                {
-                    <details class="glass-card debug-accordion">
-                        <summary class="debug-summary">
-                            <span>
-                                <strong id="debug-title">Debug</strong>
-                                <small>Dev-only инструменты и сценарии</small>
-                            </span>
-                            <em>@(string.IsNullOrWhiteSpace(debugMessage) ? "Закрыто" : debugMessage)</em>
-                        </summary>
-
-                        <div class="debug-panel">
-                            <div class="debug-grid">
-                                <div class="debug-group">
-                                    <label>
-                                        Участник
-                                        <input @bind="debugAgentName" />
-                                    </label>
-                                    <label>
-                                        Сторона
-                                        <select @bind="debugOrderSide">
-                                            <option value="@OrderSide.Buy">Buy</option>
-                                            <option value="@OrderSide.Sell">Sell</option>
-                                        </select>
-                                    </label>
-                                    <label>
-                                        Тип
-                                        <select @bind="debugOrderType">
-                                            <option value="@OrderType.Limit">Limit</option>
-                                            <option value="@OrderType.Market">Market</option>
-                                        </select>
-                                    </label>
-                                    <label>
-                                        Цена
-                                        <input type="number" step="0.01" disabled="@(debugOrderType == OrderType.Market)" @bind="debugOrderPrice" />
-                                    </label>
-                                    <label>
-                                        Кол-во
-                                        <input type="number" step="0.01" min="0.01" @bind="debugOrderQuantity" />
-                                    </label>
-                                    <button type="button" @onclick="SubmitDebugOrder">Добавить заявку</button>
-                                </div>
-
-                                <div class="debug-group">
-                                    <label>
-                                        Агент
-                                        <select @bind="debugAgentType">
-                                            <option value="@AgentType.MarketMaker">MarketMaker</option>
-                                            <option value="@AgentType.TrendFollowing">TrendFollowing</option>
-                                            <option value="@AgentType.CounterTrend">CounterTrend</option>
-                                            <option value="@AgentType.NewsDriven">NewsDriven</option>
-                                        </select>
-                                    </label>
-                                    <label>
-                                        Cash
-                                        <input type="number" step="100" min="0" @bind="debugAgentCash" />
-                                    </label>
-                                    <label>
-                                        Position
-                                        <input type="number" step="1" min="0" @bind="debugAgentPosition" />
-                                    </label>
-                                    <button type="button" @onclick="AddDebugAgent">Добавить агента</button>
-                                </div>
-                            </div>
-
-                            <div class="debug-scenarios">
-                                <div class="debug-scenarios-head">
-                                    <strong>Сценарии рынка</strong>
-                                    <span>Быстрые пресеты для красивого движения графика и проверки стакана</span>
-                                </div>
-                                <div class="debug-scenario-buttons">
-                                    <button type="button"
-                                            class="scenario-button bullish"
-                                            disabled="@isRunningDebugScenario"
-                                            @onclick="RunBullishScenarioAsync">
-                                        <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
-                                        <span>Рост</span>
-                                    </button>
-                                    <button type="button"
-                                            class="scenario-button bearish"
-                                            disabled="@isRunningDebugScenario"
-                                            @onclick="RunSelloffScenarioAsync">
-                                        <i class="bi bi-graph-down-arrow" aria-hidden="true"></i>
-                                        <span>Sell-off</span>
-                                    </button>
-                                    <button type="button"
-                                            class="scenario-button reversal"
-                                            disabled="@isRunningDebugScenario"
-                                            @onclick="RunReversalScenarioAsync">
-                                        <i class="bi bi-arrow-left-right" aria-hidden="true"></i>
-                                        <span>Разворот</span>
-                                    </button>
-                                    <button type="button"
-                                            class="scenario-button stop"
-                                            disabled="@(!isRunningDebugScenario)"
-                                            @onclick="StopDebugScenario">
-                                        <i class="bi bi-stop-circle" aria-hidden="true"></i>
-                                        <span>Стоп</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div class="debug-agents">
-                                <div class="debug-agents-head">
-                                    <span>Имя</span>
-                                    <span>Тип</span>
-                                    <span>Cash</span>
-                                    <span>Position</span>
-                                    <span>Value</span>
-                                </div>
-                                @foreach (var agent in latestTick?.Agents ?? [])
+                @* Агенты: действие и объяснение — то, ради чего выбрана эта компоновка *@
+                <Panel Title="Агенты" Class="rise rise-3" Flush="true">
+                    <Meta>
+                        @if (isRunning)
+                        {
+                            <text>@agents.Count в работе · @chart.UpdatedAt.ToLowerInvariant()</text>
+                        }
+                        else
+                        {
+                            <text>торги остановлены</text>
+                        }
+                    </Meta>
+                    <ChildContent>
+                        @if (latestTick is null)
+                        {
+                            <div class="agents__skeleton">
+                                @for (var i = 0; i < 4; i++)
                                 {
-                                    <div class="debug-agent-row">
-                                        <strong>@agent.Name</strong>
-                                        <span>@agent.Type</span>
-                                        <span>@FormatMoney(agent.Cash)</span>
-                                        <span>@FormatQuantity(agent.Position)</span>
-                                        <span>@FormatMoney(agent.PortfolioValue)</span>
+                                    <div class="agents__skeleton-row">
+                                        <Skeleton Width="160px" Height="14px" />
+                                        <Skeleton Width="88px" Height="12px" />
+                                        <Skeleton Width="72px" Height="12px" />
+                                        <Skeleton Width="220px" Height="12px" />
                                     </div>
                                 }
                             </div>
+                        }
+                        else
+                        {
+                            // Решение на тип берём от первого агента типа: внутри типа
+                            // стратегия одна, а объяснение формулирует именно её.
+                            var decisionsByAgent = (latestTick.Decisions ?? [])
+                                .GroupBy(d => d.AgentName, StringComparer.Ordinal)
+                                .ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
+
+                            var groups = agents
+                                .GroupBy(a => a.Type)
+                                .Select(g => new
+                                {
+                                    Type = g.Key,
+                                    Count = g.Count(),
+                                    Cash = g.Sum(a => a.Cash),
+                                    Position = g.Sum(a => a.Position),
+                                    Value = g.Sum(a => a.PortfolioValue),
+                                    Decision = g
+                                        .Select(a => decisionsByAgent.GetValueOrDefault(a.Name))
+                                        .FirstOrDefault(d => d is not null)
+                                })
+                                .OrderByDescending(g => g.Value)
+                                .ToArray();
+
+                            <div class="agents-wrap">
+                            <table class="agents">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="label agents__c-name">Агент</th>
+                                        <th scope="col" class="label agents__c-num">Деньги</th>
+                                        <th scope="col" class="label agents__c-num">Позиция</th>
+                                        <th scope="col" class="label agents__c-num">Стоимость</th>
+                                        <th scope="col" class="label agents__c-why">Действие и объяснение</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var g in groups)
+                                    {
+                                        <tr>
+                                            <th scope="row" class="agents__c-name">
+                                                <span class="agents__cell">
+                                                <StatusDot Tone="@AgentTone(g.Type)" />
+                                                <span class="agents__name">
+                                                    <span class="agents__title">@AgentDisplay.GetTypeLabel(g.Type) ×@g.Count</span>
+                                                    <span class="agents__kind">@Kind(g.Type)</span>
+                                                </span>
+                                                </span>
+                                            </th>
+                                            <td class="agents__c-num num-sm">@FormatQuantity(g.Cash)</td>
+                                            <td class="agents__c-num num-sm @(g.Position > 0m ? "tone-up" : g.Position < 0m ? "tone-down" : null)">@FormatQuantity(g.Position)</td>
+                                            <td class="agents__c-num num">@FormatQuantity(g.Value)</td>
+                                            <td class="agents__c-why">
+                                                @if (g.Decision is null)
+                                                {
+                                                    <span class="nodata">—</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="agents__why">
+                                                        <span class="agents__why-act @ActionTone(g.Decision.Action)">@ActionLabel(g.Decision.Action)</span>
+                                                        <span class="agents__why-reason">@g.Decision.Explanation</span>
+                                                    </span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th scope="row" class="agents__c-name">Итого · @agents.Count @Plural(agents.Count, "агент", "агента", "агентов")</th>
+                                        <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Cash))</td>
+                                        <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Position))</td>
+                                        <td class="agents__c-num num">@FormatQuantity(agents.Sum(a => a.PortfolioValue))</td>
+                                        <td class="agents__c-why">@string.Join(" + ", groups.Select(g => g.Count))</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            </div>
+                        }
+                    </ChildContent>
+                </Panel>
+            </div>
+
+            @* ─────────── ПРАВЫЙ РЕЛЬС ─────────── *@
+            <div class="rail rail--right">
+
+                <Panel Title="Стакан заявок" Class="rise rise-2" Flush="true">
+                    <ChildContent>
+                        @if (!isRunning && latestTick is null)
+                        {
+                            <EmptyState IconName="book"
+                                        Title="Заявок нет"
+                                        Description="Торги остановлены — агенты сняли открытые заявки. Стакан наполнится после запуска сессии.">
+                                <Action>
+                                    <AppButton Variant="primary" Icon="play" OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
+                                </Action>
+                            </EmptyState>
+                        }
+                        else
+                        {
+                            <div class="book">
+                                <div class="book__head">
+                                    <span class="label">Цена</span>
+                                    <span class="label book__c-vol">Объём</span>
+                                    <span class="label book__c-sum">Сумма</span>
+                                </div>
+
+                                <div class="book__side">
+                                    @foreach (var row in book.Asks.TakeLast(7))
+                                    {
+                                        <div class="book__row @(row.IsEmpty ? "is-empty" : null)">
+                                            <span class="book__bar book__bar--ask" style="@row.DepthStyle" aria-hidden="true"></span>
+                                            <span class="num-sm book__c-price tone-down">@row.Price</span>
+                                            <span class="num-sm book__c-vol">@row.Volume</span>
+                                            <span class="num-sm book__c-sum">@row.Total</span>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="book__spread">
+                                    <span>спред <span class="num-sm">@(snapshot?.BestAsk is { } a2 && snapshot.BestBid is { } b2 ? FormatPrice(a2 - b2) : "—") ₽</span></span>
+                                    <span>мид <span class="num-sm">@(snapshot?.BestAsk is { } a3 && snapshot.BestBid is { } b3 ? FormatPrice((a3 + b3) / 2m) : "—") ₽</span></span>
+                                </div>
+
+                                <div class="book__side">
+                                    @foreach (var row in book.Bids.Take(7))
+                                    {
+                                        <div class="book__row @(row.IsEmpty ? "is-empty" : null)">
+                                            <span class="book__bar book__bar--bid" style="@row.DepthStyle" aria-hidden="true"></span>
+                                            <span class="num-sm book__c-price tone-up">@row.Price</span>
+                                            <span class="num-sm book__c-vol">@row.Volume</span>
+                                            <span class="num-sm book__c-sum">@row.Total</span>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </ChildContent>
+                </Panel>
+
+                <Panel Title="Лента сделок" Class="tape-panel rise rise-3" Flush="true">
+                    <Meta>
+                        @if (trades.Length == 0)
+                        {
+                            <text>нет сделок</text>
+                        }
+                        else
+                        {
+                            <text>последние <span class="num-sm">@trades.Length</span></text>
+                        }
+                    </Meta>
+                    <ChildContent>
+                        <div class="tape">
+                            <div class="tape__list">
+                                @foreach (var trade in trades)
+                                {
+                                    <div class="tape__row" title="@trade.Buyer ← @trade.Seller">
+                                        <span class="num-xs tape__time">@trade.Time</span>
+                                        <span class="num-sm @(trade.SideClass == "buy" ? "tone-up" : "tone-down")">
+                                            @(trade.SideClass == "buy" ? "↗" : "↘") @trade.Price
+                                        </span>
+                                        <span class="num-sm tape__qty">@trade.Volume</span>
+                                        <span class="tape__pair">
+                                            <StatusDot Tone="@NameTone(trade.Buyer)" />
+                                            <span class="num-xs tape__arrow">←</span>
+                                            <StatusDot Tone="@NameTone(trade.Seller)" />
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="tape__legend">
+                                <StatusDot Tone="agent-trend">Трендовый</StatusDot>
+                                <StatusDot Tone="agent-counter">Контр-тренд</StatusDot>
+                                <StatusDot Tone="agent-mm">Маркет-мейкер</StatusDot>
+                                <StatusDot Tone="agent-news">Новостной</StatusDot>
+                            </div>
                         </div>
-                    </details>
-                }
+                    </ChildContent>
+                </Panel>
             </div>
-        </section>
-                </main>
-            </div>
+        </div>
+    </main>
+</div>
 
 @code {
     private static readonly TimeframeDefinition[] Timeframes =
