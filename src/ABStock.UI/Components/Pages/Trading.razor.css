@@ -309,13 +309,13 @@
 
 .agents__c-name { width: 200px; }
 .agents__c-num { width: 130px; text-align: right; }
-.agents__c-why { padding-left: var(--s-8); min-width: 0; }
+.agents__c-why { padding-left: var(--s-6); min-width: 0; }
 
 /* Колонка объяснения не должна схлопываться: она — причина этой компоновки.
    На узких экранах ужимаются имя и числа, а не объяснение. */
 @media (max-width: 1599px) {
-    .agents__c-name { width: 168px; }
-    .agents__c-num { width: 104px; }
+    .agents__c-name { width: 164px; }
+    .agents__c-num { width: 92px; }
     .agents__c-why { padding-left: var(--s-4); }
 }
 
@@ -330,7 +330,7 @@
 
 .agents__name { display: flex; flex-direction: column; min-width: 0; }
 .agents__why { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.agents__why-act { color: var(--text-1); }
+.agents__why-act { color: var(--text-1); white-space: nowrap; }
 
 /* Объяснение — ровно одна строка. Перенос менял бы высоту строки на каждом
    тике, а это запрещённая разделом 12 анимация, двигающая layout.
@@ -342,6 +342,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.agents__title,
+.agents__kind {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .agents__title { font: var(--t-h3); color: var(--text-1); }
 .agents__kind { font: var(--t-caption); color: var(--text-4); }
 .agents__c-num.num-sm { color: var(--text-2); }

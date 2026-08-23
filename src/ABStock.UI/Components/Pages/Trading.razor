@@ -343,7 +343,6 @@
                                         <th scope="col" class="label agents__c-num">Деньги</th>
                                         <th scope="col" class="label agents__c-num">Позиция</th>
                                         <th scope="col" class="label agents__c-num">P/L</th>
-                                        <th scope="col" class="label agents__c-num">Стоимость</th>
                                         <th scope="col" class="label agents__c-why">Действие и объяснение</th>
                                     </tr>
                                 </thead>
@@ -363,7 +362,6 @@
                                             <td class="agents__c-num num-sm">@FormatQuantity(g.Cash)</td>
                                             <td class="agents__c-num num-sm @(g.Position > 0m ? "tone-up" : g.Position < 0m ? "tone-down" : null)">@FormatQuantity(g.Position)</td>
                                             <td class="agents__c-num num-sm @DeltaTone(g.Pnl)">@Signed(g.Pnl)</td>
-                                            <td class="agents__c-num num">@FormatQuantity(g.Value)</td>
                                             <td class="agents__c-why">
                                                 @if (g.Decision is null)
                                                 {
@@ -386,7 +384,6 @@
                                         <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Cash))</td>
                                         <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Position))</td>
                                         <td class="agents__c-num num-sm @DeltaTone(agents.Sum(a => a.PortfolioValue - a.InitialPortfolioValue))">@Signed(agents.Sum(a => a.PortfolioValue - a.InitialPortfolioValue))</td>
-                                        <td class="agents__c-num num">@FormatQuantity(agents.Sum(a => a.PortfolioValue))</td>
                                         <td class="agents__c-why">@string.Join(" + ", groups.Select(g => g.Count))</td>
                                     </tr>
                                 </tfoot>
