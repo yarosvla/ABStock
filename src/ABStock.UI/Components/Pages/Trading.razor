@@ -99,6 +99,16 @@
         _ => "tone-flat"
     };
 
+    // Дельта со знаком; минус — U+2212, а не дефис (раздел 10).
+    static string Signed(decimal value) => value > 0m
+        ? "+" + FormatQuantity(value)
+        : value < 0m
+            ? "\u2212" + FormatQuantity(Math.Abs(value))
+            : FormatQuantity(0m);
+
+    static string DeltaTone(decimal value) =>
+        value > 0m ? "tone-up" : value < 0m ? "tone-down" : "tone-flat";
+
     static string Dash(decimal? value) => value is null ? "—" : FormatPrice(value.Value);
 }
 
@@ -317,6 +327,7 @@
                                     Cash = g.Sum(a => a.Cash),
                                     Position = g.Sum(a => a.Position),
                                     Value = g.Sum(a => a.PortfolioValue),
+                                    Pnl = g.Sum(a => a.PortfolioValue - a.InitialPortfolioValue),
                                     Decision = g
                                         .Select(a => decisionsByAgent.GetValueOrDefault(a.Name))
                                         .FirstOrDefault(d => d is not null)
@@ -331,6 +342,7 @@
                                         <th scope="col" class="label agents__c-name">Агент</th>
                                         <th scope="col" class="label agents__c-num">Деньги</th>
                                         <th scope="col" class="label agents__c-num">Позиция</th>
+                                        <th scope="col" class="label agents__c-num">P/L</th>
                                         <th scope="col" class="label agents__c-num">Стоимость</th>
                                         <th scope="col" class="label agents__c-why">Действие и объяснение</th>
                                     </tr>
@@ -350,6 +362,7 @@
                                             </th>
                                             <td class="agents__c-num num-sm">@FormatQuantity(g.Cash)</td>
                                             <td class="agents__c-num num-sm @(g.Position > 0m ? "tone-up" : g.Position < 0m ? "tone-down" : null)">@FormatQuantity(g.Position)</td>
+                                            <td class="agents__c-num num-sm @DeltaTone(g.Pnl)">@Signed(g.Pnl)</td>
                                             <td class="agents__c-num num">@FormatQuantity(g.Value)</td>
                                             <td class="agents__c-why">
                                                 @if (g.Decision is null)
@@ -372,6 +385,7 @@
                                         <th scope="row" class="agents__c-name">Итого · @agents.Count @Plural(agents.Count, "агент", "агента", "агентов")</th>
                                         <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Cash))</td>
                                         <td class="agents__c-num num-sm">@FormatQuantity(agents.Sum(a => a.Position))</td>
+                                        <td class="agents__c-num num-sm @DeltaTone(agents.Sum(a => a.PortfolioValue - a.InitialPortfolioValue))">@Signed(agents.Sum(a => a.PortfolioValue - a.InitialPortfolioValue))</td>
                                         <td class="agents__c-num num">@FormatQuantity(agents.Sum(a => a.PortfolioValue))</td>
                                         <td class="agents__c-why">@string.Join(" + ", groups.Select(g => g.Count))</td>
                                     </tr>
