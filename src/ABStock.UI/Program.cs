@@ -4,6 +4,17 @@ using ABStock.Persistence.Extensions;
 using ABStock.UI.Components;
 using ABStock.UI.Services;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
+using System.Globalization;
+
+// Язык интерфейса — ru-RU: запятая как дробный разделитель (DESIGN.md 10).
+// Групповой разделитель заменён на узкий неразрывный пробел (U+202F) вместо
+// обычного неразрывного, которого требует раздел 10 для разрядов: 1 324 500.
+var uiCulture = (CultureInfo)CultureInfo.GetCultureInfo("ru-RU").Clone();
+uiCulture.NumberFormat.NumberGroupSeparator = "\u202F";
+uiCulture.NumberFormat.CurrencyGroupSeparator = "\u202F";
+uiCulture.NumberFormat.PercentGroupSeparator = "\u202F";
+CultureInfo.DefaultThreadCurrentCulture = uiCulture;
+CultureInfo.DefaultThreadCurrentUICulture = uiCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);

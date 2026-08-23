@@ -6,6 +6,11 @@ import {
 } from "/lib/lightweight-charts/lightweight-charts.standalone.production.mjs";
 
 const FOLLOW_THRESHOLD_PX = 24;
+
+// Высота ценовой метки: соседняя метка шкалы, попавшая в этот зазор,
+// скрывается, чтобы не наезжать на метку текущей цены.
+const PRICE_LABEL_GUARD_PX = 14;
+
 const controllers = new WeakMap();
 
 const timeframeConfig = {
@@ -65,15 +70,14 @@ function normalizePoint(point) {
         return null;
     }
 
+    // Цвет свечи задаётся темой серии (раздел 11), а не полями точки:
+    // payload несёт наследные значения, которые палитре не соответствуют.
     return {
         time: point.time ?? point.Time,
         open: point.open ?? point.Open,
         high: point.high ?? point.High,
         low: point.low ?? point.Low,
-        close: point.close ?? point.Close,
-        color: point.color ?? point.Color,
-        borderColor: point.borderColor ?? point.BorderColor,
-        wickColor: point.wickColor ?? point.WickColor
+        close: point.close ?? point.Close
     };
 }
 
@@ -126,6 +130,39 @@ function setLegendValues(controller, candle) {
     closeElement.textContent = toLegendText(candle.close);
 }
 
+// Ширина «мёртвой зоны» вокруг текущей цены в ценовых единицах: столько,
+// сколько занимает PRICE_LABEL_GUARD_PX пикселей на текущем масштабе шкалы.
+function recomputeLabelGuard(controller) {
+    const lastPoint = controller.data.length > 0 ? controller.data[controller.data.length - 1] : null;
+
+    if (!lastPoint || lastPoint.close === null || lastPoint.close === undefined) {
+        controller.labelGuard = null;
+        return;
+    }
+
+    const price = Number(lastPoint.close);
+    const coordinate = controller.series.priceToCoordinate(price);
+
+    if (coordinate === null || coordinate === undefined) {
+        controller.labelGuard = null;
+        return;
+    }
+
+    const neighbour = controller.series.coordinateToPrice(coordinate - PRICE_LABEL_GUARD_PX);
+
+    if (neighbour === null || neighbour === undefined) {
+        controller.labelGuard = null;
+        return;
+    }
+
+    controller.labelGuard = { price, epsilon: Math.abs(Number(neighbour) - price) };
+}
+
+function setCrosshairActive(controller, active) {
+    controller.crosshairActive = active;
+    controller.legend?.classList.toggle("is-active", active);
+}
+
 function updateEmptyState(controller) {
     if (!controller.emptyState) {
         return;
@@ -141,15 +178,19 @@ function refreshLegend(controller) {
 
 function handleCrosshairMove(controller, param) {
     if (!param) {
+        setCrosshairActive(controller, false);
         refreshLegend(controller);
         return;
     }
 
     const seriesPoint = param.seriesData?.get(controller.series);
     if (!seriesPoint || param.time === undefined || param.time === null) {
+        setCrosshairActive(controller, false);
         refreshLegend(controller);
         return;
     }
+
+    setCrosshairActive(controller, true);
 
     setLegendValues(controller, {
         time: typeof param.time === "number" ? param.time : seriesPoint.time,
@@ -258,6 +299,7 @@ function replaceData(controller, data, forceScrollToRealtime, fitContent) {
 
     requestAnimationFrame(() => {
         ensureViewport(controller, { forceScrollToRealtime, fitContent });
+        recomputeLabelGuard(controller);
     });
 }
 
@@ -280,6 +322,7 @@ function updateLatestPoint(controller, point, forceScrollToRealtime) {
 
     requestAnimationFrame(() => {
         ensureViewport(controller, { forceScrollToRealtime });
+        recomputeLabelGuard(controller);
     });
 }
 
@@ -294,39 +337,63 @@ export function register(root) {
     }
 
     const initialSize = getCanvasSize(surface);
+
+    // Замыкание на контроллер: форматтер шкалы создаётся раньше самого контроллера.
+    const scope = { controller: null };
+
+    const axisPriceFormatter = value => {
+        const controller = scope.controller;
+        const guard = controller?.labelGuard;
+
+        // Пока активен кроссхейр, метки шкалы не прячем: подпись кроссхейра
+        // сама забирает на себя внимание, а её blanking читался бы как баг.
+        if (guard && !controller.crosshairActive &&
+            value !== guard.price &&
+            Math.abs(value - guard.price) < guard.epsilon) {
+            return "";
+        }
+
+        return priceFormatter.format(value);
+    };
+
     const chart = createChart(surface, {
         width: initialSize.width,
         height: initialSize.height,
         autoSize: false,
         layout: {
-            background: { type: ColorType.Solid, color: "#0d1524" },
-            textColor: "#8ea0ba",
-            fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            background: { type: ColorType.Solid, color: "transparent" },
+            textColor: "#7C8288",
+            fontFamily: "'JetBrains Mono', ui-monospace, 'SF Mono', monospace",
+            fontSize: 11,
             attributionLogo: false
+        },
+        localization: {
+            locale: "ru-RU",
+            priceFormatter: axisPriceFormatter
         },
         grid: {
             vertLines: {
-                color: "rgba(142, 160, 186, 0.09)",
+                color: "rgba(255, 255, 255, 0.03)",
                 style: LineStyle.Solid
             },
             horzLines: {
-                color: "rgba(142, 160, 186, 0.11)",
+                color: "rgba(255, 255, 255, 0.03)",
                 style: LineStyle.Solid
             }
         },
         crosshair: {
-            mode: CrosshairMode.MagnetOHLC,
+            mode: CrosshairMode.Magnet,
             vertLine: {
-                color: "rgba(85, 199, 255, 0.36)",
+                color: "rgba(255, 255, 255, 0.28)",
                 style: LineStyle.Dashed,
                 width: 1,
-                labelBackgroundColor: "#18263d"
+                labelBackgroundColor: "#292C30"
             },
             horzLine: {
-                color: "rgba(124, 92, 255, 0.34)",
+                color: "rgba(255, 255, 255, 0.28)",
                 style: LineStyle.Dashed,
                 width: 1,
-                labelBackgroundColor: "#18263d"
+                labelBackgroundColor: "#292C30"
             }
         },
         handleScroll: {
@@ -344,17 +411,21 @@ export function register(root) {
             pinch: false
         },
         rightPriceScale: {
-            borderVisible: false,
+            borderVisible: true,
+            borderColor: "rgba(255, 255, 255, 0.055)",
             scaleMargins: {
-                top: 0.06,
-                bottom: 0.02
+                top: 0.12,
+                bottom: 0.12
             }
         },
         leftPriceScale: {
             visible: false
         },
         timeScale: {
-            borderVisible: false,
+            borderVisible: true,
+            borderColor: "rgba(255, 255, 255, 0.055)",
+            timeVisible: true,
+            secondsVisible: true,
             rightOffset: 0,
             lockVisibleTimeRangeOnResize: true,
             rightBarStaysOnScroll: false,
@@ -365,13 +436,16 @@ export function register(root) {
     });
 
     const series = chart.addCandlestickSeries({
-        upColor: "#36d98a",
-        downColor: "#ff6b5f",
-        borderUpColor: "#36d98a",
-        borderDownColor: "#ff6b5f",
-        wickUpColor: "#65f1ab",
-        wickDownColor: "#ff8a80",
-        priceLineVisible: false,
+        upColor: "#3FA37A",
+        downColor: "#D2555F",
+        borderVisible: false,
+        wickUpColor: "rgba(63, 163, 122, 0.55)",
+        wickDownColor: "rgba(210, 85, 95, 0.55)",
+        // Линия текущей цены — пунктир с ценовой меткой на шкале.
+        priceLineVisible: true,
+        priceLineColor: "rgba(255, 255, 255, 0.45)",
+        priceLineStyle: LineStyle.Dashed,
+        priceLineWidth: 1,
         lastValueVisible: true
     });
 
@@ -388,11 +462,15 @@ export function register(root) {
         data: [],
         followRealtime: true,
         hasViewport: false,
+        crosshairActive: false,
+        labelGuard: null,
         resizeObserver: null,
         visibleRangeHandler: null,
         crosshairHandler: null,
         liveButtonHandler: null
     };
+
+    scope.controller = controller;
 
     applyTimeframeOptions(controller, controller.currentTimeframe);
     refreshLegend(controller);
@@ -419,6 +497,7 @@ export function register(root) {
         const height = Math.max(1, Math.round(relevant.contentRect.height));
         controller.chart.resize(width, height);
         ensureViewport(controller, { forceScrollToRealtime: false });
+        recomputeLabelGuard(controller);
     });
 
     controller.resizeObserver.observe(surface);

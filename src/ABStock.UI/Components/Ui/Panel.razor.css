@@ -1,0 +1,52 @@
+.ui-panel {
+    /* Панель не ужимается ниже своего содержимого: расти разрешено адресно
+       (.chart-panel, .tape-panel), а нехватку высоты забирает прокрутка страницы. */
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: var(--gph-850);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-sm);
+}
+
+.ui-panel--quiet {
+    background: transparent;
+    border-color: var(--line-1);
+    box-shadow: none;
+}
+
+.ui-panel__head {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    min-height: var(--h-ctl-lg);
+    padding: var(--s-3) var(--s-4);
+    border-bottom: 1px solid var(--line-1);
+}
+
+.ui-panel__head ::deep h2 {
+    font: var(--t-h2);
+    color: var(--text-1);
+    letter-spacing: -0.015em;
+    margin: 0;
+}
+
+.ui-panel__meta,
+.ui-panel__head ::deep .ui-panel__meta {
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.ui-panel__body {
+    flex: 1;
+    min-height: 0;
+    padding: var(--s-4);
+}
+
+.ui-panel__body--flush {
+    padding: 0;
+}

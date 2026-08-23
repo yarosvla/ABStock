@@ -1,0 +1,31 @@
+.ui-seg {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-md);
+    background: var(--gph-800);
+}
+
+.ui-seg__item {
+    height: 22px;
+    padding: 0 9px;
+    border: 0;
+    border-radius: var(--r-xs);
+    background: transparent;
+    color: var(--text-3);
+    font: var(--n-sm);
+    font-variant-numeric: tabular-nums;
+    line-height: 22px;
+    cursor: pointer;
+    transition: background var(--d-base) var(--e-out), color var(--d-base) var(--e-out);
+}
+
+.ui-seg__item:hover { color: var(--text-2); }
+
+.ui-seg__item.is-active {
+    background: var(--gph-600);
+    color: var(--text-1);
+}

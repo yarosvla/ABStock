@@ -1,0 +1,22 @@
+@* Пустое состояние — раздел 9.15. Иконка 32 без круга и подложки,
+   H3, одна строка пояснения, одна кнопка. Никаких иллюстраций. *@
+
+<div class="ui-empty">
+    <Icon Name="@IconName" Size="32" />
+    <h3>@Title</h3>
+    @if (Description is not null)
+    {
+        <p class="ui-empty__text">@Description</p>
+    }
+    @if (Action is not null)
+    {
+        <div class="ui-empty__action">@Action</div>
+    }
+</div>
+
+@code {
+    [Parameter] public string IconName { get; set; } = "news";
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public RenderFragment? Action { get; set; }
+}
