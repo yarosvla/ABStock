@@ -43,12 +43,12 @@ public class MarketMakerAgent : AgentBase
         }
 
         if (orders.Count == 0)
-            return HoldDecision($"Cannot place orders: cash={State.Cash}, position={State.Position}");
+            return HoldDecision($"нечем выставлять заявки: деньги {State.Cash:F2}, позиция {State.Position:F2}");
 
         return new AgentDecision(
             State.AgentName,
             TradeAction.Hold,
-            $"Maintaining {LadderLevels}-level liquidity ladder around {snapshot.LastPrice:F2}",
+            $"держу спред: лестница ликвидности на {LadderLevels} уровня вокруг {snapshot.LastPrice:F2}",
             orders
         );
     }
