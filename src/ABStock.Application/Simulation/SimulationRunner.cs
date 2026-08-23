@@ -23,6 +23,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
 
     public event Action<SimulationTickResult>? OnTick;
 
+    public event Action? OnStateChanged;
+
     public SimulationTickResult? Current
     {
         get
@@ -101,9 +103,10 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var runCts = _runCts;
             _runTask = Task.Run(() => RunLoopAsync(config, runCts.Token), CancellationToken.None);
-
-            return Task.CompletedTask;
         }
+
+        OnStateChanged?.Invoke();
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync()
@@ -131,6 +134,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
         catch (OperationCanceledException)
         {
         }
+
+        OnStateChanged?.Invoke();
     }
 
     public SubmitResult SubmitOrder(SimulationDebugOrderRequest request)
