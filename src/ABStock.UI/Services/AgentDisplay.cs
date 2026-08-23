@@ -11,8 +11,8 @@ public static class AgentDisplay
     public static string GetTypeLabel(AgentType type) => type switch
     {
         AgentType.TrendFollowing => "Трендовый",
-        AgentType.CounterTrend => "Контртрендовый",
-        AgentType.MarketMaker => "Маркетмейкер",
+        AgentType.CounterTrend => "Контр-тренд",
+        AgentType.MarketMaker => "Маркет-мейкер",
         AgentType.NewsDriven => "Новостной",
         _ => type.ToString()
     };
