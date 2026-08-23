@@ -1,19 +1,43 @@
 @* Кнопка — раздел 9.2. Primary = светлая заливка (акцент как свет, не как цвет).
-   Размеры 26/32/40. Loading не меняет ширину кнопки. *@
+   Размеры 26/32/40. Loading не меняет ширину кнопки.
+
+   Содержимое собрано разметкой, а не RenderTreeBuilder-ом со счётчиком:
+   номера последовательности должны быть константами времени компиляции,
+   иначе диффер Blazor путает узлы и привязывает обработчики не к тем кнопкам. *@
 
 @if (Href is null)
 {
     <button type="@Type"
             class="@CssClass"
-            disabled="@(Disabled || Loading)"
+            disabled="@IsDisabled"
             @onclick="OnClick"
             @attributes="Extra">
-        @Inner
+        @if (Loading)
+        {
+            <span class="ui-btn__spinner" aria-hidden="true"></span>
+        }
+        else if (Icon is not null)
+        {
+            <Icon Name="@Icon" Size="@GlyphSize" />
+        }
+        @if (ChildContent is not null)
+        {
+            <span class="ui-btn__label">@ChildContent</span>
+        }
     </button>
 }
 else
 {
-    <a href="@Href" class="@CssClass" @attributes="Extra">@Inner</a>
+    <a href="@Href" class="@CssClass" @attributes="Extra">
+        @if (Icon is not null)
+        {
+            <Icon Name="@Icon" Size="@GlyphSize" />
+        }
+        @if (ChildContent is not null)
+        {
+            <span class="ui-btn__label">@ChildContent</span>
+        }
+    </a>
 }
 
 @code {
@@ -31,33 +55,10 @@ else
     [Parameter(CaptureUnmatchedValues = true)]
     public IReadOnlyDictionary<string, object>? Extra { get; set; }
 
+    private bool IsDisabled => Disabled || Loading;
+
+    private int GlyphSize => Size >= 40 ? 18 : 16;
+
     private string CssClass =>
         $"ui-btn ui-btn--{Variant} ui-btn--{Size}{(Loading ? " ui-btn--loading" : "")} {Class}".TrimEnd();
-
-    private RenderFragment Inner => builder =>
-    {
-        var seq = 0;
-        if (Loading)
-        {
-            builder.OpenElement(seq++, "span");
-            builder.AddAttribute(seq++, "class", "ui-btn__spinner");
-            builder.AddAttribute(seq++, "aria-hidden", "true");
-            builder.CloseElement();
-        }
-        else if (Icon is not null)
-        {
-            builder.OpenComponent<Icon>(seq++);
-            builder.AddComponentParameter(seq++, nameof(Components.Ui.Icon.Name), Icon);
-            builder.AddComponentParameter(seq++, nameof(Components.Ui.Icon.Size), Size >= 40 ? 18 : 16);
-            builder.CloseComponent();
-        }
-
-        if (ChildContent is not null)
-        {
-            builder.OpenElement(seq++, "span");
-            builder.AddAttribute(seq++, "class", "ui-btn__label");
-            builder.AddContent(seq++, ChildContent);
-            builder.CloseElement();
-        }
-    };
 }
