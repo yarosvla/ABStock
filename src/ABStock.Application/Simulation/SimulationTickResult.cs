@@ -14,5 +14,6 @@ public record SimulationTickResult(
     int Tick,
     MarketSnapshot Snapshot,
     OrderBookSnapshot OrderBook,
-    IReadOnlyList<AgentSnapshot> Agents
+    IReadOnlyList<AgentSnapshot> Agents,
+    IReadOnlyList<AgentDecision> Decisions
 );

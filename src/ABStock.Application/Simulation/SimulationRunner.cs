@@ -270,8 +270,13 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
 
         AgentReservations.Refresh(_exchange, _agents);
 
-        var allOrders = _agents
-            .SelectMany(a => a.Decide(snapshot, news).Orders)
+        // Решения агентов несут готовое Explanation — сохраняем их, а не только заявки.
+        var decisions = _agents
+            .Select(a => a.Decide(snapshot, news))
+            .ToList();
+
+        var allOrders = decisions
+            .SelectMany(decision => decision.Orders)
             .ToList();
 
         var newSnapshot = snapshot;
@@ -282,10 +287,12 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             newSnapshot = submitResult.Snapshot;
         }
 
-        return CreateTickResultLocked(newSnapshot);
+        return CreateTickResultLocked(newSnapshot, decisions);
     }
 
-    private SimulationTickResult CreateTickResultLocked(MarketSnapshot snapshot)
+    private SimulationTickResult CreateTickResultLocked(
+        MarketSnapshot snapshot,
+        IReadOnlyList<AgentDecision>? decisions = null)
     {
         if (_exchange is null)
         {
@@ -296,7 +303,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             ++_tick,
             snapshot,
             _exchange.GetOrderBookSnapshot(depth: 8),
-            GetAgentSnapshots(_agents, snapshot.LastPrice)
+            GetAgentSnapshots(_agents, snapshot.LastPrice),
+            decisions ?? []
         );
 
         _current = tickResult;
