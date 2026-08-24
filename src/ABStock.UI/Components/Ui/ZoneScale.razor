@@ -1,0 +1,124 @@
+@using System.Globalization
+
+@* Шкала с зонами — раздел 9.17.
+   Дорожка поделена на именованные зоны, сегменты различаются светлотой.
+   Числа границ стоят ПОД делениями (в начале, на каждой границе, в конце),
+   названия зон — по центру своих сегментов, значение подписано у маркера.
+   Позиция маркера считается честно: (значение − минимум) / (максимум − минимум). *@
+
+<div class="ui-scale @(Compact ? "ui-scale--compact" : null) @Class" role="img" aria-label="@AriaLabel">
+    @if (Label is not null)
+    {
+        <span class="label ui-scale__label">@Label</span>
+    }
+
+    <div class="ui-scale__head">
+        <span class="ui-scale__value" style="left:@Position">
+            <span class="ui-scale__number">@Format(Value)</span>
+            @if (Note is not null)
+            {
+                <span class="ui-scale__note">@Note</span>
+            }
+        </span>
+    </div>
+
+    <div class="ui-scale__track">
+        @foreach (var segment in Segments)
+        {
+            <span class="ui-scale__zone" style="width:@Share(segment)"></span>
+        }
+        <span class="ui-scale__marker ui-scale__marker--@Tone" style="left:@Position"></span>
+    </div>
+
+    <div class="ui-scale__names">
+        @foreach (var segment in Segments)
+        {
+            <span class="ui-scale__name @(segment.IsActive ? "is-active" : null)" style="width:@Share(segment)">@segment.Name</span>
+        }
+    </div>
+
+    <div class="ui-scale__ticks">
+        <span class="ui-scale__tick ui-scale__tick--first">@Format(Min)</span>
+        @foreach (var segment in Segments.SkipLast(1))
+        {
+            <span class="ui-scale__tick" style="left:@Percent(segment.To)">@Format(segment.To)</span>
+        }
+        <span class="ui-scale__tick ui-scale__tick--last">@Format(Max)</span>
+    </div>
+</div>
+
+@code {
+    /// <summary>Зона шкалы: имя и верхняя граница. Верхняя граница последней зоны = <see cref="Max"/>.</summary>
+    public sealed record Zone(string Name, decimal To);
+
+    [Parameter, EditorRequired] public decimal Value { get; set; }
+    [Parameter, EditorRequired] public decimal Min { get; set; }
+    [Parameter, EditorRequired] public decimal Max { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<Zone> Zones { get; set; } = [];
+
+    /// <summary>Микро-лейбл над шкалой. Не ставится, если значение понятно без него.</summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>Подпись рядом со значением: «высокая», «средняя · значение по отрасли».</summary>
+    [Parameter] public string? Note { get; set; }
+
+    /// <summary>Тон маркера: acc (обычный) · warn (значение получено запасным путём).</summary>
+    [Parameter] public string Tone { get; set; } = "acc";
+
+    /// <summary>Число-герой ужимается до крупного: шкала внутри плотного блока.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    /// <summary>Число знаков после запятой у значения и границ.</summary>
+    [Parameter] public int Digits { get; set; } = 2;
+
+    [Parameter] public string? Class { get; set; }
+
+    private sealed record Segment(string Name, decimal From, decimal To, bool IsActive);
+
+    private decimal Span => Max - Min;
+
+    private IReadOnlyList<Segment> Segments
+    {
+        get
+        {
+            var segments = new List<Segment>(Zones.Count);
+            var from = Min;
+
+            for (var i = 0; i < Zones.Count; i++)
+            {
+                var zone = Zones[i];
+                var isLast = i == Zones.Count - 1;
+                var isActive = Value >= from && (Value < zone.To || isLast);
+                segments.Add(new Segment(zone.Name, from, zone.To, isActive));
+                from = zone.To;
+            }
+
+            return segments;
+        }
+    }
+
+    private string Share(Segment segment) => Percent(segment.To, segment.From);
+
+    /// <summary>Доля шкалы в процентах. Только InvariantCulture: значение уезжает в CSS.</summary>
+    private string Percent(decimal value, decimal? from = null) =>
+        Span <= 0m
+            ? "0%"
+            : ((value - (from ?? Min)) / Span * 100m).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+
+    private string Position => Percent(Math.Clamp(Value, Min, Max));
+
+    private string Format(decimal value) => value.ToString("F" + Digits);
+
+    private string AriaLabel
+    {
+        get
+        {
+            var head = Label is null ? Format(Value) : $"{Label}: {Format(Value)}";
+            var zone = Note ?? Segments.FirstOrDefault(segment => segment.IsActive)?.Name;
+
+            return zone is null
+                ? $"{head}, шкала от {Format(Min)} до {Format(Max)}"
+                : $"{head} — {zone}, шкала от {Format(Min)} до {Format(Max)}";
+        }
+    }
+}

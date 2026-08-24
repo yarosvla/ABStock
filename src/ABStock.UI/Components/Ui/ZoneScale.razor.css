@@ -1,0 +1,112 @@
+/* Шкала с зонами — раздел 9.17. Только раскладка и токены. */
+
+.ui-scale {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+}
+
+.ui-scale__label {
+    margin-bottom: var(--s-1);
+}
+
+/* Значение стоит НАД маркером: связь «вот число — вот его место» теряется,
+   если унести его в угол панели. */
+.ui-scale__head {
+    position: relative;
+    height: var(--s-10);
+}
+
+.ui-scale__value {
+    position: absolute;
+    bottom: 0;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    white-space: nowrap;
+}
+
+.ui-scale__number {
+    font: var(--n-hero);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-1);
+    letter-spacing: -0.02em;
+}
+
+.ui-scale__note {
+    font: var(--t-body);
+    color: var(--text-2);
+}
+
+.ui-scale--compact .ui-scale__head { height: var(--s-8); }
+.ui-scale--compact .ui-scale__number { font: var(--n-lg); }
+.ui-scale--compact .ui-scale__note { font: var(--t-body-sm); }
+
+/* ---------- дорожка: сегменты различаются светлотой ---------- */
+.ui-scale__track {
+    position: relative;
+    display: flex;
+    gap: 3px;
+    height: 14px;
+}
+
+.ui-scale--compact .ui-scale__track { height: var(--s-3); }
+
+.ui-scale__zone {
+    height: 100%;
+    border-radius: var(--r-xs);
+    background: var(--gph-700);
+}
+
+.ui-scale__zone:nth-child(2) { background: var(--gph-600); }
+.ui-scale__zone:nth-child(3) { background: var(--gph-500); }
+.ui-scale__zone:nth-child(4) { background: var(--gph-400); }
+
+.ui-scale__marker {
+    position: absolute;
+    top: -6px;
+    width: 2px;
+    height: calc(100% + var(--s-3));
+    transform: translateX(-50%);
+}
+
+.ui-scale__marker--acc  { background: var(--acc-500); }
+.ui-scale__marker--warn { background: var(--warn-500); }
+
+/* ---------- названия зон по центру сегментов ---------- */
+.ui-scale__names {
+    display: flex;
+    gap: 3px;
+    font: var(--t-micro);
+    font-weight: 400;
+    color: var(--text-3);
+}
+
+.ui-scale__name {
+    text-align: center;
+    min-width: 0;
+}
+
+.ui-scale__name.is-active {
+    color: var(--text-1);
+    font-weight: 500;
+}
+
+/* ---------- числа границ под делениями ---------- */
+.ui-scale__ticks {
+    position: relative;
+    height: var(--s-4);
+    font: var(--n-xs);
+    color: var(--text-4);
+    font-variant-numeric: tabular-nums;
+}
+
+.ui-scale__tick {
+    position: absolute;
+    transform: translateX(-50%);
+}
+
+.ui-scale__tick--first { left: 0; transform: none; }
+.ui-scale__tick--last  { right: 0; left: auto; transform: none; }

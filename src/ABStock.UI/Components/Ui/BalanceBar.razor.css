@@ -1,0 +1,54 @@
+/* Полоса баланса — раздел 9.18. Половины различаются светлотой, не цветом. */
+
+.ui-balance {
+    display: flex;
+    gap: 3px;
+    height: 22px;
+    min-width: 0;
+}
+
+.ui-balance__half {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 0 var(--s-2);
+    border: 1px solid transparent;
+    border-radius: var(--r-xs);
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.ui-balance__half--positive {
+    background: var(--acc-600);
+    color: var(--acc-ink);
+}
+
+.ui-balance__half--negative {
+    justify-content: flex-end;
+    background: var(--acc-soft);
+    border-color: var(--line-3);
+    color: var(--text-2);
+}
+
+.ui-balance__half--empty {
+    justify-content: center;
+    background: transparent;
+    border-color: var(--line-1);
+    color: var(--text-4);
+}
+
+.ui-balance__count {
+    font: var(--n-sm);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: inherit;
+}
+
+.ui-balance__caption {
+    font: var(--t-caption);
+    font-weight: 500;
+    color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

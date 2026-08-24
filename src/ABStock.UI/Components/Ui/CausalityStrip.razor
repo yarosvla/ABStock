@@ -1,0 +1,21 @@
+@* Полоса связи — раздел 9.19. Цепочка причинности во всю ширину контентной
+   зоны: читается слева направо как одна фраза, шаги разделены стрелкой.
+   Не решётка карточек и не растёт в высоту — если содержимое не помещается,
+   сокращается текст шага, а не добавляется второй ряд.
+
+   На экране не больше одной полосы связи. *@
+
+<div class="ui-causality @(Quiet ? "ui-causality--quiet" : null) @Class" aria-label="@Label">
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Прозрачная полоса без коробки — когда полоса лежит внутри панели.</summary>
+    [Parameter] public bool Quiet { get; set; }
+
+    [Parameter] public string? Label { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+}

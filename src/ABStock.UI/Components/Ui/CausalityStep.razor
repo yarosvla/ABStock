@@ -1,0 +1,44 @@
+@using System.Globalization
+
+@* Шаг полосы связи — раздел 9.19. Микро-лейбл сверху, значение под ним,
+   при необходимости — одна поясняющая строка. Слово пишется целиком:
+   сокращений вида «увер × чувств» здесь не бывает (раздел 17). *@
+
+<div class="ui-causality__step" style="flex:@FlexShare">
+    <span class="label ui-causality__label">@Label</span>
+
+    @if (ChildContent is not null)
+    {
+        @ChildContent
+    }
+    else
+    {
+        <span class="ui-causality__value @(Truncate ? "is-truncated" : null)" title="@(Truncate ? Value : null)">@Value</span>
+    }
+
+    @if (Note is not null)
+    {
+        <span class="ui-causality__note">@Note</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+
+    /// <summary>Значение шага. Игнорируется, если задан <see cref="ChildContent"/>.</summary>
+    [Parameter] public string? Value { get; set; }
+
+    /// <summary>Одна поясняющая строка под значением.</summary>
+    [Parameter] public string? Note { get; set; }
+
+    /// <summary>Длинное значение обрезается в одну строку, целиком — в подсказке.</summary>
+    [Parameter] public bool Truncate { get; set; }
+
+    /// <summary>Доля ширины шага в полосе.</summary>
+    [Parameter] public double Weight { get; set; } = 1;
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Доля уезжает в CSS, поэтому форматируется InvariantCulture.</summary>
+    private string FlexShare => Weight.ToString("0.###", CultureInfo.InvariantCulture);
+}
