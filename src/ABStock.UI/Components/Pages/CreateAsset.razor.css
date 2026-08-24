@@ -163,10 +163,16 @@
 
 .field__counter.is-invalid { color: var(--down-500); }
 
+/* Ошибка — кромка --down-500 плюс строка с иконкой (раздел 9.3). */
 .field__error {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
     font: var(--t-caption);
     color: var(--down-500);
 }
+
+.field__error .ui-icon { flex: none; }
 
 /* ---------- поля ввода (9.3) ---------- */
 .input {
