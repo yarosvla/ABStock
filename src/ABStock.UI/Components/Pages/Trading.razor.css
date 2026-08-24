@@ -575,31 +575,12 @@
    только выравнивание внутри числовой колонки таблицы. */
 .compose__c-count ::deep .compose__stepper { display: flex; justify-content: flex-end; }
 
+/* Капитал: степпер занимает ячейку целиком, поле забирает остаток от кнопок. */
+.compose__c-cap ::deep .compose__capital { width: 100%; }
+.compose__c-cap.is-error ::deep .ui-stepper__input { border-color: var(--down-500); }
 
-/* поле ввода — раздел 9.3 */
-.field {
-    width: 100%;
-    height: var(--h-ctl-md);
-    padding: 0 10px;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    background: var(--gph-750);
-    color: var(--text-1);
-    font: var(--n-sm);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-}
-
-.field::placeholder { color: var(--text-4); }
-
-.field:focus-visible {
-    outline: none;
-    border-color: var(--acc-line);
-    box-shadow: 0 0 0 2px var(--acc-soft);
-}
-
-.field.is-error { border-color: var(--down-500); }
-
+/* Само поле ввода приехало в кит вместе со степпером — здесь осталась
+   только строка ошибки под ним (раздел 9.3). */
 .field__error {
     display: flex;
     align-items: center;
