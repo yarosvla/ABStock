@@ -66,11 +66,18 @@ public sealed class NewsProcessingService : INewsProcessingService
         decimal impactScore)
     {
         var confidence = Math.Round(finBert.Confidence * 100, 0);
-        return $"News identified as {polarity}. " +
-               $"FinBERT confidence: {confidence}%. " +
-               $"Positive factor matches: {match.PositiveMatches}, " +
-               $"Negative factor matches: {match.NegativeMatches}, " +
-               $"Risk factor matches: {match.RiskMatches}. " +
-               $"Impact score: {Math.Round(impactScore, 2)}.";
+        return $"Новость определена как {PolarityName(polarity)}. " +
+               $"Уверенность FinBERT: {confidence}%. " +
+               $"Затронуто позитивных факторов: {match.PositiveMatches}, " +
+               $"негативных факторов: {match.NegativeMatches}, " +
+               $"рисков: {match.RiskMatches}. " +
+               $"Сила влияния: {Math.Round(impactScore, 2)}.";
     }
+
+    private static string PolarityName(SignalPolarity polarity) => polarity switch
+    {
+        SignalPolarity.Positive => "позитивная",
+        SignalPolarity.Negative => "негативная",
+        _ => "нейтральная"
+    };
 }
