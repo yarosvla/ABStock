@@ -138,7 +138,13 @@ public static class ActiveAssetDefaults
             positiveFactors.Add("Высокий потенциал роста");
         }
 
-        var newsSensitivity = Math.Clamp(0.45m + draft.GrowthPotential / 200m, 0.45m, 0.95m);
+        // Тот же масштаб, что у генератора: середина шкалы плюс отклонение
+        // потенциала роста от 50. Иначе демо-актив на «Торгах» и «Новостях»
+        // показывал бы чувствительность по другой линейке.
+        var newsSensitivity = Math.Clamp(
+            0.62m + (Math.Clamp(draft.GrowthPotential, 0, 100) - 50) / 400m,
+            0.45m,
+            0.95m);
         var keywords = new[]
         {
             draft.Name,
