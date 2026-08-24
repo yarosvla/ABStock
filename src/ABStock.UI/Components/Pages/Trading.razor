@@ -302,7 +302,6 @@
                                             <th scope="col" class="label compose__c-count">Количество</th>
                                             <th scope="col" class="label compose__c-cap">Капитал агента, ₽</th>
                                             <th scope="col" class="label compose__c-total">Всего капитала</th>
-                                            <th scope="col" class="label compose__c-why">Поведение</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -322,7 +321,10 @@
                                                 <th scope="row" class="compose__c-type">
                                                     <span class="compose__cell">
                                                         <StatusDot Tone="@AgentTone(row.Type)" />
-                                                        <span>@typeLabel</span>
+                                                        <span class="compose__type">
+                                                            <span class="compose__type-name">@typeLabel</span>
+                                                            <span class="compose__type-why" title="@row.Behaviour">@row.Behaviour</span>
+                                                        </span>
                                                     </span>
                                                 </th>
                                                 <td class="compose__c-count">
@@ -349,7 +351,6 @@
                                                     }
                                                 </td>
                                                 <td class="compose__c-total num-sm">@Money0(row.TotalCapital)</td>
-                                                <td class="compose__c-why">@row.Behaviour</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -359,29 +360,32 @@
                                             <td class="compose__c-count num-sm">@TotalAgentCount</td>
                                             <td class="compose__c-cap"></td>
                                             <td class="compose__c-total num-sm">@Money0(TotalCompositionCapital)</td>
-                                            <td class="compose__c-why">
-                                                @if (TotalAgentCount < MinTotalAgents)
-                                                {
-                                                    <span class="compose__warn">
-                                                        <Icon Name="alert" Size="14" />
-                                                        <span>Нужен хотя бы один агент</span>
-                                                    </span>
-                                                }
-                                                else if (TotalAgentCount > MaxTotalAgents)
-                                                {
-                                                    <span class="compose__warn">
-                                                        <Icon Name="alert" Size="14" />
-                                                        <span>Не больше @MaxTotalAgents агентов в сессии</span>
-                                                    </span>
-                                                }
-                                                else
-                                                {
-                                                    <text>Новостной агент активируется после первой новости в сессии</text>
-                                                }
-                                            </td>
                                         </tr>
                                     </tfoot>
                                 </table>
+
+                                @* Строка относится ко всему составу, а не к колонке,
+                                   поэтому стоит под таблицей, а не в ячейке подвала. *@
+                                <p class="compose__note">
+                                    @if (TotalAgentCount < MinTotalAgents)
+                                    {
+                                        <span class="compose__warn">
+                                            <Icon Name="alert" Size="14" />
+                                            <span>Нужен хотя бы один агент</span>
+                                        </span>
+                                    }
+                                    else if (TotalAgentCount > MaxTotalAgents)
+                                    {
+                                        <span class="compose__warn">
+                                            <Icon Name="alert" Size="14" />
+                                            <span>Не больше @MaxTotalAgents агентов в сессии</span>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <text>Новостной агент активируется после первой новости в сессии</text>
+                                    }
+                                </p>
                             </div>
                         </ChildContent>
                     </Panel>

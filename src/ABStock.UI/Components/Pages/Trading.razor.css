@@ -521,16 +521,37 @@
 .compose tbody tr.is-off th { color: var(--text-4); }
 .compose tbody tr.is-off .compose__c-total { color: var(--text-4); }
 
-.compose__c-type { width: 200px; }
-.compose__c-count { width: 120px; text-align: right; }
-.compose__c-cap { width: 160px; text-align: right; }
-.compose__c-total { width: 150px; text-align: right; }
-.compose td.compose__c-why,
-.compose th.compose__c-why { padding-left: var(--s-6); }
+/* Тип забирает остаток ширины: у трёх числовых колонок он фиксированный,
+   и на 1440 «Поведение» отдельной колонкой схлопывалось в ноль, а строка
+   вырастала до 97px. Объяснение переехало второй строкой под тип — тот же
+   приём, что в таблице агентов ниже, и ровно тот случай, под который в
+   разделе 8 заведён --h-row-tall. */
+.compose__c-type { width: auto; }
+.compose__c-count { width: 88px; text-align: right; }
+.compose__c-cap { width: 152px; text-align: right; }
+.compose__c-total { width: 108px; text-align: right; }
 
 .compose__cell { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
 .compose__c-total { color: var(--text-1); }
-.compose__c-why { color: var(--text-3); font: var(--t-caption); }
+
+.compose__type { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.compose__type-name { color: var(--text-1); white-space: nowrap; }
+
+/* Объяснение — ровно одна строка, полный текст по наведению. */
+.compose__type-why {
+    font: var(--t-caption);
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.compose__note {
+    margin: 0;
+    padding-top: var(--s-2);
+    font: var(--t-caption);
+    color: var(--text-3);
+}
 
 .compose tfoot th, .compose tfoot td {
     height: var(--h-row);
@@ -553,6 +574,7 @@
 /* Степпер приехал в кит (Components/Ui/NumberStepper) — здесь остаётся
    только выравнивание внутри числовой колонки таблицы. */
 .compose__c-count ::deep .compose__stepper { display: flex; justify-content: flex-end; }
+
 
 /* поле ввода — раздел 9.3 */
 .field {
