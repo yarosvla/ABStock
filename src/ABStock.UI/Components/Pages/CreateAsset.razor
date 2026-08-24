@@ -563,7 +563,11 @@
 
     private ActiveAssetView SessionAsset => ActiveAssetContext.GetView();
 
-    private bool HasSessionAsset => profile is not null || ActiveAssetContext.Draft is not null || SessionAsset.IsFallback;
+    /// <summary>
+    /// Актив в крошках показывается, только когда у него есть имя: стёртое поле
+    /// названия оставляло в пути пустой элемент «Активы ›  › Создание актива».
+    /// </summary>
+    private bool HasSessionAsset => !string.IsNullOrWhiteSpace(SessionAsset.Draft.Name);
 
     private string Symbol => ActiveAssetDefaults.BuildSymbol(profile?.Name ?? assetName);
 
