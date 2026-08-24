@@ -1,0 +1,87 @@
+@using System.Globalization
+
+@* Число со степпером − / + — раздел 9.2.1. Нативный спиннер браузера не
+   используется: у него своя типографика, свои цвета и своя высота.
+
+   Два режима. Editable=false — значение только читается, меняется кнопками
+   (состав агентов на «Торгах»). Editable=true — рядом с кнопками поле ввода
+   для прямого набора: докликивать до 62 никто не станет. *@
+
+<div class="ui-stepper @Class">
+    <AppButton Variant="secondary" Size="26" Icon="minus"
+               Class="ui-btn--icon"
+               Disabled="@AtMin"
+               OnClick="Decrement"
+               aria-label="@DecrementLabel" />
+
+    @if (Editable)
+    {
+        @* type="text" + inputmode: спиннера нет, а цифровая клавиатура есть. *@
+        <input class="ui-stepper__input"
+               type="text" inputmode="numeric" autocomplete="off"
+               placeholder="@Placeholder"
+               aria-label="@Label"
+               value="@Text"
+               @onchange="HandleInput" />
+    }
+    else
+    {
+        <span class="ui-stepper__value" aria-label="@Label">@Text</span>
+    }
+
+    <AppButton Variant="secondary" Size="26" Icon="plus"
+               Class="ui-btn--icon"
+               Disabled="@AtMax"
+               OnClick="Increment"
+               aria-label="@IncrementLabel" />
+</div>
+
+@code {
+    [Parameter] public int? Value { get; set; }
+    [Parameter] public EventCallback<int?> ValueChanged { get; set; }
+
+    [Parameter] public int Min { get; set; }
+    [Parameter] public int Max { get; set; } = 100;
+    [Parameter] public int Step { get; set; } = 1;
+
+    /// <summary>Разрешить прямой набор числа рядом с кнопками.</summary>
+    [Parameter] public bool Editable { get; set; }
+
+    /// <summary>Что показать, когда значение не задано. Не «0» — раздел 10.</summary>
+    [Parameter] public string Placeholder { get; set; } = "—";
+
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? DecrementLabel { get; set; }
+    [Parameter] public string? IncrementLabel { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    private string Text => Value is { } value
+        ? value.ToString(CultureInfo.InvariantCulture)
+        : Editable ? string.Empty : Placeholder;
+
+    private bool AtMin => Value is { } value && value <= Min;
+    private bool AtMax => Value is { } value && value >= Max;
+
+    /// <summary>Незаполненное поле начинает счёт с минимума, а не с нуля.</summary>
+    private Task Decrement() => Commit(Value is { } value ? value - Step : Min);
+
+    private Task Increment() => Commit(Value is { } value ? value + Step : Min);
+
+    private Task HandleInput(ChangeEventArgs args)
+    {
+        var raw = args.Value?.ToString();
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return Commit(null);
+        }
+
+        return int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? Commit(parsed)
+            : ValueChanged.InvokeAsync(Value); // мусор не принимаем, поле возвращается к текущему числу
+    }
+
+    private Task Commit(int? next) =>
+        ValueChanged.InvokeAsync(next is { } value ? Math.Clamp(value, Min, Max) : null);
+}

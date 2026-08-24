@@ -179,12 +179,6 @@
     color: var(--text-1);
 }
 
-.input--num {
-    width: 96px;
-    font: var(--n-md);
-    font-variant-numeric: tabular-nums;
-}
-
 .textarea {
     /* 6 строк по умолчанию, дальше поле растёт по мере ввода и скроллится
        внутри себя (раздел 7.1). field-sizing поддержан не везде — там поле

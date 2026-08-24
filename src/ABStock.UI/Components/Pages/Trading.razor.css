@@ -550,18 +550,9 @@
 }
 
 /* степпер количества — две иконки-кнопки 26 и моно-значение между ними */
-.stepper {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--s-2);
-}
-
-.stepper__value {
-    min-width: var(--s-5);
-    text-align: center;
-    color: var(--text-1);
-}
+/* Степпер приехал в кит (Components/Ui/NumberStepper) — здесь остаётся
+   только выравнивание внутри числовой колонки таблицы. */
+.compose__c-count ::deep .compose__stepper { display: flex; justify-content: flex-end; }
 
 /* поле ввода — раздел 9.3 */
 .field {

@@ -314,8 +314,7 @@
                                             var lessLabel = "Убрать агента: " + typeLabel;
                                             var moreLabel = "Добавить агента: " + typeLabel;
                                             var capitalLabel = "Капитал агента: " + typeLabel;
-                                            var atMin = row.Count <= 0;
-                                            var atMax = row.Count >= MaxAgentsPerType;
+                                            var countLabel = "Количество агентов: " + typeLabel;
                                             var rowClass = isOff ? "is-off" : null;
                                             var fieldClass = capitalError ? "field is-error" : "field";
                                             var invalidFlag = capitalError ? "true" : null;
@@ -327,19 +326,13 @@
                                                     </span>
                                                 </th>
                                                 <td class="compose__c-count">
-                                                    <span class="stepper">
-                                                        <AppButton Variant="secondary" Size="26" Icon="minus"
-                                                                   Class="ui-btn--icon"
-                                                                   Disabled="atMin"
-                                                                   OnClick="@(() => ChangeAgentCount(row, -1))"
-                                                                   aria-label="@lessLabel" />
-                                                        <span class="num-sm stepper__value">@row.Count</span>
-                                                        <AppButton Variant="secondary" Size="26" Icon="plus"
-                                                                   Class="ui-btn--icon"
-                                                                   Disabled="atMax"
-                                                                   OnClick="@(() => ChangeAgentCount(row, 1))"
-                                                                   aria-label="@moreLabel" />
-                                                    </span>
+                                                    <NumberStepper Value="row.Count"
+                                                                   ValueChanged="@(value => ChangeAgentCount(row, (value ?? row.Count) - row.Count))"
+                                                                   Min="0" Max="MaxAgentsPerType"
+                                                                   Class="compose__stepper"
+                                                                   Label="@countLabel"
+                                                                   DecrementLabel="@lessLabel"
+                                                                   IncrementLabel="@moreLabel" />
                                                 </td>
                                                 <td class="compose__c-cap">
                                                     <input class="@fieldClass"
