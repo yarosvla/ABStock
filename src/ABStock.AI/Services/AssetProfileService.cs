@@ -42,17 +42,22 @@ public sealed class AssetProfileService : IAssetProfileService
             negativeFactors.Add("Ограниченная внешняя поддержка");
         }
 
-        if (request.GrowthPotential >= 70)
+        // Поле необязательное: если пользователь его не заполнил, вывода
+        // о потенциале роста нет — ни в плюс, ни в минус.
+        if (request.GrowthPotential is { } growthPotential)
         {
-            positiveFactors.Add("Высокий потенциал роста в среднесрочном горизонте");
-        }
-        else if (request.GrowthPotential >= 40)
-        {
-            positiveFactors.Add("Умеренный потенциал роста при стабильном новостном фоне");
-        }
-        else
-        {
-            risks.Add("Ограниченный апсайд при текущих вводных");
+            if (growthPotential >= 70)
+            {
+                positiveFactors.Add("Высокий потенциал роста в среднесрочном горизонте");
+            }
+            else if (growthPotential >= 40)
+            {
+                positiveFactors.Add("Умеренный потенциал роста при стабильном новостном фоне");
+            }
+            else
+            {
+                risks.Add("Ограниченный апсайд при текущих вводных");
+            }
         }
 
         switch (request.AssetType)
@@ -100,7 +105,7 @@ public sealed class AssetProfileService : IAssetProfileService
         AssetType assetType,
         string industry,
         bool includeGovernmentSupport,
-        int growthPotential)
+        int? growthPotential)
     {
         var baseSensitivity = assetType switch
         {
@@ -122,8 +127,11 @@ public sealed class AssetProfileService : IAssetProfileService
             baseSensitivity += 0.05m;
         }
 
-        baseSensitivity += Math.Clamp(growthPotential, 0, 100) / 250m;
-        return Math.Clamp(baseSensitivity, 0.35m, 0.95m);
+        baseSensitivity += Math.Clamp(growthPotential ?? 0, 0, 100) / 250m;
+
+        // Диапазон 0,45–0,95 подписан на экране «Создание актива» и размечен
+        // зонами шкалы: значение вне него сделало бы подпись неправдой.
+        return Math.Clamp(baseSensitivity, 0.45m, 0.95m);
     }
 
     private static IReadOnlyList<string> BuildKeywords(
