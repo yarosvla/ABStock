@@ -25,11 +25,15 @@
             @if (HasSessionAsset)
             {
                 <Icon Name="chevron-right" Size="14" />
-                <span class="crumbs__asset">@SessionAsset.Draft.Name<Icon Name="chevron-down" Size="14" /></span>
-                @if (SessionAsset.IsFallback)
-                {
-                    <span class="chip">Демо-контекст</span>
-                }
+                @* Статус актива — чипом рядом с именем, внутри одного элемента пути.
+                   Между «›» он читался бы как ещё один раздел (раздел 13). *@
+                <span class="crumbs__asset">
+                    <span class="crumbs__name">@SessionAsset.Draft.Name<Icon Name="chevron-down" Size="14" /></span>
+                    @if (SessionAsset.IsFallback)
+                    {
+                        <span class="chip">Демо-контекст</span>
+                    }
+                </span>
             }
             <Icon Name="chevron-right" Size="14" />
             <span class="crumbs__current">Создание актива</span>

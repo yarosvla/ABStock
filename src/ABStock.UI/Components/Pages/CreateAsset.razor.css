@@ -46,7 +46,8 @@
 .crumbs a { color: var(--text-3); text-decoration: none; }
 .crumbs a:hover { color: var(--text-2); }
 .crumbs .ui-icon { color: var(--text-4); }
-.crumbs__asset { display: flex; align-items: center; gap: var(--s-1); color: var(--text-2); }
+.crumbs__asset { display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); }
+.crumbs__name { display: flex; align-items: center; gap: var(--s-1); }
 .crumbs__current { color: var(--text-1); }
 
 /* ---------- шапка страницы ---------- */
