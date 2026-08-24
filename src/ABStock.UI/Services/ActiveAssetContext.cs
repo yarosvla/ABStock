@@ -41,6 +41,7 @@ public sealed class ActiveAssetContext : IActiveAssetContext
             profile,
             ActiveAssetDefaults.BuildSymbol(draft.Name),
             Draft is null,
+            profile.Source,
             UpdatedAt ?? DateTimeOffset.Now);
     }
 
@@ -80,11 +81,19 @@ public sealed record ActiveAssetDraft(
     bool IncludeGovernmentSupport,
     int GrowthPotential);
 
+/// <param name="IsFallback">
+/// Актив ещё не создавался — на экранах показывается демо-пример.
+/// Это НЕ то же самое, что <paramref name="ProfileSource"/>: демо-контекст
+/// говорит о том, чей актив на экране, источник профиля — о том, разобрала
+/// ли описание языковая модель.
+/// </param>
+/// <param name="ProfileSource">Чем собран профиль: моделью или запасным алгоритмом.</param>
 public sealed record ActiveAssetView(
     ActiveAssetDraft Draft,
     AssetProfile Profile,
     string Symbol,
     bool IsFallback,
+    ProfileSource ProfileSource,
     DateTimeOffset UpdatedAt);
 
 public static class ActiveAssetDefaults
@@ -146,7 +155,11 @@ public static class ActiveAssetDefaults
             negativeFactors,
             risks,
             newsSensitivity,
-            keywords);
+            keywords)
+        {
+            // Демо-профиль собирается здесь же, без языковой модели.
+            Source = ProfileSource.Fallback
+        };
     }
 
     public static string BuildSymbol(string assetName)
