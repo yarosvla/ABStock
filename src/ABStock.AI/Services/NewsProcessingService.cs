@@ -30,7 +30,13 @@ public sealed class NewsProcessingService : INewsProcessingService
             Confidence: finBertResult.Confidence,
             ImpactScore: Math.Round(impactScore, 4),
             Explanation: explanation
-        );
+        )
+        {
+            PositiveMatches = matchResult.PositiveMatches,
+            NegativeMatches = matchResult.NegativeMatches,
+            RiskMatches = matchResult.RiskMatches,
+            MatchScore = matchResult.Score
+        };
     }
 
     private static SignalPolarity DeterminePolarity(FinBertResult finBert, AspectMatchResult match)

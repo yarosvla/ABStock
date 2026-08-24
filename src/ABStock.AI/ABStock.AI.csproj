@@ -14,4 +14,8 @@
     <ProjectReference Include="..\ABStock.Shared\ABStock.Shared.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ABStock.AI.Tests" />
+  </ItemGroup>
+
 </Project>
