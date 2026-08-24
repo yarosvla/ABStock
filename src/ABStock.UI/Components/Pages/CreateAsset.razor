@@ -3,790 +3,825 @@
 @rendermode InteractiveServer
 @using ABStock.AI.Models
 @using ABStock.AI.Services
+@using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
 @inject IAssetProfileService AssetProfileService
 @inject IActiveAssetContext ActiveAssetContext
+@inject ISimulationRunner SimulationRunner
 
 <PageTitle>Создание актива</PageTitle>
 
-<div class="create-asset-shell">
-    <TopNavigation ActivePage="CreateAsset" />
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
-    <main class="create-asset-main @(isProfileGenerated ? "generated" : isGenerating ? "generating" : "draft")">
-        <section class="work-stage">
-            <header class="stage-header">
-                <div class="page-header">
-                    <span class="page-kicker">ABStock AI</span>
-                    <h1>@PageTitleText</h1>
-                    <p>@PageDescriptionText</p>
+<div class="create-shell">
+    <TopNavigation ActivePage="CreateAsset" ShowClock="true" />
+
+    <main class="create-page">
+
+        @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
+        <nav class="crumbs" aria-label="Навигационная цепочка">
+            <a href="/create-asset">Активы</a>
+            @if (HasSessionAsset)
+            {
+                <Icon Name="chevron-right" Size="14" />
+                <span class="crumbs__asset">@SessionAsset.Draft.Name<Icon Name="chevron-down" Size="14" /></span>
+                @if (SessionAsset.IsFallback)
+                {
+                    <span class="chip">Демо-контекст</span>
+                }
+            }
+            <Icon Name="chevron-right" Size="14" />
+            <span class="crumbs__current">Создание актива</span>
+        </nav>
+
+        @if (profile is null)
+        {
+            @* ══════════════ Форма и загрузка ══════════════ *@
+            <header class="page-head">
+                <div class="page-head__title">
+                    <h1>Создание актива</h1>
+                    <p class="page-head__context">Опишите компанию словами — система соберёт профиль, по которому рынок будет реагировать на новости.</p>
                 </div>
-
-                <section class="workflow-progress" aria-label="Статус создания актива">
-                    <div class="workflow-step @(isProfileGenerated || isGenerating ? "done" : "active")">
-                        <span aria-hidden="true">@(isProfileGenerated || isGenerating ? "✓" : "1")</span>
-                        <strong>Ввод данных</strong>
-                    </div>
-                    <i aria-hidden="true"></i>
-                    <div class="workflow-step @(isProfileGenerated ? "done" : isGenerating ? "active" : null)">
-                        <span aria-hidden="true">@(isProfileGenerated ? "✓" : "2")</span>
-                        <strong>AI-анализ</strong>
-                    </div>
-                    <i aria-hidden="true"></i>
-                    <div class="workflow-step @(isProfileGenerated ? "active" : null)">
-                        <span aria-hidden="true">3</span>
-                        <strong>Готово</strong>
-                    </div>
-                </section>
             </header>
 
-            <section class="workspace-grid @(isProfileGenerated ? "profile-visible review-mode" : isGenerating ? "generating-mode" : "profile-hidden")" aria-label="Создание актива">
-                <section class="glass-card form-card @(isProfileGenerated ? "summary-card" : null)" aria-labelledby="form-title">
-                    @if (isProfileGenerated)
-                    {
-                        <div class="profile-params-head">
-                            <h2 id="form-title">Параметры профиля</h2>
-                            <div class="summary-actions">
-                                <button class="secondary-button compact-button" type="button" @onclick="EditParameters">
-                                    <i class="bi bi-pencil" aria-hidden="true"></i>
-                                    Редактировать
-                                </button>
-                                <button class="secondary-button compact-button" type="button" @onclick="RegenerateProfile">
-                                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
-                                    Перегенерировать
-                                </button>
-                            </div>
+            @if (isGenerating)
+            {
+                @* Загрузка — скелетоны по форме будущего профиля (раздел 9.16).
+                   Процентов здесь нет: честно посчитать их нельзя ни сейчас,
+                   ни когда разбор описания станет асинхронным. *@
+                <div class="loading" aria-live="polite" aria-busy="true">
+                    <span class="sr-only">Профиль строится</span>
+
+                    <div class="loading__strip panel">
+                        <div class="loading__step"><Skeleton Width="62px" Height="9px" /><Skeleton Width="88%" Height="14px" /></div>
+                        <span class="loading__arrow" aria-hidden="true">→</span>
+                        <div class="loading__step loading__step--wide"><Skeleton Width="140px" Height="9px" /><Skeleton Width="110px" Height="34px" /><Skeleton Height="14px" /></div>
+                        <span class="loading__arrow" aria-hidden="true">→</span>
+                        <div class="loading__step"><Skeleton Width="96px" Height="9px" /><Skeleton Width="92%" Height="14px" /></div>
+                    </div>
+
+                    <div class="loading__balance">
+                        <Skeleton Width="120px" Height="9px" />
+                        <Skeleton Height="16px" />
+                    </div>
+
+                    <div class="loading__factors">
+                        <div class="loading__card panel">
+                            <Skeleton Width="150px" Height="14px" />
+                            <Skeleton Width="92%" Height="12px" />
+                            <Skeleton Width="78%" Height="12px" />
+                            <Skeleton Width="85%" Height="12px" />
+                            <Skeleton Width="66%" Height="12px" />
                         </div>
-
-                        <dl class="profile-summary-spec">
-                            <div>
-                                <dt>Актив</dt>
-                                <dd>@DisplayAssetName</dd>
-                            </div>
-                            <div>
-                                <dt>Тип</dt>
-                                <dd>@selectedAssetType.Name</dd>
-                            </div>
-                            <div>
-                                <dt>Сектор</dt>
-                                <dd>@selectedIndustry</dd>
-                            </div>
-                            <div>
-                                <dt>Регион</dt>
-                                <dd>Россия / СНГ</dd>
-                            </div>
-                            <div>
-                                <dt>Валюта</dt>
-                                <dd>RUB</dd>
-                            </div>
-                            <div>
-                                <dt>Горизонт</dt>
-                                <dd>6-24 мес.</dd>
-                            </div>
-                        </dl>
-
-                        <div class="summary-description">
-                            <strong>Описание (кратко)</strong>
-                            <p>@SummaryDescription</p>
+                        <div class="loading__card panel">
+                            <Skeleton Width="168px" Height="14px" />
+                            <Skeleton Width="88%" Height="12px" />
+                            <Skeleton Width="72%" Height="12px" />
+                            <Skeleton Width="80%" Height="12px" />
                         </div>
+                    </div>
 
-                        <button class="read-description-button" type="button" @onclick="ToggleDescriptionExpansion">
-                            @(isDescriptionExpanded ? "Скрыть полное описание" : "Читать полное описание")
-                            <i class="bi bi-chevron-down" aria-hidden="true"></i>
-                        </button>
-
-                        <p class="summary-generated-note">
-                            <span aria-hidden="true">i</span>
-                            Профиль сгенерирован на основе AI-модели ABStock v1.3
-                        </p>
-                    }
-                    else if (isGenerating)
-                    {
-                        <div class="card-title-row compact">
-                            <div>
-                                <h2 id="form-title">Формирование AI-профиля</h2>
-                                <p>Модель последовательно оценивает описание, риски и чувствительность к новостям</p>
-                            </div>
-                            <span class="state-pill">Анализ</span>
-                        </div>
-
-                        <div class="generation-panel" style="--progress:@GenerationProgress%">
-                            <div class="generation-progress" aria-hidden="true"><span></span></div>
-                            <ol class="analysis-stage-list">
-                                @for (var i = 0; i < AnalysisStages.Length; i++)
-                                {
-                                    var stageClass = i < generationStep ? "done" : i == generationStep ? "current" : "pending";
-                                    <li class="@stageClass">
-                                        <span>@(i < generationStep ? "✓" : i + 1)</span>
-                                        <div>
-                                            <strong>@AnalysisStages[i]</strong>
-                                            <small>@(i == generationStep ? "Выполняется" : i < generationStep ? "Завершено" : "В очереди")</small>
-                                        </div>
-                                    </li>
-                                }
-                            </ol>
-                            <div class="profile-skeleton" aria-hidden="true">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="card-title-row">
-                            <div>
-                                <span class="demo-badge">Демо-черновик</span>
-                                <h2 id="form-title">Параметры актива</h2>
-                                <p>Укажите данные для оценки факторов роста, рисков и новостной чувствительности</p>
-                            </div>
-                            <span class="state-pill">Черновик</span>
-                        </div>
-
-                        <div class="asset-form">
-                            <div class="field-group asset-type-field">
-                                <label id="asset-type-label">Тип актива <span>*</span></label>
-                                <div class="asset-type-grid" role="group" aria-labelledby="asset-type-label">
+                    <div class="loading__chips">
+                        <Skeleton Width="96px" Height="22px" Radius="var(--r-pill)" />
+                        <Skeleton Width="124px" Height="22px" Radius="var(--r-pill)" />
+                        <Skeleton Width="88px" Height="22px" Radius="var(--r-pill)" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="layout">
+                    <Panel Class="form rise rise-1" Flush="true">
+                        <ChildContent>
+                            <section class="field">
+                                <div class="field__head">
+                                    <span class="field__no">01</span>
+                                    <span class="label">Тип актива</span>
+                                </div>
+                                <div class="types" role="group" aria-label="Тип актива">
                                     @foreach (var type in AssetTypes)
                                     {
-                                        <button class="asset-type-tile @(type.Name == selectedAssetType.Name ? "selected" : null)" type="button" aria-pressed="@(type.Name == selectedAssetType.Name)" @onclick="() => SelectAssetType(type)">
-                                            <span class="select-icon" aria-hidden="true">
-                                                <i class="bi @type.IconClass"></i>
-                                            </span>
+                                        var isSelected = type.Type == selectedAssetType;
+                                        <button class="type @(isSelected ? "is-selected" : null)" type="button"
+                                                aria-pressed="@(isSelected ? "true" : "false")"
+                                                @onclick="() => SelectAssetType(type.Type)">
                                             <strong>@type.Name</strong>
-                                            <small>@type.Description</small>
+                                            <small>@type.Hint</small>
                                         </button>
                                     }
                                 </div>
-                            </div>
+                            </section>
 
-                            <div class="field-group @(ShowAssetNameValidation ? "has-error" : null)">
-                                <label for="asset-name">Название актива <span>*</span></label>
-                                <input id="asset-name" type="text" placeholder="Например: КвантЭнерго" @bind="assetName" @bind:event="oninput" @bind:after="SyncDraftState" aria-invalid="@ShowAssetNameValidation" />
-                                @if (ShowAssetNameValidation)
+                            <section class="field">
+                                <div class="field__head">
+                                    <span class="field__no">02</span>
+                                    <label class="label" for="asset-name">Название</label>
+                                </div>
+                                <input id="asset-name" class="input @(NameInvalid ? "is-invalid" : null)"
+                                       type="text" maxlength="120"
+                                       placeholder="Например, Гелиос Энерго"
+                                       aria-invalid="@(NameInvalid ? "true" : "false")"
+                                       aria-describedby="@(NameInvalid ? "asset-name-error" : null)"
+                                       @bind="assetName" @bind:event="oninput" @bind:after="TouchForm" />
+                                @if (NameInvalid)
                                 {
-                                    <small class="validation-message">Укажите название актива.</small>
+                                    <span id="asset-name-error" class="field__error">Введите название — из него генерируется тикер</span>
                                 }
-                            </div>
+                            </section>
 
-                            <div class="field-group @(ShowAssetDescriptionValidation ? "has-error" : null)">
-                                <label for="asset-description">Описание актива <span>*</span></label>
-                                <textarea id="asset-description" placeholder="Опишите бизнес-модель, регион, драйверы роста, ограничения и риски." @bind="assetDescription" @bind:event="oninput" @bind:after="SyncDraftState" aria-invalid="@ShowAssetDescriptionValidation"></textarea>
-                                @if (ShowAssetDescriptionValidation)
+                            <section class="field">
+                                <div class="field__head field__head--split">
+                                    <div class="field__head-main">
+                                        <span class="field__no">03</span>
+                                        <label class="label" for="asset-description">Описание</label>
+                                        <span class="field__hint">главное поле — из него строится профиль</span>
+                                    </div>
+                                    <span class="field__counter @(DescriptionInvalid ? "is-invalid" : null)">@assetDescription.Length / @MaxDescriptionLength</span>
+                                </div>
+                                <textarea id="asset-description" class="textarea @(DescriptionInvalid ? "is-invalid" : null)"
+                                          maxlength="@MaxDescriptionLength" rows="6"
+                                          placeholder="Чем занимается компания, на чём зарабатывает, от чего зависит её выручка. Три-четыре предложения обычным языком."
+                                          aria-invalid="@(DescriptionInvalid ? "true" : "false")"
+                                          aria-describedby="@(DescriptionInvalid ? "asset-description-error" : null)"
+                                          @bind="assetDescription" @bind:event="oninput" @bind:after="TouchForm"></textarea>
+                                @if (DescriptionInvalid)
                                 {
-                                    <small class="validation-message">Добавьте описание для генерации AI-профиля.</small>
+                                    <span id="asset-description-error" class="field__error">Слишком коротко: нужно не меньше @MinDescriptionLength символов, чтобы собрать факторы и риски</span>
+                                }
+                            </section>
+
+                            <section class="field">
+                                <div class="field__head">
+                                    <span class="field__no">04</span>
+                                    <span class="label">Параметры</span>
+                                </div>
+                                <div class="params">
+                                    <div class="param">
+                                        <span class="param__label" id="industry-label">Отрасль</span>
+                                        <div class="select">
+                                            <button class="select__trigger @(selectedIndustry is null ? "is-empty" : null)" type="button"
+                                                    aria-labelledby="industry-label"
+                                                    aria-expanded="@(isIndustryOpen ? "true" : "false")"
+                                                    @onclick="ToggleIndustry">
+                                                <span>@(selectedIndustry ?? "Выберите отрасль")</span>
+                                                <Icon Name="chevron-down" Size="14" />
+                                            </button>
+                                            @if (isIndustryOpen)
+                                            {
+                                                <div class="select__panel glass" role="listbox" aria-label="Отрасль">
+                                                    @foreach (var industry in Industries)
+                                                    {
+                                                        var isChosen = industry == selectedIndustry;
+                                                        <button class="select__option @(isChosen ? "is-chosen" : null)" type="button"
+                                                                role="option" aria-selected="@(isChosen ? "true" : "false")"
+                                                                @onclick="() => SelectIndustry(industry)">
+                                                            <span>@industry</span>
+                                                            @if (isChosen)
+                                                            {
+                                                                <Icon Name="check" Size="14" />
+                                                            }
+                                                        </button>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <div class="param">
+                                        <span class="param__label" id="support-label">Государственная поддержка</span>
+                                        <div class="param__control">
+                                            <button class="toggle @(includeGovernmentSupport ? "is-on" : null)" type="button"
+                                                    role="switch" aria-labelledby="support-label"
+                                                    aria-checked="@(includeGovernmentSupport ? "true" : "false")"
+                                                    @onclick="ToggleGovernmentSupport">
+                                                <span class="toggle__knob"></span>
+                                            </button>
+                                            <span class="toggle__text @(includeGovernmentSupport ? "is-on" : null)">@(includeGovernmentSupport ? "учитывать" : "не учитывать")</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="param">
+                                        <label class="param__label" for="growth-potential">Потенциал роста</label>
+                                        <div class="param__control">
+                                            <input id="growth-potential" class="input input--num"
+                                                   type="number" min="0" max="100" step="1" placeholder="—"
+                                                   @bind="growthPotential" @bind:event="oninput" />
+                                            <span class="param__range">0 – 100</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <footer class="form__foot hairline-top">
+                                <p class="form__note">@SessionNote</p>
+                                <div class="form__actions">
+                                    <AppButton Variant="ghost" OnClick="ClearForm">Очистить</AppButton>
+                                    <AppButton Variant="primary" Disabled="@(!IsValid)" OnClick="RequestProfile">Создать актив</AppButton>
+                                </div>
+                            </footer>
+
+                            @if (ShowErrors && !IsValid)
+                            {
+                                <p class="form__verdict hairline-top">Профиль не построен — исправьте @(ErrorCount == 1 ? "одно поле" : "два поля").</p>
+                            }
+                        </ChildContent>
+                    </Panel>
+
+                    <Panel Title="Что получится" Class="promise rise rise-2">
+                        <MetaContent><text>профиль актива</text></MetaContent>
+                        <ChildContent>
+                            <dl class="promise__list">
+                                @foreach (var item in ProfilePromise)
+                                {
+                                    <div class="promise__row">
+                                        <dt>@item.Title</dt>
+                                        <dd>@item.Text</dd>
+                                    </div>
+                                }
+                            </dl>
+                            <p class="promise__foot hairline-top">Чувствительность и факторы участвуют в расчёте силы влияния новости на «Новостях» и определяют поведение новостного агента на «Торгах».</p>
+                        </ChildContent>
+                    </Panel>
+                </div>
+            }
+        }
+        else
+        {
+            @* ══════════════ Профиль ══════════════ *@
+            <header class="page-head">
+                <div class="page-head__title">
+                    <div class="asset">
+                        <h1>@profile.Name</h1>
+                        <span class="asset__rule" aria-hidden="true"></span>
+                        <span class="asset__ticker">@Symbol</span>
+                        <span class="chip">@AssetTypeName(profile.AssetType)</span>
+                        @if (!string.IsNullOrWhiteSpace(draftIndustry))
+                        {
+                            <span class="chip">@draftIndustry</span>
+                        }
+                        @if (includeGovernmentSupport)
+                        {
+                            <span class="chip">господдержка учтена</span>
+                        }
+                        @if (growthPotential is { } potential)
+                        {
+                            <span class="chip">потенциал роста <span class="num-sm">@potential</span></span>
+                        }
+                        <span class="badge badge--@(IsFallbackProfile ? "warn" : "acc")">@SourceBadge</span>
+                    </div>
+                    <p class="page-head__context @(IsFallbackProfile ? "is-warn" : null)">@SourceNote</p>
+                </div>
+                <div class="page-head__actions">
+                    <AppButton Variant="secondary" OnClick="SecondaryAction">@SecondaryActionLabel</AppButton>
+                    <AppButton Variant="primary" Href="/trading">Перейти к торгам</AppButton>
+                </div>
+            </header>
+
+            @* Полоса связи — одна на экран (раздел 9.19) *@
+            <CausalityStrip Class="rise rise-1" Label="Как профиль связан с рынком">
+                <CausalityStep Label="Описание" Weight="1.1"
+                               Value="@DescriptionExcerpt" Truncate="true"
+                               Note="@($"{profile.Description.Length} символов")" />
+
+                <CausalityStep Label="Чувствительность к новостям" Weight="1.9">
+                    <ZoneScale Value="profile.NewsSensitivity"
+                               Min="SensitivityMin" Max="SensitivityMax"
+                               Zones="SensitivityZones"
+                               Note="@SensitivityNote"
+                               Tone="@(IsFallbackProfile ? "warn" : "acc")" />
+                </CausalityStep>
+
+                <CausalityStep Label="Сила влияния новости" Weight="1.15"
+                               Value="уверенность × чувствительность × тема"
+                               Note="чувствительность — постоянный множитель" />
+
+                <CausalityStep Label="Реакция рынка" Weight="1.15"
+                               Value="@MarketReaction" Note="@MarketReactionNote" />
+            </CausalityStrip>
+
+            <div class="layout">
+                <div class="profile rise rise-2">
+
+                    <section class="balance">
+                        <div class="balance__head">
+                            <span class="label">Баланс факторов</span>
+                            <span class="balance__meta">из описания собрано <span class="num-sm">@TotalFactors</span> @FactorWord</span>
+                        </div>
+                        <BalanceBar Positive="profile.PositiveFactors.Count" Negative="profile.NegativeFactors.Count" />
+                    </section>
+
+                    <div class="factors">
+                        <Panel Title="Позитивные факторы" Class="factors__panel" Flush="true">
+                            <MetaContent><span class="num-sm">@profile.PositiveFactors.Count</span></MetaContent>
+                            <ChildContent>
+                                @if (profile.PositiveFactors.Count > 0)
+                                {
+                                    <ul class="factor-list">
+                                        @foreach (var factor in profile.PositiveFactors)
+                                        {
+                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@factor">@factor</span></li>
+                                        }
+                                    </ul>
                                 }
                                 else
                                 {
-                                    <small class="field-hint">После генерации описание будет сжато в резюме.</small>
+                                    <p class="factors__empty">—</p>
                                 }
-                            </div>
+                            </ChildContent>
+                        </Panel>
 
-                            <button class="optional-row @(isOptionalOpen ? "open" : null)" type="button" aria-expanded="@isOptionalOpen" @onclick="ToggleOptional">
-                                <span class="optional-copy">
-                                    <strong>Дополнительные параметры</strong>
-                                </span>
-                                <i class="bi bi-chevron-down" aria-hidden="true"></i>
-                            </button>
-
-                            @if (isOptionalOpen)
-                            {
-                                <div class="optional-panel">
-                                    <div class="field-group compact">
-                                        <label id="industry-label">Сектор</label>
-                                        <button class="select-control small" type="button" aria-labelledby="industry-label" aria-expanded="@isIndustryOpen" @onclick="ToggleIndustry">
-                                            <span>@selectedIndustry</span>
-                                            <i class="bi bi-chevron-down chevron @(isIndustryOpen ? "open" : null)" aria-hidden="true"></i>
-                                        </button>
-                                        @if (isIndustryOpen)
+                        <Panel Title="Негативные факторы" Class="factors__panel" Flush="true">
+                            <MetaContent><span class="num-sm">@profile.NegativeFactors.Count</span></MetaContent>
+                            <ChildContent>
+                                @if (profile.NegativeFactors.Count > 0)
+                                {
+                                    <ul class="factor-list">
+                                        @foreach (var factor in profile.NegativeFactors)
                                         {
-                                            <div class="dropdown-panel compact-list" role="listbox" aria-label="Сектор">
-                                                @foreach (var industry in Industries)
-                                                {
-                                                    <button class="dropdown-option text-only @(industry == selectedIndustry ? "selected" : null)" type="button" role="option" @onclick="() => SelectIndustry(industry)">
-                                                        <strong>@industry</strong>
-                                                    </button>
-                                                }
-                                            </div>
-                                        }
-                                    </div>
-
-                                    <label class="toggle-row">
-                                        <input type="checkbox" @bind="includeGovernmentSupport" @bind:after="SyncDraftState" />
-                                        <span>Учитывать государственную поддержку</span>
-                                    </label>
-
-                                    <label class="range-row">
-                                        <span>Потенциал роста</span>
-                                        <strong>@growthPotential%</strong>
-                                        <input type="range" min="0" max="100" step="1" @bind="growthPotential" @bind:after="SyncDraftState" />
-                                    </label>
-                                </div>
-                            }
-
-                            <div class="form-footer">
-                                <p class="privacy-note">
-                                    <i class="bi bi-lock" aria-hidden="true"></i>
-                                    Профиль формируется только по введённым данным и выбранным параметрам.
-                                </p>
-
-                                <div class="form-actions">
-                                    <button class="secondary-button" type="button" @onclick="ClearForm">
-                                        <i class="bi bi-eraser" aria-hidden="true"></i>
-                                        Очистить
-                                    </button>
-                                    <button class="primary-button" type="button" @onclick="GenerateProfile" disabled="@isGenerating">
-                                        Сформировать AI-профиль
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </section>
-
-                @if (!isProfileGenerated && !isGenerating)
-                {
-                    <aside class="glass-card ai-preview-card" aria-label="Предпросмотр AI-профиля">
-                        <div class="preview-title-row">
-                            <div>
-                                <span>ABStock AI Core v2.3</span>
-                                <h2>Предпросмотр профиля</h2>
-                            </div>
-                            <div class="preview-orbit" aria-hidden="true">
-                                <i class="bi bi-stars"></i>
-                            </div>
-                        </div>
-
-                        <dl class="preview-metrics">
-                            <div>
-                                <dt>Актив</dt>
-                                <dd>@DisplayAssetName</dd>
-                            </div>
-                            <div>
-                                <dt>Тип</dt>
-                                <dd>@selectedAssetType.Name</dd>
-                            </div>
-                            <div>
-                                <dt>Сектор</dt>
-                                <dd>@selectedIndustry</dd>
-                            </div>
-                            <div>
-                                <dt>Источник</dt>
-                                <dd>Ввод пользователя</dd>
-                            </div>
-                        </dl>
-
-                        <div class="preview-readiness" style="--ready:@(CompletedRequiredFields * 50)%">
-                            <div>
-                                <span>Готовность данных</span>
-                                <strong>@(CompletedRequiredFields * 50)%</strong>
-                            </div>
-                            <span aria-hidden="true"><i></i></span>
-                        </div>
-
-                        <section class="preview-summary">
-                            <h3>Будущий профиль</h3>
-                            <p>@DescriptionPreview</p>
-                        </section>
-
-                        <ul class="preview-usage-list" aria-label="Модули использования">
-                            <li>
-                                <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
-                                <span>Торговые идеи</span>
-                            </li>
-                            <li>
-                                <i class="bi bi-activity" aria-hidden="true"></i>
-                                <span>Симуляции</span>
-                            </li>
-                            <li>
-                                <i class="bi bi-shield-check" aria-hidden="true"></i>
-                                <span>Риск-анализ</span>
-                            </li>
-                        </ul>
-
-                        <p class="assistant-warning">В прототипе профиль формируется только по введённому описанию и выбранным параметрам.</p>
-                    </aside>
-                }
-
-                @if (isProfileGenerated)
-                {
-                    <aside class="glass-card profile-card profile-redesign" aria-labelledby="profile-title">
-                        <div class="card-title-row profile-title-row">
-                            <h2 id="profile-title">Профиль актива</h2>
-                            <span class="ai-generated-pill">
-                                <i class="bi bi-stars" aria-hidden="true"></i>
-                                Сгенерировано AI
-                            </span>
-                        </div>
-
-                        <section class="profile-hero-card" id="profile-overview" aria-label="Сводка AI-профиля">
-                            <div class="asset-summary-block">
-                                <div class="asset-emblem compact" aria-hidden="true">
-                                    <i class="bi @selectedAssetType.IconClass"></i>
-                                </div>
-                                <div>
-                                    <h3>@DisplayAssetName</h3>
-                                    <div class="profile-chip-row">
-                                        <span>@DisplayAssetTypeName</span>
-                                        <span>@selectedIndustry</span>
-                                        <span>Россия / СНГ</span>
-                                        <span>RUB</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="profile-kpi-strip">
-                                <div class="kpi-card recommendation">
-                                    <span>Рекомендация</span>
-                                    <strong class="@RecommendationTextClass">@RecommendationLabel</strong>
-                                    <i class="bi bi-graph-up-arrow" aria-hidden="true"></i>
-                                </div>
-                                <div class="kpi-card risk">
-                                    <span>Риск</span>
-                                    <strong class="@RiskTextClass">@RiskLevelLabel</strong>
-                                    <i class="bi bi-shield-exclamation" aria-hidden="true"></i>
-                                </div>
-                                <div class="kpi-card horizon">
-                                    <span>Горизонт</span>
-                                    <strong>6-24 мес.</strong>
-                                    <i class="bi bi-calendar-range" aria-hidden="true"></i>
-                                </div>
-                                <div class="kpi-card confidence">
-                                    <span>Уверенность</span>
-                                    <strong class="positive-text">@ConfidenceLabel</strong>
-                                    <i class="bi bi-bullseye" aria-hidden="true"></i>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section class="profile-dashboard" id="profile-factors" aria-label="Ключевые выводы AI-профиля">
-                            <article class="profile-panel growth-panel">
-                                <div class="panel-title-row">
-                                    <h3>Драйверы роста</h3>
-                                    <i class="bi bi-graph-up-arrow moving-panel-icon" aria-hidden="true"></i>
-                                </div>
-                                <ul class="driver-summary-list">
-                                    @foreach (var factor in ProfilePositiveFactors.Take(3))
-                                    {
-                                        <li>
-                                            <span class="signal-dot green-dot"></span>
-                                            <strong>@factor.Title</strong>
-                                            <em>@factor.Impact</em>
-                                        </li>
-                                    }
-                                </ul>
-                                <div class="panel-footline">
-                                    <span>Позитивное влияние</span>
-                                    <strong>@PositiveImpactLabel</strong>
-                                </div>
-                            </article>
-
-                            <article class="profile-panel risk-panel">
-                                <div class="panel-title-row">
-                                    <h3>Ключевые риски</h3>
-                                    <i class="bi bi-shield-exclamation moving-panel-icon shield-icon" aria-hidden="true"></i>
-                                </div>
-                                <ul class="risk-summary-list">
-                                    @foreach (var risk in ProfileRiskFactors.Take(3))
-                                    {
-                                        <li>
-                                            <span class="signal-dot red-dot"></span>
-                                            <strong>@risk.Title</strong>
-                                            <em>@risk.Probability</em>
-                                        </li>
-                                    }
-                                </ul>
-                                <div class="panel-footline risk-footline">
-                                    <span>Общий уровень риска</span>
-                                    <strong>@RiskLevelLabel</strong>
-                                </div>
-                            </article>
-
-                            <article class="profile-panel sensitivity-panel" id="profile-news">
-                                <div class="panel-title-row">
-                                    <h3>Чувствительность к новостям</h3>
-                                </div>
-                                <div class="news-score-layout">
-                                    <div class="news-gauge" aria-label="86 из 100, высокая чувствительность">
-                                        <svg viewBox="0 0 180 170" aria-hidden="true">
-                                            <defs>
-                                                <linearGradient id="newsGaugeGradient"
-                                                                x1="35" y1="130"
-                                                                x2="145" y2="45"
-                                                                gradientUnits="userSpaceOnUse">
-                                                    <stop stop-color="#55C7FF" />
-                                                    <stop offset=".52" stop-color="#7C5CFF" />
-                                                    <stop offset="1" stop-color="#36D98A" />
-                                                </linearGradient>
-                                            </defs>
-
-                                            <path class="news-gauge-track"
-                                                  d="M36 126 A62 62 0 1 1 144 126"
-                                                  pathLength="100" />
-
-                                            <path class="news-gauge-value"
-                                                  d="M36 126 A62 62 0 1 1 144 126"
-                                                  pathLength="100" />
-
-                                        </svg>
-
-                                        <div class="news-gauge-score">
-                                            <strong>@NewsSensitivityScore</strong>
-                                            <span>/100</span>
-                                        </div>
-
-                                        <small class="news-gauge-label">@NewsSensitivityLabel</small>
-                                    </div>
-                                    <ul class="news-sensitivity-list">
-                                        @foreach (var driver in ProfileSensitivityDrivers)
-                                        {
-                                            <li class="@(driver.Level == "Высокая" ? "high" : "medium")">
-                                                <span>@driver.Name</span>
-                                                <em>@driver.Level</em>
-                                            </li>
+                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@factor">@factor</span></li>
                                         }
                                     </ul>
-                                </div>
-                                <a class="sensitivity-link" href="#profile-news">
-                                    Подробнее о чувствительности
-                                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
-                                </a>
-                            </article>
-                        </section>
+                                }
+                                else
+                                {
+                                    <p class="factors__empty">—</p>
+                                }
+                            </ChildContent>
+                        </Panel>
+                    </div>
 
-                        <section class="profile-bottom-row" id="profile-actions">
-                            <div class="profile-panel tags-panel">
-                                <h3>Ключевые теги</h3>
-                                <div class="tag-cloud sector-tags">
-                                    @foreach (var tag in ProfileTags)
-                                    {
-                                        <span class="@tag.ClassName">@tag.Label</span>
-                                    }
-                                </div>
-                            </div>
-                            <div class="profile-panel conclusion-panel">
-                                <h3>Ключевые выводы</h3>
-                                <ul>
-                                    @foreach (var conclusion in ProfileConclusions)
-                                    {
-                                        <li>
-                                            <i class="bi @conclusion.Icon" aria-hidden="true"></i>
-                                            @conclusion.Text
-                                        </li>
-                                    }
-                                </ul>
-                            </div>
-                        </section>
-
-                        <div class="profile-action-footer">
-                            <div class="action-buttons">
-                                <a class="primary-action" href="/trading">
-                                    <i class="bi bi-play-circle" aria-hidden="true"></i>
-                                    Запустить торги
-                                </a>
-                                <button type="button">
-                                    <i class="bi bi-activity" aria-hidden="true"></i>
-                                    Запустить симуляцию
-                                </button>
-                                <button type="button">
-                                    <i class="bi bi-star" aria-hidden="true"></i>
-                                    Добавить в watchlist
-                                </button>
-                            </div>
-                            <p>Сформировано: @GeneratedAtLabel <i class="bi bi-info-circle" aria-hidden="true"></i></p>
+                    <section class="aside-row hairline-top">
+                        <div class="aside-row__head">
+                            <span class="label">Риски</span>
+                            <span class="aside-row__hint">условия, а не факты</span>
                         </div>
-                    </aside>
-                }
-            </section>
-        </section>
+                        <div class="aside-row__body">
+                            @if (profile.Risks.Count > 0)
+                            {
+                                @foreach (var risk in profile.Risks)
+                                {
+                                    <span class="risk">@risk</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="risk nodata">—</span>
+                            }
+                        </div>
+                    </section>
+
+                    <section class="aside-row aside-row--center hairline-top">
+                        <div class="aside-row__head">
+                            <span class="label">Ключевые слова</span>
+                            <span class="aside-row__hint">сопоставление новости</span>
+                        </div>
+                        <div class="aside-row__body aside-row__body--chips">
+                            @if (profile.Keywords.Count > 0)
+                            {
+                                @foreach (var keyword in profile.Keywords)
+                                {
+                                    <span class="chip">@keyword</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="nodata">—</span>
+                            }
+                        </div>
+                    </section>
+                </div>
+
+                <Panel Title="Исходное описание" Class="source rise rise-3">
+                    <MetaContent><text>то, что вы написали</text></MetaContent>
+                    <ChildContent>
+                        <p class="source__text">@profile.Description</p>
+                        <dl class="source__spec hairline-top">
+                            <div class="source__row">
+                                <dt>Тип актива</dt>
+                                <dd>@AssetTypeName(profile.AssetType)</dd>
+                            </div>
+                            <div class="source__row">
+                                <dt>Отрасль</dt>
+                                <dd>@(string.IsNullOrWhiteSpace(draftIndustry) ? "—" : draftIndustry)</dd>
+                            </div>
+                            <div class="source__row">
+                                <dt>Государственная поддержка</dt>
+                                <dd>@(includeGovernmentSupport ? "учитывается" : "не учитывается")</dd>
+                            </div>
+                            <div class="source__row">
+                                <dt>Потенциал роста</dt>
+                                <dd>
+                                    @if (growthPotential is { } value)
+                                    {
+                                        <span class="num">@value</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="nodata">—</span>
+                                    }
+                                </dd>
+                            </div>
+                        </dl>
+                    </ChildContent>
+                </Panel>
+            </div>
+
+            <p class="page-foot hairline-top">@SavedNote</p>
+        }
     </main>
 </div>
 
+@* Подтверждение: создание нового актива прервёт торги (раздел 9.12) *@
+@if (isConfirmOpen)
+{
+    <div class="overlay" @onclick="CloseConfirm">
+        <div class="confirm glass" role="dialog" aria-modal="true" aria-labelledby="confirm-title"
+             tabindex="-1" @ref="confirmDialog" @onkeydown="HandleConfirmKey" @onclick:stopPropagation="true">
+            <h2 id="confirm-title">Создать новый актив?</h2>
+            <p class="confirm__text">Актив в сессии один. Текущие торги по «@SessionAsset.Draft.Name» остановятся, агенты снимут открытые заявки. История сделок сохранится.</p>
+            <div class="confirm__meta">
+                <span>открытых заявок <span class="num-sm">@OpenOrdersCount</span></span>
+                <span>агентов <span class="num-sm">@SessionAgentsCount</span></span>
+                <span>шаг симуляции <span class="num-sm">@SessionTick</span></span>
+            </div>
+            <div class="confirm__actions">
+                <AppButton Variant="ghost" OnClick="CloseConfirm">Отмена</AppButton>
+                <AppButton Variant="primary" OnClick="ConfirmAndGenerate">Создать и остановить торги</AppButton>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
-    private readonly AssetTypeOption[] AssetTypes =
+    private const int MinDescriptionLength = 120;
+    private const int MaxDescriptionLength = 1200;
+
+    // Диапазон подписан на экране и размечен зонами: 0,45 · 0,60 · 0,75 · 0,95.
+    private const decimal SensitivityMin = 0.45m;
+    private const decimal SensitivityMax = 0.95m;
+
+    private static readonly ZoneScale.Zone[] SensitivityZones =
     [
-        new(AssetType.Stock, "Акция", "Публичная компания", "bi-graph-up-arrow"),
-        new(AssetType.Bond, "Облигация", "Долговой инструмент", "bi-receipt"),
-        new(AssetType.Commodity, "Товар", "Биржевой актив", "bi-bar-chart-line"),
-        new(AssetType.Crypto, "Криптоактив", "Цифровой актив", "bi-currency-bitcoin")
+        new("низкая", 0.60m),
+        new("средняя", 0.75m),
+        new("высокая", SensitivityMax)
     ];
 
-    private readonly string[] Industries =
+    private static readonly AssetTypeOption[] AssetTypes =
+    [
+        new(AssetType.Stock, "Акция", "доля в компании"),
+        new(AssetType.Bond, "Облигация", "долговая бумага"),
+        new(AssetType.Commodity, "Товар", "сырьё и ресурсы"),
+        new(AssetType.Crypto, "Криптовалюта", "цифровой актив")
+    ];
+
+    private static readonly string[] Industries =
     [
         "Энергетика",
         "Технологии",
         "Финансы",
         "Промышленность",
-        "Потребительский сектор"
+        "Транспорт",
+        "Розничная торговля"
     ];
 
-    private static readonly string[] AnalysisStages =
+    // Что появится в профиле. Текст описывает разделы профиля, а не выдумывает
+    // их: каждый пункт отрисовывается ниже из AssetProfile.
+    private static readonly PromiseItem[] ProfilePromise =
     [
-        "Анализ описания",
-        "Определение сектора",
-        "Оценка позитивных факторов",
-        "Оценка рисков",
-        "Расчёт чувствительности к новостям",
-        "Формирование тегов"
+        new("Позитивные и негативные факторы", "Что в описании работает на цену актива, а что против неё."),
+        new("Риски", "Условия, при которых оценка актива изменится."),
+        new("Чувствительность к новостям", "Число от 0,45 до 0,95: насколько сильно новости двигают цену этого актива."),
+        new("Ключевые слова", "По ним новость сопоставляется с активом."),
+        new("Тикер", "Система сгенерирует его из названия — вводить не нужно.")
     ];
 
-    private AssetTypeOption selectedAssetType = default!;
-    private string selectedIndustry = "Энергетика";
-    private string assetName = ActiveAssetDefaults.DemoDraft.Name;
-    private string assetDescription = ActiveAssetDefaults.DemoDraft.Description;
-    private bool isAssetTypeOpen;
+    private AssetType selectedAssetType = AssetType.Stock;
+    private string assetName = string.Empty;
+    private string assetDescription = string.Empty;
+    private string? selectedIndustry;
+    private bool includeGovernmentSupport;
+    private int? growthPotential;
+
     private bool isIndustryOpen;
-    private bool isOptionalOpen;
-    private bool isProfileGenerated;
     private bool isGenerating;
-    private bool includeGovernmentSupport = true;
-    private int growthPotential = 85;
-    private int generationStep = -1;
-    private DateTimeOffset? generatedAt;
-    private bool wasSubmitted;
-    private AssetProfile? generatedProfile;
-    private bool isDescriptionExpanded;
+    private bool isConfirmOpen;
+    private bool isConfirmFocused;
+    private bool isFormTouched;
+
+    private AssetProfile? profile;
+    private string draftIndustry = string.Empty;
+    private ElementReference confirmDialog;
 
     protected override void OnInitialized()
     {
-        var draft = ActiveAssetContext.Draft ?? ActiveAssetDefaults.DemoDraft;
-        selectedAssetType = ResolveAssetTypeOption(draft.AssetType);
-        ApplyDraft(draft);
-
-        if (ActiveAssetContext.Profile is not null)
+        // Черновик пустой, пока пользователь ничего не вводил: в макете форма
+        // пустая, а демо-актив сессии живёт отдельно и подписан в крошках.
+        if (ActiveAssetContext.Draft is { } draft)
         {
-            generatedProfile = ActiveAssetContext.Profile;
-            generatedAt = ActiveAssetContext.UpdatedAt;
-            isProfileGenerated = true;
+            selectedAssetType = draft.AssetType;
+            assetName = draft.Name;
+            assetDescription = draft.Description;
+            selectedIndustry = string.IsNullOrWhiteSpace(draft.Industry) ? null : draft.Industry;
+            includeGovernmentSupport = draft.IncludeGovernmentSupport;
+
+            // Ноль и «не задан» в черновике неразличимы, а нулевой потенциал
+            // роста смысла не имеет — читаем ноль как незаполненное поле.
+            growthPotential = draft.GrowthPotential > 0 ? draft.GrowthPotential : null;
+            draftIndustry = draft.Industry;
+            isFormTouched = true;
+        }
+
+        if (ActiveAssetContext.Profile is { } saved)
+        {
+            profile = saved;
         }
     }
 
-    private AssetProfile CurrentProfile => generatedProfile ?? ActiveAssetDefaults.BuildProfile(BuildDraft());
-    private bool CanGenerate => !string.IsNullOrWhiteSpace(assetName) && !string.IsNullOrWhiteSpace(assetDescription);
-    private int CompletedRequiredFields => (string.IsNullOrWhiteSpace(assetName) ? 0 : 1) + (string.IsNullOrWhiteSpace(assetDescription) ? 0 : 1);
-    private bool ShowAssetNameValidation => wasSubmitted && string.IsNullOrWhiteSpace(assetName);
-    private bool ShowAssetDescriptionValidation => wasSubmitted && string.IsNullOrWhiteSpace(assetDescription);
-    private string DisplayAssetName => string.IsNullOrWhiteSpace(assetName) ? "Новый актив" : assetName.Trim();
-    private string DisplayAssetTypeName => selectedAssetType.Name;
-    private int GenerationProgress => isGenerating ? Math.Clamp((generationStep + 1) * 100 / AnalysisStages.Length, 8, 100) : 0;
-    private string GeneratedAtLabel => generatedAt?.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "не сформировано";
-    private string PageTitleText => isProfileGenerated
-        ? "AI-профиль готов"
-        : isGenerating
-            ? "Формируем AI-профиль"
-            : "Создание актива";
-
-    private string PageDescriptionText => isProfileGenerated
-        ? "Проверьте сгенерированные параметры и переходите к торговым сценариям."
-        : isGenerating
-            ? "Модель последовательно оценивает описание, риски и чувствительность к новостям."
-            : "Опишите актив, уточните параметры и получите профиль с факторами роста, рисками и чувствительностью к новостям.";
-
-    private string DescriptionPreview => BuildDescriptionPreview(maxLength: 180);
-
-    private string SummaryDescription => isDescriptionExpanded
-        ? CurrentProfile.Description
-        : BuildDescriptionPreview(maxLength: 300);
-
-    private string RecommendationLabel =>
-        CurrentProfile.PositiveFactors.Count >= CurrentProfile.NegativeFactors.Count + 2
-            ? "позитивная"
-            : CurrentProfile.PositiveFactors.Count >= CurrentProfile.NegativeFactors.Count
-                ? "нейтрально-позитивная"
-                : "сбалансированная";
-
-    private string RecommendationTextClass => RecommendationLabel == "сбалансированная" ? "warning-text" : "positive-text";
-
-    private string RiskLevelLabel =>
-        CurrentProfile.Risks.Count + CurrentProfile.NegativeFactors.Count >= 5
-            ? "умеренно высокий"
-            : CurrentProfile.Risks.Count >= 2
-                ? "средний"
-                : "контролируемый";
-
-    private string RiskTextClass => RiskLevelLabel == "контролируемый" ? "positive-text" : "warning-text";
-
-    private string ConfidenceLabel => $"{Math.Clamp(64 + growthPotential / 4 + (includeGovernmentSupport ? 3 : 0), 68, 92)}%";
-
-    private int NewsSensitivityScore => (int)Math.Round(CurrentProfile.NewsSensitivity * 100m, MidpointRounding.AwayFromZero);
-
-    private string NewsSensitivityLabel => NewsSensitivityScore switch
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        >= 80 => "Высокая",
-        >= 60 => "Средняя",
-        _ => "Низкая"
+        // Фокус переводится в диалог один раз на открытие: иначе каждый
+        // повторный рендер утаскивал бы фокус с кнопок внутри диалога.
+        if (isConfirmOpen && !isConfirmFocused)
+        {
+            isConfirmFocused = true;
+            await confirmDialog.FocusAsync();
+        }
+    }
+
+    // ── Сессия ──────────────────────────────────────────────────────────────
+
+    private ActiveAssetView SessionAsset => ActiveAssetContext.GetView();
+
+    private bool HasSessionAsset => profile is not null || ActiveAssetContext.Draft is not null || SessionAsset.IsFallback;
+
+    private string Symbol => ActiveAssetDefaults.BuildSymbol(profile?.Name ?? assetName);
+
+    private string SessionNote => SessionAsset.IsFallback
+        ? $"Демо-контекст: в сессии пример «{SessionAsset.Draft.Name}» — новый актив заменит его."
+        : "Актив в сессии один: новый актив заменит текущий.";
+
+    private int OpenOrdersCount
+    {
+        get
+        {
+            var book = SimulationRunner.Current?.OrderBook;
+            return book is null
+                ? 0
+                : book.Bids.Sum(level => level.OrdersCount) + book.Asks.Sum(level => level.OrdersCount);
+        }
+    }
+
+    private int SessionAgentsCount => SimulationRunner.Current?.Agents.Count ?? 0;
+
+    private int SessionTick => SimulationRunner.Current?.Tick ?? 0;
+
+    // ── Валидация ───────────────────────────────────────────────────────────
+
+    private bool NameValid => !string.IsNullOrWhiteSpace(assetName);
+    private bool DescriptionValid => assetDescription.Trim().Length >= MinDescriptionLength;
+    private bool IsValid => NameValid && DescriptionValid;
+
+    /// <summary>Ошибки показываются, как только пользователь начал заполнять форму.</summary>
+    private bool ShowErrors => isFormTouched;
+
+    private bool NameInvalid => ShowErrors && !NameValid;
+    private bool DescriptionInvalid => ShowErrors && !DescriptionValid;
+    private int ErrorCount => (NameValid ? 0 : 1) + (DescriptionValid ? 0 : 1);
+
+    // ── Профиль на экране ───────────────────────────────────────────────────
+
+    private bool IsFallbackProfile => profile?.Source == ProfileSource.Fallback;
+
+    private string SourceBadge => IsFallbackProfile ? "Запасной алгоритм" : "Профиль построен AI";
+
+    private string SourceNote => IsFallbackProfile
+        ? "Языковая модель была недоступна: профиль собран по ключевым словам описания и отрасли, текст не анализировался."
+        : $"Профиль построен по описанию · тикер сгенерирован системой · {(ActiveAssetContext.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():d MMMM yyyy, HH:mm:ss}";
+
+    /// <summary>
+    /// Одно действие — одна формулировка (раздел 17). «Изменить описание» и
+    /// «Построить профиль заново» — одна кнопка: в обычном профиле пользователь
+    /// правит текст, в запасном — повторяет разбор того же текста.
+    /// </summary>
+    private string SecondaryActionLabel => IsFallbackProfile ? "Построить профиль заново" : "Изменить описание";
+
+    private Task SecondaryAction() => IsFallbackProfile ? RebuildProfile() : RunEditDescription();
+
+    private string SavedNote => IsFallbackProfile
+        ? "Описание можно проанализировать заново, когда модель ответит."
+        : "Профиль сохранён. Актив в сессии один — торги пойдут по нему.";
+
+    private int TotalFactors => (profile?.PositiveFactors.Count ?? 0) + (profile?.NegativeFactors.Count ?? 0);
+
+    private string FactorWord => (TotalFactors % 100 is >= 11 and <= 14) switch
+    {
+        true => "факторов",
+        false => (TotalFactors % 10) switch
+        {
+            1 => "фактор",
+            2 or 3 or 4 => "фактора",
+            _ => "факторов"
+        }
     };
 
-    private string PositiveImpactLabel => $"{Math.Clamp(58 + NewsSensitivityScore / 3, 62, 91)}%";
+    private string DescriptionExcerpt => profile?.Description ?? string.Empty;
 
-    private IReadOnlyList<FactorInsight> ProfilePositiveFactors =>
-        CurrentProfile.PositiveFactors
-            .Take(4)
-            .Select((factor, index) => new FactorInsight(
-                factor,
-                BuildPositiveFactorDetail(factor),
-                index == 0 ? "Высокое влияние" : index == 1 ? "Среднее влияние" : "Умеренное влияние",
-                $"{Math.Clamp(NewsSensitivityScore - index * 6, 54, 94)}%"))
-            .ToArray();
-
-    private IReadOnlyList<RiskInsight> ProfileRiskFactors =>
-        CurrentProfile.Risks
-            .Concat(CurrentProfile.NegativeFactors)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(4)
-            .Select((risk, index) => new RiskInsight(
-                risk,
-                index == 0 ? "Рыночные" : index == 1 ? "Операционные" : "Структурные",
-                BuildRiskDetail(risk),
-                index == 0 ? "Высокая" : "Средняя",
-                index == 0 ? "Высокий" : "Средний"))
-            .ToArray();
-
-    private IReadOnlyList<SensitivityDriver> ProfileSensitivityDrivers => BuildSensitivityDrivers();
-
-    private IReadOnlyList<TagChip> ProfileTags => BuildProfileTags();
-
-    private IReadOnlyList<ProfileConclusion> ProfileConclusions => BuildConclusions();
-
-    private string BuildDescriptionPreview(int maxLength)
+    private string SensitivityZoneName
     {
-        var source = isProfileGenerated
-            ? CurrentProfile.Description
-            : assetDescription;
-        var value = string.IsNullOrWhiteSpace(source)
-            ? "Описание не заполнено."
-            : source.Trim().Replace("\n", " ");
+        get
+        {
+            var value = profile?.NewsSensitivity ?? SensitivityMin;
 
-        return value.Length <= maxLength ? value : $"{value[..maxLength]}...";
+            foreach (var zone in SensitivityZones)
+            {
+                if (value < zone.To)
+                {
+                    return zone.Name;
+                }
+            }
+
+            return SensitivityZones[^1].Name;
+        }
     }
 
-    private void ToggleAssetType()
+    private string SensitivityNote => IsFallbackProfile
+        ? $"{SensitivityZoneName} · значение по отрасли"
+        : SensitivityZoneName;
+
+    private string MarketReaction => SensitivityZoneName switch
     {
-        isAssetTypeOpen = !isAssetTypeOpen;
+        "высокая" => "Новость по теме двигает цену сильнее среднего",
+        "средняя" => "Новость по теме двигает цену на среднюю величину",
+        _ => "Новость по теме двигает цену слабее среднего"
+    };
+
+    private string MarketReactionNote => SensitivityZoneName switch
+    {
+        "высокая" => "новостной агент на «Торгах» реагирует активнее",
+        "средняя" => "новостной агент на «Торгах» реагирует умеренно",
+        _ => "новостной агент на «Торгах» реагирует сдержаннее"
+    };
+
+    private static string AssetTypeName(AssetType assetType) =>
+        AssetTypes.First(option => option.Type == assetType).Name;
+
+    // ── Действия формы ──────────────────────────────────────────────────────
+
+    private void TouchForm()
+    {
+        isFormTouched = true;
+        SyncDraft();
+    }
+
+    private void SelectAssetType(AssetType assetType)
+    {
+        selectedAssetType = assetType;
         isIndustryOpen = false;
+        SyncDraft();
     }
 
-    private void SelectAssetType(AssetTypeOption type)
-    {
-        selectedAssetType = type;
-        isAssetTypeOpen = false;
-        SyncDraftState();
-    }
-
-    private void ToggleOptional()
-    {
-        isOptionalOpen = !isOptionalOpen;
-        isAssetTypeOpen = false;
-        isIndustryOpen = false;
-    }
-
-    private void ToggleIndustry()
-    {
-        isIndustryOpen = !isIndustryOpen;
-        isAssetTypeOpen = false;
-    }
+    private void ToggleIndustry() => isIndustryOpen = !isIndustryOpen;
 
     private void SelectIndustry(string industry)
     {
         selectedIndustry = industry;
         isIndustryOpen = false;
-        SyncDraftState();
+        SyncDraft();
     }
 
-    private async Task GenerateProfile()
+    private void ToggleGovernmentSupport()
     {
-        wasSubmitted = true;
+        includeGovernmentSupport = !includeGovernmentSupport;
+        SyncDraft();
+    }
 
-        if (!CanGenerate || isGenerating)
+    private void ClearForm()
+    {
+        selectedAssetType = AssetType.Stock;
+        assetName = string.Empty;
+        assetDescription = string.Empty;
+        selectedIndustry = null;
+        includeGovernmentSupport = false;
+        growthPotential = null;
+        isIndustryOpen = false;
+        isFormTouched = false;
+        profile = null;
+        draftIndustry = string.Empty;
+        ActiveAssetContext.Clear();
+    }
+
+    private Task RunEditDescription()
+    {
+        EditDescription();
+        return Task.CompletedTask;
+    }
+
+    private void EditDescription()
+    {
+        profile = null;
+        isIndustryOpen = false;
+        ActiveAssetContext.SetDraft(BuildDraft());
+    }
+
+    private Task RebuildProfile()
+    {
+        profile = null;
+        return GenerateProfileAsync();
+    }
+
+    /// <summary>
+    /// Актив в сессии один: если торги идут, новый актив их прервёт, и это
+    /// подтверждается явно.
+    /// </summary>
+    private Task RequestProfile()
+    {
+        if (!IsValid)
+        {
+            isFormTouched = true;
+            return Task.CompletedTask;
+        }
+
+        if (SimulationRunner.IsRunning)
+        {
+            isConfirmOpen = true;
+            isConfirmFocused = false;
+            return Task.CompletedTask;
+        }
+
+        return GenerateProfileAsync();
+    }
+
+    private void CloseConfirm()
+    {
+        isConfirmOpen = false;
+        isConfirmFocused = false;
+    }
+
+    private Task HandleConfirmKey(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            CloseConfirm();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmAndGenerate()
+    {
+        CloseConfirm();
+        await SimulationRunner.StopAsync();
+        await GenerateProfileAsync();
+    }
+
+    /// <summary>
+    /// Состояние загрузки остаётся: разбор описания станет асинхронным, и
+    /// скелетон по форме будущего профиля работает и сейчас, и тогда.
+    /// </summary>
+    private async Task GenerateProfileAsync()
+    {
+        if (isGenerating)
         {
             return;
         }
 
         isGenerating = true;
-        isProfileGenerated = false;
-        wasSubmitted = false;
-        isAssetTypeOpen = false;
         isIndustryOpen = false;
-        isOptionalOpen = false;
+        StateHasChanged();
 
-        for (var i = 0; i < AnalysisStages.Length; i++)
+        // Уступаем поток, чтобы скелетон успел отрисоваться. Когда разбор
+        // описания станет асинхронным, здесь будет await настоящего вызова,
+        // и состояние загрузки заработает без правок разметки.
+        await Task.Yield();
+
+        try
         {
-            generationStep = i;
-            StateHasChanged();
-            await Task.Delay(320);
+            var draft = BuildDraft();
+            var generated = AssetProfileService.CreateProfile(new AssetProfileRequest
+            {
+                AssetType = draft.AssetType,
+                Name = draft.Name,
+                Description = draft.Description,
+                Industry = draft.Industry,
+                IncludeGovernmentSupport = draft.IncludeGovernmentSupport,
+                GrowthPotential = growthPotential
+            });
+
+            draftIndustry = draft.Industry;
+            profile = generated;
+            ActiveAssetContext.SetProfile(draft, generated);
         }
-
-        var draft = BuildDraft();
-        generatedProfile = AssetProfileService.CreateProfile(new AssetProfileRequest
+        finally
         {
-            AssetType = draft.AssetType,
-            Name = draft.Name,
-            Description = draft.Description,
-            Industry = draft.Industry,
-            IncludeGovernmentSupport = draft.IncludeGovernmentSupport,
-            GrowthPotential = draft.GrowthPotential
-        });
-
-        generatedAt = DateTimeOffset.Now;
-        generationStep = AnalysisStages.Length;
-        isGenerating = false;
-        isProfileGenerated = true;
-        isDescriptionExpanded = false;
-        ActiveAssetContext.SetProfile(draft, generatedProfile);
+            isGenerating = false;
+        }
     }
 
-    private Task RegenerateProfile()
+    private void SyncDraft()
     {
-        return GenerateProfile();
-    }
-
-    private void EditParameters()
-    {
-        generatedProfile = null;
-        isProfileGenerated = false;
-        isGenerating = false;
-        wasSubmitted = false;
-        generationStep = -1;
-        isDescriptionExpanded = false;
-        ActiveAssetContext.SetDraft(BuildDraft());
-    }
-
-    private void ClearForm()
-    {
-        selectedAssetType = AssetTypes[0];
-        selectedIndustry = "Энергетика";
-        assetName = string.Empty;
-        assetDescription = string.Empty;
-        includeGovernmentSupport = true;
-        growthPotential = 85;
-        isOptionalOpen = false;
-        isAssetTypeOpen = false;
-        isIndustryOpen = false;
-        isProfileGenerated = false;
-        isGenerating = false;
-        wasSubmitted = false;
-        generationStep = -1;
-        generatedAt = null;
-        generatedProfile = null;
-        isDescriptionExpanded = false;
-        ActiveAssetContext.Clear();
-    }
-
-    private void ToggleDescriptionExpansion() => isDescriptionExpanded = !isDescriptionExpanded;
-
-    private void ApplyDraft(ActiveAssetDraft draft)
-    {
-        selectedAssetType = ResolveAssetTypeOption(draft.AssetType);
-        selectedIndustry = string.IsNullOrWhiteSpace(draft.Industry) ? Industries[0] : draft.Industry;
-        assetName = draft.Name;
-        assetDescription = draft.Description;
-        includeGovernmentSupport = draft.IncludeGovernmentSupport;
-        growthPotential = draft.GrowthPotential;
-    }
-
-    private void SyncDraftState()
-    {
-        if (isGenerating)
+        if (isGenerating || profile is not null)
         {
             return;
         }
@@ -796,92 +831,14 @@
 
     private ActiveAssetDraft BuildDraft() =>
         new(
-            Name: DisplayAssetName,
-            Description: string.IsNullOrWhiteSpace(assetDescription) ? "Описание не заполнено." : assetDescription.Trim(),
-            AssetType: selectedAssetType.Type,
-            Industry: selectedIndustry,
+            Name: assetName.Trim(),
+            Description: assetDescription.Trim(),
+            AssetType: selectedAssetType,
+            Industry: selectedIndustry ?? string.Empty,
             IncludeGovernmentSupport: includeGovernmentSupport,
-            GrowthPotential: growthPotential);
+            GrowthPotential: growthPotential ?? 0);
 
-    private AssetTypeOption ResolveAssetTypeOption(AssetType assetType) =>
-        AssetTypes.FirstOrDefault(item => item.Type == assetType) ?? AssetTypes[0];
+    private sealed record AssetTypeOption(AssetType Type, string Name, string Hint);
 
-    private IReadOnlyList<SensitivityDriver> BuildSensitivityDrivers()
-    {
-        var drivers = new List<SensitivityDriver>
-        {
-            new("Корпоративные новости", NewsSensitivityScore >= 75 ? "Высокая" : "Средняя"),
-            new($"Сектор {selectedIndustry}", NewsSensitivityScore >= 65 ? "Высокая" : "Средняя"),
-            new(includeGovernmentSupport ? "Господдержка" : "Рыночный спрос", includeGovernmentSupport ? "Высокая" : "Средняя")
-        };
-
-        return drivers
-            .DistinctBy(driver => driver.Name)
-            .ToArray();
-    }
-
-    private IReadOnlyList<TagChip> BuildProfileTags()
-    {
-        var tags = new List<TagChip>
-        {
-            new(selectedIndustry, string.Empty),
-            new(DisplayAssetTypeName, string.Empty)
-        };
-
-        if (includeGovernmentSupport)
-        {
-            tags.Add(new("Господдержка", "green-tag"));
-        }
-
-        if (CurrentProfile.Risks.Count > 0)
-        {
-            tags.Add(new(CurrentProfile.Risks[0], "risk-tag"));
-        }
-
-        if (NewsSensitivityScore >= 70)
-        {
-            tags.Add(new("Высокая чувствительность", "warning-tag"));
-        }
-
-        tags.AddRange(CurrentProfile.Keywords
-            .Where(keyword => !string.Equals(keyword, DisplayAssetName, StringComparison.OrdinalIgnoreCase))
-            .Take(3)
-            .Select(keyword => new TagChip(keyword, string.Empty)));
-
-        return tags
-            .DistinctBy(tag => tag.Label)
-            .Take(5)
-            .ToArray();
-    }
-
-    private IReadOnlyList<ProfileConclusion> BuildConclusions()
-    {
-        var conclusions = new List<ProfileConclusion>();
-
-        if (CurrentProfile.PositiveFactors.Count > 0)
-        {
-            conclusions.Add(new("bi-bar-chart-line", $"Основной драйвер: {CurrentProfile.PositiveFactors[0]}"));
-        }
-
-        if (CurrentProfile.Risks.Count > 0)
-        {
-            conclusions.Add(new("bi-exclamation-triangle", $"Главный риск: {CurrentProfile.Risks[0]}"));
-        }
-
-        conclusions.Add(new("bi-bullseye", $"Профиль: {RiskLevelLabel} риск при рекомендации «{RecommendationLabel}»"));
-        return conclusions.Take(3).ToArray();
-    }
-
-    private static string BuildPositiveFactorDetail(string factor) =>
-        $"{factor}. Фактор учитывается в профиле как один из основных драйверов сценария роста.";
-
-    private static string BuildRiskDetail(string risk) =>
-        $"{risk}. Требует мониторинга в ленте новостей, ликвидности и в динамике поведения агентов.";
-
-    private sealed record AssetTypeOption(AssetType Type, string Name, string Description, string IconClass);
-    private sealed record FactorInsight(string Title, string Detail, string Impact, string Confidence);
-    private sealed record RiskInsight(string Title, string Type, string Detail, string Probability, string Impact);
-    private sealed record SensitivityDriver(string Name, string Level);
-    private sealed record TagChip(string Label, string ClassName);
-    private sealed record ProfileConclusion(string Icon, string Text);
+    private sealed record PromiseItem(string Title, string Text);
 }

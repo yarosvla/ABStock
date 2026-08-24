@@ -2,7 +2,7 @@
 
 .ui-balance {
     display: flex;
-    gap: 3px;
+    gap: var(--s-1);
     height: 22px;
     min-width: 0;
 }
@@ -10,7 +10,7 @@
 .ui-balance__half {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--s-1);
     min-width: 0;
     padding: 0 var(--s-2);
     border: 1px solid transparent;
