@@ -315,8 +315,7 @@
                                             var capitalLabel = "Капитал агента: " + typeLabel;
                                             var countLabel = "Количество агентов: " + typeLabel;
                                             var rowClass = isOff ? "is-off" : null;
-                                            var fieldClass = capitalError ? "field is-error" : "field";
-                                            var invalidFlag = capitalError ? "true" : null;
+                                            var capitalCellClass = capitalError ? "is-error" : null;
                                             <tr class="@rowClass">
                                                 <th scope="row" class="compose__c-type">
                                                     <span class="compose__cell">
@@ -336,12 +335,15 @@
                                                                    DecrementLabel="@lessLabel"
                                                                    IncrementLabel="@moreLabel" />
                                                 </td>
-                                                <td class="compose__c-cap">
-                                                    <input class="@fieldClass"
-                                                           type="number" min="1" step="1000"
-                                                           aria-label="@capitalLabel"
-                                                           aria-invalid="@invalidFlag"
-                                                           @bind="row.Capital" @bind:event="oninput" />
+                                                <td class="compose__c-cap @capitalCellClass">
+                                                    <NumberStepper Value="@((int)row.Capital)"
+                                                                   ValueChanged="@(value => { row.Capital = value ?? 0m; })"
+                                                                   Min="0" Max="null" Step="1000"
+                                                                   Editable="true" Fill="true"
+                                                                   Class="compose__capital"
+                                                                   Label="@capitalLabel"
+                                                                   DecrementLabel="@("Уменьшить капитал: " + typeLabel)"
+                                                                   IncrementLabel="@("Увеличить капитал: " + typeLabel)" />
                                                     @if (capitalError)
                                                     {
                                                         <span class="field__error">

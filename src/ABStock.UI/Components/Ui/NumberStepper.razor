@@ -7,7 +7,7 @@
    (состав агентов на «Торгах»). Editable=true — рядом с кнопками поле ввода
    для прямого набора: докликивать до 62 никто не станет. *@
 
-<div class="ui-stepper @Class">
+<div class="ui-stepper @(Fill ? "ui-stepper--fill" : null) @Class">
     <AppButton Variant="secondary" Size="26" Icon="minus"
                Class="ui-btn--icon"
                Disabled="@AtMin"
@@ -16,8 +16,13 @@
 
     @if (Editable)
     {
-        @* type="text" + inputmode: спиннера нет, а цифровая клавиатура есть. *@
-        <input class="ui-stepper__input"
+        @* type="text" + inputmode: спиннера нет, а цифровая клавиатура есть.
+           @key пересоздаёт поле после каждого ввода: без него набранное
+           «110000» так и осталось бы без разделителя разрядов — Blazor
+           сравнивает отрисованное значение, а не то, что в DOM. Ввод к этому
+           моменту уже завершён (onchange), фокус не теряется. *@
+        <input @key="revision"
+               class="ui-stepper__input"
                type="text" inputmode="numeric" autocomplete="off"
                placeholder="@Placeholder"
                aria-label="@Label"
@@ -41,8 +46,14 @@
     [Parameter] public EventCallback<int?> ValueChanged { get; set; }
 
     [Parameter] public int Min { get; set; }
-    [Parameter] public int Max { get; set; } = 100;
+
+    /// <summary>Верхняя граница. null — потолка нет: у капитала агента его никто не задавал.</summary>
+    [Parameter] public int? Max { get; set; } = 100;
+
     [Parameter] public int Step { get; set; } = 1;
+
+    /// <summary>Растянуть степпер по ширине ячейки: поле забирает всё, что осталось от кнопок.</summary>
+    [Parameter] public bool Fill { get; set; }
 
     /// <summary>Разрешить прямой набор числа рядом с кнопками.</summary>
     [Parameter] public bool Editable { get; set; }
@@ -56,12 +67,19 @@
 
     [Parameter] public string? Class { get; set; }
 
+    /// <summary>
+    /// Тысячи разделяются узким пробелом (раздел 10): «110 000», а не «110000».
+    /// Нативный input type=number так не умел — это одна из причин, по которой
+    /// его здесь нет.
+    /// </summary>
     private string Text => Value is { } value
-        ? value.ToString(CultureInfo.InvariantCulture)
+        ? value.ToString("N0")
         : Editable ? string.Empty : Placeholder;
 
+    private int revision;
+
     private bool AtMin => Value is { } value && value <= Min;
-    private bool AtMax => Value is { } value && value >= Max;
+    private bool AtMax => Max is { } max && Value is { } value && value >= max;
 
     /// <summary>Незаполненное поле начинает счёт с минимума, а не с нуля.</summary>
     private Task Decrement() => Commit(Value is { } value ? value - Step : Min);
@@ -70,6 +88,7 @@
 
     private Task HandleInput(ChangeEventArgs args)
     {
+        revision++;
         var raw = args.Value?.ToString();
 
         if (string.IsNullOrWhiteSpace(raw))
@@ -77,11 +96,15 @@
             return Commit(null);
         }
 
-        return int.TryParse(raw.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+        // Разделители разрядов пользователь может и оставить, и стереть —
+        // принимаем оба написания.
+        var digits = new string(raw.Where(symbol => !char.IsWhiteSpace(symbol)).ToArray());
+
+        return int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? Commit(parsed)
             : ValueChanged.InvokeAsync(Value); // мусор не принимаем, поле возвращается к текущему числу
     }
 
     private Task Commit(int? next) =>
-        ValueChanged.InvokeAsync(next is { } value ? Math.Clamp(value, Min, Max) : null);
+        ValueChanged.InvokeAsync(next is { } value ? Math.Clamp(value, Min, Max ?? int.MaxValue) : null);
 }
