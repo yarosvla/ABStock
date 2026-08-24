@@ -101,37 +101,51 @@ public sealed class AssetProfileService : IAssetProfileService
         };
     }
 
+    /// <summary>
+    /// Чувствительность к новостям в диапазоне 0,45–0,95, размеченном зонами
+    /// шкалы: низкая до 0,60, средняя до 0,75, высокая дальше.
+    ///
+    /// Тип актива задаёт положение на шкале, остальные вводные его сдвигают.
+    /// Сдвиги намеренно небольшие: раньше потенциал роста давал до +0,40 и
+    /// в одиночку доводил почти любой актив до потолка 0,95 — шкала показывала
+    /// максимум всегда и ничего не различала. Потенциал роста считается
+    /// отклонением от середины (50), поэтому средний потенциал не двигает
+    /// значение, низкий тянет вниз, высокий вверх.
+    /// </summary>
     private static decimal CalculateNewsSensitivity(
         AssetType assetType,
         string industry,
         bool includeGovernmentSupport,
         int? growthPotential)
     {
-        var baseSensitivity = assetType switch
+        var sensitivity = assetType switch
         {
             AssetType.Stock => 0.62m,
-            AssetType.Bond => 0.44m,
+            AssetType.Bond => 0.50m,
             AssetType.Commodity => 0.58m,
             AssetType.Crypto => 0.78m,
-            _ => 0.55m
+            _ => 0.60m
         };
 
         if (industry.Contains("Энерг", StringComparison.OrdinalIgnoreCase) ||
             industry.Contains("Тех", StringComparison.OrdinalIgnoreCase))
         {
-            baseSensitivity += 0.08m;
+            sensitivity += 0.04m;
         }
 
         if (includeGovernmentSupport)
         {
-            baseSensitivity += 0.05m;
+            sensitivity += 0.03m;
         }
 
-        baseSensitivity += Math.Clamp(growthPotential ?? 0, 0, 100) / 250m;
+        if (growthPotential is { } potential)
+        {
+            sensitivity += (Math.Clamp(potential, 0, 100) - 50) / 400m;
+        }
 
-        // Диапазон 0,45–0,95 подписан на экране «Создание актива» и размечен
-        // зонами шкалы: значение вне него сделало бы подпись неправдой.
-        return Math.Clamp(baseSensitivity, 0.45m, 0.95m);
+        // Диапазон подписан на экране «Создание актива»: значение вне него
+        // сделало бы подпись неправдой.
+        return Math.Clamp(sensitivity, 0.45m, 0.95m);
     }
 
     private static IReadOnlyList<string> BuildKeywords(
@@ -153,9 +167,16 @@ public sealed class AssetProfileService : IAssetProfileService
             keywords.Add("господдержка");
         }
 
+        // Грубый фильтр, пока описание разбирает не модель: слишком короткие
+        // и служебные слова («какой», «текст», «написан») попадали в чипы и
+        // читались как характеристика актива. Когда придёт модель, фильтр
+        // останется безвредным — она таких слов не вернёт.
         keywords.AddRange(description
-            .Split([' ', ',', '.', ':', ';', '(', ')', '\n', '\r', '-'], StringSplitOptions.RemoveEmptyEntries)
-            .Where(word => word.Length >= 5)
+            .Split([' ', ',', '.', ':', ';', '(', ')', '\n', '\r', '-', '—', '«', '»', '"'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(word => word.Trim())
+            .Where(word => word.Length >= MinKeywordLength)
+            .Where(word => word.All(char.IsLetter))
+            .Where(word => !StopWords.Contains(word))
             .Take(6));
 
         return keywords
@@ -164,6 +185,26 @@ public sealed class AssetProfileService : IAssetProfileService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
+
+    /// <summary>Короче — уже не характеристика актива, а связка.</summary>
+    private const int MinKeywordLength = 6;
+
+    /// <summary>
+    /// Служебные и оценочные слова, которые в описании встречаются часто,
+    /// а об активе не говорят ничего.
+    /// </summary>
+    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "который", "которая", "которое", "которые", "которых", "которым",
+        "поэтому", "однако", "также", "потому", "значит", "например",
+        "необходимо", "является", "являются", "будет", "может", "можно", "нужно",
+        "около", "между", "после", "перед", "через", "чтобы", "когда",
+        "больше", "меньше", "очень", "почти", "всего", "только", "именно",
+        "написан", "написано", "написать", "описание", "описания",
+        "данный", "данные", "данных", "такой", "такая", "такие", "такое",
+        "общий", "общая", "общее", "общей", "общего", "общих",
+        "часть", "части", "время", "период", "компания", "компании"
+    };
 
     private static string GetAssetTypeLabel(AssetType assetType) =>
         assetType switch
