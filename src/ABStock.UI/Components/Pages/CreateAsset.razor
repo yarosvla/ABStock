@@ -206,11 +206,14 @@
                                     </div>
 
                                     <div class="param">
-                                        <label class="param__label" for="growth-potential">Потенциал роста</label>
+                                        <span class="param__label" id="growth-label">Потенциал роста</span>
                                         <div class="param__control">
-                                            <input id="growth-potential" class="input input--num"
-                                                   type="number" min="0" max="100" step="1" placeholder="—"
-                                                   @bind="growthPotential" @bind:event="oninput" />
+                                            <NumberStepper Value="growthPotential"
+                                                           ValueChanged="SetGrowthPotential"
+                                                           Min="0" Max="100" Editable="true"
+                                                           Label="Потенциал роста, от 0 до 100"
+                                                           DecrementLabel="Уменьшить потенциал роста"
+                                                           IncrementLabel="Увеличить потенциал роста" />
                                             <span class="param__range">0 – 100</span>
                                         </div>
                                     </div>
@@ -692,6 +695,12 @@
     {
         selectedIndustry = industry;
         isIndustryOpen = false;
+        SyncDraft();
+    }
+
+    private void SetGrowthPotential(int? value)
+    {
+        growthPotential = value;
         SyncDraft();
     }
 

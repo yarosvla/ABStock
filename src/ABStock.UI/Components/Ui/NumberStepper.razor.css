@@ -1,0 +1,40 @@
+/* Число со степпером — раздел 9.2.1. Только раскладка и токены. */
+
+.ui-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.ui-stepper__value {
+    min-width: var(--s-5);
+    font: var(--n-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--text-1);
+}
+
+.ui-stepper__input {
+    width: var(--s-14);
+    height: var(--h-ctl-md);
+    padding: 0 10px;
+    background: var(--gph-750);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    font: var(--n-md);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--text-1);
+
+    /* Раздел 9.2.1: браузерных украшений у поля не остаётся. */
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.ui-stepper__input::placeholder { color: var(--text-4); }
+
+.ui-stepper__input:focus {
+    outline: none;
+    border-color: var(--acc-line);
+    box-shadow: 0 0 0 2px var(--acc-soft);
+}
