@@ -28,4 +28,7 @@
   <Folder Name="/tests/Persistence.Tests/">
     <Project Path="tests/Persistence.Tests/ABStock.Persistence.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/UI.Tests/">
+    <Project Path="tests/UI.Tests/ABStock.UI.Tests.csproj" />
+  </Folder>
 </Solution>
