@@ -130,7 +130,10 @@
                                        @bind="assetName" @bind:event="oninput" @bind:after="TouchForm" />
                                 @if (NameInvalid)
                                 {
-                                    <span id="asset-name-error" class="field__error">Введите название — из него генерируется тикер</span>
+                                    <span id="asset-name-error" class="field__error">
+                                        <Icon Name="alert" Size="14" />
+                                        <span>Введите название — из него генерируется тикер</span>
+                                    </span>
                                 }
                             </section>
 
@@ -151,7 +154,10 @@
                                           @bind="assetDescription" @bind:event="oninput" @bind:after="TouchForm"></textarea>
                                 @if (DescriptionInvalid)
                                 {
-                                    <span id="asset-description-error" class="field__error">Слишком коротко: нужно не меньше @MinDescriptionLength символов, чтобы собрать факторы и риски</span>
+                                    <span id="asset-description-error" class="field__error">
+                                        <Icon Name="alert" Size="14" />
+                                        <span>Слишком коротко: нужно не меньше @MinDescriptionLength символов, чтобы собрать факторы и риски</span>
+                                    </span>
                                 }
                             </section>
 
@@ -270,10 +276,6 @@
                         @if (includeGovernmentSupport)
                         {
                             <span class="chip">господдержка учтена</span>
-                        }
-                        @if (growthPotential is { } potential)
-                        {
-                            <span class="chip">потенциал роста <span class="num-sm">@potential</span></span>
                         }
                         <span class="badge badge--@(IsFallbackProfile ? "warn" : "acc")">@SourceBadge</span>
                     </div>
