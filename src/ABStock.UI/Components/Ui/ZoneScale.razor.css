@@ -21,12 +21,15 @@
 .ui-scale__value {
     position: absolute;
     bottom: 0;
-    transform: translateX(-50%);
     display: flex;
     align-items: baseline;
-    gap: 7px;
+    gap: var(--s-2);
     white-space: nowrap;
 }
+
+.ui-scale__value--center { transform: translateX(-50%); }
+.ui-scale__value--start  { transform: none; }
+.ui-scale__value--end    { transform: translateX(-100%); }
 
 .ui-scale__number {
     font: var(--n-hero);
@@ -48,7 +51,7 @@
 .ui-scale__track {
     position: relative;
     display: flex;
-    gap: 3px;
+    gap: var(--s-1);
     height: 14px;
 }
 
@@ -78,7 +81,7 @@
 /* ---------- названия зон по центру сегментов ---------- */
 .ui-scale__names {
     display: flex;
-    gap: 3px;
+    gap: var(--s-1);
     font: var(--t-micro);
     font-weight: 400;
     color: var(--text-3);
