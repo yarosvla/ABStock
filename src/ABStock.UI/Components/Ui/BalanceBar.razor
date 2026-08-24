@@ -1,0 +1,48 @@
+@using System.Globalization
+
+@* Полоса баланса — раздел 9.18. Соотношение двух встречных величин одной
+   природы. Половины различаются СВЕТЛОТОЙ, а не цветом: зелёный и красный
+   зарезервированы за движением цены (раздел 3). *@
+
+<div class="ui-balance @Class" role="img" aria-label="@AriaLabel">
+    @if (Positive > 0)
+    {
+        <div class="ui-balance__half ui-balance__half--positive" style="flex:@Flex(Positive)">
+            <span class="ui-balance__count">@Positive</span>
+            <span class="ui-balance__caption">@PositiveLabel</span>
+        </div>
+    }
+    @if (Negative > 0)
+    {
+        <div class="ui-balance__half ui-balance__half--negative" style="flex:@Flex(Negative)">
+            <span class="ui-balance__count">@Negative</span>
+            <span class="ui-balance__caption">@NegativeLabel</span>
+        </div>
+    }
+    @if (Positive == 0 && Negative == 0)
+    {
+        <div class="ui-balance__half ui-balance__half--empty" style="flex:1">
+            <span class="ui-balance__caption">@EmptyLabel</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public int Positive { get; set; }
+    [Parameter, EditorRequired] public int Negative { get; set; }
+
+    [Parameter] public string PositiveLabel { get; set; } = "позитивных";
+    [Parameter] public string NegativeLabel { get; set; } = "негативных";
+
+    /// <summary>Что написать, когда считать нечего. Не «0» — раздел 10.</summary>
+    [Parameter] public string EmptyLabel { get; set; } = "нет данных";
+
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Доля половины. InvariantCulture: значение уезжает в CSS.</summary>
+    private static string Flex(int count) => count.ToString(CultureInfo.InvariantCulture);
+
+    private string AriaLabel => Positive == 0 && Negative == 0
+        ? EmptyLabel
+        : $"{Positive} {PositiveLabel} против {Negative} {NegativeLabel}";
+}

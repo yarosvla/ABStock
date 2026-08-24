@@ -1,0 +1,74 @@
+/* Полоса связи — раздел 9.19. Стрелки между шагами рисует сама полоса:
+   шаг не знает, первый он или нет. */
+
+.ui-causality {
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    padding: var(--s-4) var(--s-5);
+    background: var(--gph-850);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-lg);
+    box-shadow: var(--sh-sm);
+}
+
+.ui-causality--quiet {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+.ui-causality ::deep .ui-causality__step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+}
+
+.ui-causality ::deep .ui-causality__step + .ui-causality__step {
+    margin-left: var(--s-10);
+}
+
+/* Стрелка стоит ровно посередине зазора в 40px между шагами. */
+.ui-causality ::deep .ui-causality__step + .ui-causality__step::before {
+    content: "→";
+    position: absolute;
+    top: 0;
+    left: calc(-1 * var(--s-5));
+    transform: translateX(-50%);
+    font: var(--t-body);
+    color: var(--text-4);
+}
+
+.ui-causality ::deep .ui-causality__label {
+    white-space: nowrap;
+}
+
+.ui-causality ::deep .ui-causality__value {
+    font: var(--t-body);
+    color: var(--text-1);
+    text-wrap: pretty;
+}
+
+.ui-causality ::deep .ui-causality__value.is-truncated {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ui-causality ::deep .ui-causality__note {
+    font: var(--t-caption);
+    color: var(--text-3);
+    text-wrap: pretty;
+}
+
+/* < --bp-sm: полоса не растёт в высоту, но зазор между шагами ужимается.
+   var() в условии @media невалиден, поэтому здесь литерал — он обязан
+   совпадать с --bp-sm (1280) из design-system.css. */
+@media (max-width: 1279px) {
+    .ui-causality { padding: var(--s-3) var(--s-4); }
+    .ui-causality ::deep .ui-causality__step + .ui-causality__step { margin-left: var(--s-6); }
+    .ui-causality ::deep .ui-causality__step + .ui-causality__step::before { left: calc(-1 * var(--s-3)); }
+}
