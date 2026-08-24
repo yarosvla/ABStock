@@ -87,7 +87,13 @@ public sealed class AssetProfileService : IAssetProfileService
             Risks: risks.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             NewsSensitivity: newsSensitivity,
             Keywords: keywords
-        );
+        )
+        {
+            // Разбор описания сегодня один — свой. Когда сюда придёт вызов
+            // языковой модели, при неудаче здесь встанет ProfileSource.Fallback,
+            // и страница покажет запасной профиль без правок интерфейса.
+            Source = ProfileSource.Ai
+        };
     }
 
     private static decimal CalculateNewsSensitivity(
