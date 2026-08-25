@@ -1,3 +1,4 @@
+using ABStock.Application.Simulation;
 using ABStock.Shared;
 
 namespace ABStock.UI.Services;
@@ -24,11 +25,29 @@ public interface ISessionNewsFeed
     void Clear();
 }
 
-public sealed class SessionNewsFeed : ISessionNewsFeed
+/// <summary>
+/// Сессия здесь — это торговый прогон, а он живёт в singleton-ISimulationRunner,
+/// поэтому и лента singleton. Scoped не подошёл: роутер приложения статический,
+/// каждая навигация между страницами поднимает новый контур, и хронология
+/// обнулялась ровно на переходе «Новости» → «Торги», где её и надо показать.
+/// </summary>
+public sealed class SessionNewsFeed(ISimulationRunner runner) : ISessionNewsFeed
 {
+    private readonly Lock _sync = new();
     private readonly List<SessionNewsEntry> _entries = [];
+    private Guid _runId;
 
-    public IReadOnlyList<SessionNewsEntry> Entries => _entries;
+    public IReadOnlyList<SessionNewsEntry> Entries
+    {
+        get
+        {
+            lock (_sync)
+            {
+                DropOtherRunLocked();
+                return _entries.ToArray();
+            }
+        }
+    }
 
     public int Revision { get; private set; }
 
@@ -45,27 +64,55 @@ public sealed class SessionNewsFeed : ISessionNewsFeed
             signal.Confidence,
             signal.ImpactScore);
 
-        _entries.Insert(0, entry);
-        Touch();
+        lock (_sync)
+        {
+            DropOtherRunLocked();
+            _entries.Insert(0, entry);
+            Revision++;
+        }
 
+        Changed?.Invoke();
         return entry;
     }
 
     public void Clear()
     {
-        if (_entries.Count == 0)
+        lock (_sync)
+        {
+            if (_entries.Count == 0)
+            {
+                return;
+            }
+
+            _entries.Clear();
+            Revision++;
+        }
+
+        Changed?.Invoke();
+    }
+
+    /// <summary>
+    /// Новый прогон — новая хронология: иначе рядом оказались бы новости
+    /// прошлого запуска и счётчики нынешнего (раздел 10, «один период»).
+    /// Событие отсюда не шлётся: проверка вызывается из геттера во время
+    /// отрисовки, и StateHasChanged на этом месте был бы повторным входом.
+    /// </summary>
+    private void DropOtherRunLocked()
+    {
+        var runId = runner.CurrentRunId;
+
+        if (runId == _runId)
         {
             return;
         }
 
-        _entries.Clear();
-        Touch();
-    }
+        _runId = runId;
 
-    private void Touch()
-    {
-        Revision++;
-        Changed?.Invoke();
+        if (_entries.Count > 0)
+        {
+            _entries.Clear();
+            Revision++;
+        }
     }
 }
 

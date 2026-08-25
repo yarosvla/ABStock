@@ -26,8 +26,9 @@ builder.Services.AddABStockPersistence(
     builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
 builder.Services.AddScoped<IActiveAssetContext, ActiveAssetContext>();
 // Хронология новостей сессии — одна на весь продукт (DESIGN.md 13):
-// её читают и «Новости», и левый рельс «Торгов».
-builder.Services.AddScoped<ISessionNewsFeed, SessionNewsFeed>();
+// её читают и «Новости», и левый рельс «Торгов». Singleton, как и сама
+// симуляция: роутер статический, каждая навигация поднимает новый контур.
+builder.Services.AddSingleton<ISessionNewsFeed, SessionNewsFeed>();
 
 if (builder.Environment.IsDevelopment())
 {
