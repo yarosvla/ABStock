@@ -156,7 +156,6 @@
                         <StatusDot Tone="agent-news" />
                         @AgentActionName
                     </span>
-                    <span class="ui-causality__note" title="@agentDecision.Explanation">@agentDecision.Explanation</span>
                 }
             </CausalityStep>
 
@@ -223,6 +222,27 @@
 
             @* ─────────── ЦЕНТР · разбор ─────────── *@
             <div class="center">
+
+                @* Решение новостного агента живёт под полосой связи во всех
+                   состояниях: шаг полосы несёт короткое действие, развёрнутое
+                   объяснение — здесь. До появления новости агент неактивен, и
+                   это состояние показывается, а не прячется (раздел 16.4). *@
+                @if (isRunning)
+                {
+                    <Panel Quiet="true" Class="rise rise-2">
+                        <div class="agent-line">
+                            <span class="label agent-line__label">Новостной агент</span>
+                            <StatusDot Tone="agent-news" />
+                            <span class="agent-line__name">@NewsAgentName</span>
+                            <span class="agent-line__state">@AgentStateText</span>
+                            @if (NewsAgent is not null)
+                            {
+                                <span class="agent-line__metric">деньги <span class="num-sm">@Count0(NewsAgent.Cash)</span></span>
+                                <span class="agent-line__metric">позиция <span class="num-sm">@Position0(NewsAgent.Position)</span></span>
+                            }
+                        </div>
+                    </Panel>
+                }
 
                 @if (!isRunning)
                 {
@@ -332,21 +352,6 @@
                         </ChildContent>
                     </Panel>
 
-                    @* Новостной агент до появления новости неактивен — это
-                       состояние показывается, а не прячется (раздел 16.4). *@
-                    <Panel Quiet="true" Class="rise rise-4">
-                        <div class="agent-line">
-                            <span class="label agent-line__label">Новостной агент</span>
-                            <StatusDot Tone="agent-news" />
-                            <span class="agent-line__name">@NewsAgentName</span>
-                            <span class="agent-line__state">@NewsAgentState</span>
-                            @if (NewsAgent is not null)
-                            {
-                                <span class="agent-line__metric">деньги <span class="num-sm">@Count0(NewsAgent.Cash)</span></span>
-                                <span class="agent-line__metric">позиция <span class="num-sm">@Position0(NewsAgent.Position)</span></span>
-                            }
-                        </div>
-                    </Panel>
                 }
                 else
                 {
@@ -441,7 +446,15 @@
                                             Negative="profile.NegativeFactors.Count"
                                             PositiveLabel="позитивных"
                                             NegativeLabel="негативных" />
-                                <p class="profile__risks">и <span class="num-sm">@profile.Risks.Count</span> @RiskWord</p>
+
+                                @* Риск — не встречная величина, в полосу баланса он не входит.
+                                   Своя дорожка того же веса под полосой: геометрия общая,
+                                   заливки нет — видно, что это условие, а не факт. *@
+                                <div class="risks">
+                                    <span class="risks__count num-sm">@profile.Risks.Count</span>
+                                    <span class="risks__label">@RiskWord</span>
+                                    <span class="risks__hint">условия, а не факты</span>
+                                </div>
                             </section>
 
                             <section class="profile__block hairline-top">
@@ -593,9 +606,29 @@
         }
     }
 
-    private string NewsAgentState => NewsFeed.Entries.Count == 0
-        ? "ждёт сигнала — новостей после старта сессии не было"
-        : "ждёт следующую новость";
+    /// <summary>
+    /// Что написать в строке агента: после разбора — его собственное объяснение
+    /// решения (раздел 1.3, объяснимость), до разбора — чего он ждёт.
+    /// </summary>
+    private string AgentStateText
+    {
+        get
+        {
+            if (agentDecision is not null)
+            {
+                return agentDecision.Explanation;
+            }
+
+            if (signal is not null)
+            {
+                return "сигнал передан — решение будет на ближайшем шаге симуляции";
+            }
+
+            return NewsFeed.Entries.Count == 0
+                ? "ждёт сигнала — новостей после старта сессии не было"
+                : "ждёт следующую новость";
+        }
+    }
 
     private string MarketTitle => signal is null ? "Рынок на сейчас" : "Рынок на момент сигнала";
 

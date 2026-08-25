@@ -223,24 +223,24 @@ main.news-page ::deep .ui-causality__note {
 }
 
 .agent-line__label { flex: none; }
+.agent-line__name { flex: none; }
 .agent-line__name { font: var(--t-body-sm); color: var(--text-1); white-space: nowrap; }
 
+/* Объяснение решения агента здесь главное, поэтому пишется целиком:
+   обрезка живёт в шаге полосы связи, а не в этом блоке. */
 .agent-line__state {
+    flex: 1;
+    min-width: 0;
     font: var(--t-body-sm);
     color: var(--text-3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-wrap: pretty;
 }
 
 .agent-line__metric {
     flex: none;
-    margin-left: auto;
     font: var(--t-caption);
     color: var(--text-3);
 }
-
-.agent-line__metric + .agent-line__metric { margin-left: 0; }
 .agent-line__metric .num-sm { color: var(--text-1); }
 
 /* ============================================================================
@@ -385,8 +385,21 @@ main.news-page ::deep .ui-causality__note {
 .profile__meta { font: var(--t-caption); color: var(--text-3); }
 .profile__meta .num-sm { color: var(--text-1); }
 
-.profile__risks { margin: 0; font: var(--t-caption); color: var(--text-3); }
-.profile__risks .num-sm { color: var(--text-2); }
+/* Дорожка рисков: высота и радиус те же, что у половин полосы баланса
+   (9.18), заливки нет — риск не участвует в балансе, он условие. */
+.risks {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 22px;
+    padding: 0 var(--s-2);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-xs);
+}
+
+.risks__count { color: var(--text-1); }
+.risks__label { font: var(--t-caption); font-weight: 500; color: var(--text-2); }
+.risks__hint { margin-left: auto; font: var(--t-caption); color: var(--text-4); }
 
 .profile__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 
