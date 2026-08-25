@@ -27,7 +27,8 @@ builder.Services.AddABStockPersistence(
 builder.Services.AddScoped<IActiveAssetContext, ActiveAssetContext>();
 // Хронология новостей сессии — одна на весь продукт (DESIGN.md 13):
 // её читают и «Новости», и левый рельс «Торгов». Singleton, как и сама
-// симуляция: роутер статический, каждая навигация поднимает новый контур.
+// симуляция: лента живёт ровно столько же, сколько прогон, чьи события
+// показывает, и переживает перезагрузку страницы вместе с ним.
 builder.Services.AddSingleton<ISessionNewsFeed, SessionNewsFeed>();
 
 if (builder.Environment.IsDevelopment())
