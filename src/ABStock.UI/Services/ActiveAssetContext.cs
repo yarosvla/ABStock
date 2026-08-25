@@ -149,7 +149,9 @@ public static class ActiveAssetDefaults
         {
             draft.Name,
             draft.Industry,
-            draft.AssetType.ToString(),
+            // Русское название типа, а не идентификатор перечисления: «Stock»
+            // в чипах читался как чужое слово в русском интерфейсе.
+            AgentDisplay.GetAssetTypeLabel(draft.AssetType),
             draft.IncludeGovernmentSupport ? "господдержка" : "рыночный спрос"
         };
 
