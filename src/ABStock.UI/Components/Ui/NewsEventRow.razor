@@ -1,0 +1,44 @@
+@using ABStock.Shared
+
+@* Строка события сессии — раздел 9.21. Левый рельс несёт хронологию событий
+   во всём продукте (раздел 13), поэтому строка одна и та же на «Новостях»
+   и на «Торгах»: время, бейдж тональности, сила влияния, текст новости.
+
+   Бейдж тональности окрашен — это разрешённое исключение раздела 3:
+   полярность предсказывает направление цены. *@
+
+<article class="ui-event @(Current ? "is-current" : null)">
+    <div class="ui-event__head">
+        <time class="ui-event__time" datetime="@At.ToString("O")">@At.ToString("HH:mm")</time>
+        <span class="ui-event__badge ui-event__badge--@Tone">@PolarityName</span>
+        <span class="ui-event__impact num-sm">@ImpactScore.ToString("F2")</span>
+    </div>
+    <p class="ui-event__text" title="@Text">@Text</p>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public DateTimeOffset At { get; set; }
+
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    [Parameter, EditorRequired] public SignalPolarity Polarity { get; set; }
+
+    [Parameter, EditorRequired] public decimal ImpactScore { get; set; }
+
+    /// <summary>Разбор именно этой новости открыт на экране.</summary>
+    [Parameter] public bool Current { get; set; }
+
+    private string Tone => Polarity switch
+    {
+        SignalPolarity.Positive => "up",
+        SignalPolarity.Negative => "down",
+        _ => "warn"
+    };
+
+    private string PolarityName => Polarity switch
+    {
+        SignalPolarity.Positive => "Позитивная",
+        SignalPolarity.Negative => "Негативная",
+        _ => "Нейтральная"
+    };
+}

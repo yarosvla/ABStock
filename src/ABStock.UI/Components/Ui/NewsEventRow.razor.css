@@ -1,0 +1,69 @@
+/* Строка события сессии — раздел 9.21. Плотная строка рельса: высота задана
+   содержимым в две строки, разделитель только снизу, зебры нет (раздел 9.8). */
+
+.ui-event {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: var(--s-1);
+    min-height: var(--h-row-tall);
+    padding: var(--s-2) var(--s-5);
+    border-bottom: 1px solid var(--line-1);
+    border-left: 2px solid transparent;
+    transition: background var(--d-fast) var(--e-out);
+}
+
+.ui-event:last-child { border-bottom: 0; }
+
+.ui-event:hover { background: var(--gph-750); }
+
+/* Разбор этой новости открыт на экране — та же отметка, что у выбранной
+   строки таблицы (раздел 9.8): фон --gph-700 плюс левая полоса. */
+.ui-event.is-current {
+    background: var(--gph-700);
+    border-left-color: var(--acc-line);
+}
+
+.ui-event.is-current .ui-event__text { color: var(--text-1); }
+
+.ui-event__head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.ui-event__time {
+    font: var(--n-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-3);
+}
+
+.ui-event__impact {
+    margin-left: auto;
+    color: var(--text-1);
+}
+
+/* Бейдж-состояние — раздел 9.6. Окрашен: тональность предсказывает
+   направление цены (раздел 3). */
+.ui-event__badge {
+    display: inline-flex;
+    align-items: center;
+    height: var(--s-5);
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    font: var(--t-caption);
+    white-space: nowrap;
+}
+
+.ui-event__badge--up   { background: var(--up-soft);   color: var(--up-400); }
+.ui-event__badge--down { background: var(--down-soft); color: var(--down-400); }
+.ui-event__badge--warn { background: var(--warn-soft); color: var(--warn-500); }
+
+.ui-event__text {
+    margin: 0;
+    font: var(--t-caption);
+    color: var(--text-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

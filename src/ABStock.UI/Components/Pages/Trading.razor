@@ -17,6 +17,7 @@
 @inject IWebHostEnvironment Environment
 @inject IJSRuntime JS
 @inject IActiveAssetContext ActiveAssetContext
+@inject ISessionNewsFeed NewsFeed
 @inject ISimulationHistoryReader SimulationHistoryReader
 
 <PageTitle>Торги</PageTitle>
@@ -190,7 +191,7 @@
                             </div>
                             <div class="kv__row">
                                 <dt>Новостей</dt>
-                                <dd class="num-sm">@Count0(0)</dd>
+                                <dd class="num-sm">@Count0(NewsFeed.Entries.Count)</dd>
                             </div>
                         </dl>
                     </ChildContent>
@@ -198,13 +199,26 @@
 
                 <Panel Title="События сессии" Class="rise rise-2" Flush="true">
                     <ChildContent>
-                        <EmptyState IconName="news"
-                                    Title="Новостей ещё не было"
-                                    Description="Рынок идёт на решениях трендового, контр-трендового агентов и маркет-мейкера. Новостной агент ждёт сигнала.">
-                            <Action>
-                                <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
-                            </Action>
-                        </EmptyState>
+                        @if (NewsFeed.Entries.Count > 0)
+                        {
+                            <div class="events">
+                                @foreach (var entry in NewsFeed.Entries)
+                                {
+                                    <NewsEventRow At="entry.At" Text="@entry.Text"
+                                                  Polarity="entry.Polarity" ImpactScore="entry.ImpactScore" />
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <EmptyState IconName="news"
+                                        Title="Новостей ещё не было"
+                                        Description="Рынок идёт на решениях трендового, контр-трендового агентов и маркет-мейкера. Новостной агент ждёт сигнала.">
+                                <Action>
+                                    <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
+                                </Action>
+                            </EmptyState>
+                        }
                     </ChildContent>
                 </Panel>
             </div>
@@ -704,6 +718,7 @@
     protected override async Task OnInitializedAsync()
     {
         SimulationRunner.OnTick += HandleTick;
+        NewsFeed.Changed += HandleNewsFeedChanged;
         latestTick = SimulationRunner.Current;
         if (latestTick is not null)
         {
@@ -2105,15 +2120,19 @@ maxY)
     private static string FormatSvgNumber(double value) =>
         value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
+    private void HandleNewsFeedChanged() => _ = InvokeAsync(StateHasChanged);
+
     public void Dispose()
     {
         SimulationRunner.OnTick -= HandleTick;
+        NewsFeed.Changed -= HandleNewsFeedChanged;
         debugScenarioCts?.Cancel();
     }
 
     public async ValueTask DisposeAsync()
     {
         SimulationRunner.OnTick -= HandleTick;
+        NewsFeed.Changed -= HandleNewsFeedChanged;
         debugScenarioCts?.Cancel();
 
         if (tradingChartModule is null)
