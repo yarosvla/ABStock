@@ -42,8 +42,12 @@
     color: var(--text-4);
 }
 
+/* Лейбл переносится, а не вылезает за свой шаг: на 1280 шесть шагов узкие,
+   и «Тональность и уверенность» при nowrap налезала на соседний шаг.
+   Слово не сокращается до обрубка (раздел 17), поэтому перенос. */
 .ui-causality ::deep .ui-causality__label {
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: break-word;
 }
 
 .ui-causality ::deep .ui-causality__value {
