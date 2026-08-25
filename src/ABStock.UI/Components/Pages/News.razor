@@ -11,6 +11,7 @@
 @inject INewsProcessingService NewsProcessingService
 @inject ISimulationRunner SimulationRunner
 @inject IActiveAssetContext ActiveAssetContext
+@inject ISessionNewsFeed NewsFeed
 
 <PageTitle>Новости</PageTitle>
 
@@ -74,16 +75,13 @@
                 <section class="glass-card trades-card history-card" aria-labelledby="history-title">
                     <div class="panel-title">
                         <h2 id="history-title">История</h2>
-                        <span>@NewsHistory.Count</span>
+                        <span>@NewsFeed.Entries.Count</span>
                     </div>
                     <div class="history-list">
-                        @foreach (var item in NewsHistory)
+                        @foreach (var entry in NewsFeed.Entries)
                         {
-                            <article class="@item.PolarityClass">
-                                <time>@item.Time</time>
-                                <strong>@item.Title</strong>
-                                <small>@item.Detail</small>
-                            </article>
+                            <NewsEventRow At="entry.At" Text="@entry.Text"
+                                          Polarity="entry.Polarity" ImpactScore="entry.ImpactScore" />
                         }
                     </div>
                 </section>
@@ -372,8 +370,6 @@
         }
     }
 
-    private IReadOnlyList<NewsHistoryItem> NewsHistory { get; set; } = [];
-
     private static readonly FlowStep[] FlowSteps =
     [
         new("Текст", "Новость пользователя", "bi-chat-left-text"),
@@ -443,7 +439,7 @@
             analysisSignal = signal;
             SimulationRunner.SubmitNews(signal);
             signalSubmitted = true;
-            AddHistoryItem(signal);
+            NewsFeed.Add(newsText, signal);
         }
         catch (Exception ex)
         {
@@ -459,23 +455,6 @@
     {
         newsText = string.Empty;
         errorMessage = null;
-    }
-
-    private void AddHistoryItem(NewsSignal signal)
-    {
-        var title = newsText.Trim();
-        if (title.Length > 44)
-        {
-            title = $"{title[..44]}...";
-        }
-
-        var item = new NewsHistoryItem(
-            DateTime.Now.ToString("HH:mm", CultureInfo.InvariantCulture),
-            title,
-            $"{PolarityLabel}, impact {signal.ImpactScore:0.00}, {RecommendedAction}",
-            PolarityClass.Replace("-signal", string.Empty));
-
-        NewsHistory = NewsHistory.Prepend(item).Take(5).ToArray();
     }
 
     private static string FormatPercent(decimal value) =>
@@ -620,5 +599,4 @@
     private sealed record DataRow(string Label, string Value, string? ValueClass);
     private sealed record FactorChip(string Label, string ClassName);
     private sealed record FlowStep(string Title, string Detail, string Icon);
-    private sealed record NewsHistoryItem(string Time, string Title, string Detail, string PolarityClass);
 }
