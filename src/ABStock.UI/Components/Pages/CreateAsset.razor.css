@@ -34,35 +34,22 @@
     align-items: start;
 }
 
-/* ---------- крошки ---------- */
-.crumbs {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    font: var(--t-caption);
-    color: var(--text-3);
-}
+/* ---------- крошки и шапка: чем эта страница отступает от кита ----------
+   Разметка живёт в <Breadcrumbs> и <PageHead>, канонические значения —
+   в их .razor.css. Ниже перечислено ровно то, чем «Создание актива»
+   отличалось от «Торгов» и «Новостей» на момент выноса. Расхождение это
+   не узаконивает, а делает видимым: когда решим свести страницы к одному
+   виду, правка будет удалением этого блока.
 
-.crumbs a { color: var(--text-3); text-decoration: none; }
-.crumbs a:hover { color: var(--text-2); }
-.crumbs .ui-icon { color: var(--text-4); }
-.crumbs__asset { display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); }
-.crumbs__name { display: flex; align-items: center; gap: var(--s-1); }
-.crumbs__current { color: var(--text-1); }
+   ::deep — потому что элементы принадлежат разметке компонентов кита,
+   и скоуп страницы до них сам не достаёт. */
 
-/* ---------- шапка страницы ---------- */
-.page-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--s-6);
-}
+.create-page ::deep .crumbs__current { color: var(--text-1); }
 
-.page-head__title { display: flex; flex-direction: column; gap: var(--s-2); min-width: 0; }
-.page-head__title h1 { font: var(--t-display); }
-.page-head__context { margin: 0; font: var(--t-body-sm); color: var(--text-3); }
-.page-head__context.is-warn { color: var(--warn-500); }
-.page-head__actions { display: flex; align-items: center; gap: var(--s-2); flex: none; }
+.create-page ::deep .page-head { gap: var(--s-6); }
+.create-page ::deep .page-head__title { gap: var(--s-2); min-width: 0; }
+.create-page ::deep .page-head__context { font: var(--t-body-sm); }
+.create-page ::deep .page-head__actions { flex: none; }
 
 .page-foot {
     margin: 0;

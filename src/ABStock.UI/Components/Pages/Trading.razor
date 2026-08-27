@@ -134,30 +134,26 @@
     <main class="trading-page">
 
         @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
-        <nav class="crumbs" aria-label="Навигационная цепочка">
-            <a href="/create-asset">Активы</a>
-            <Icon Name="chevron-right" Size="14" />
-            <span class="crumbs__asset">@CurrentAsset.Draft.Name<Icon Name="chevron-down" Size="14" /></span>
-            <Icon Name="chevron-right" Size="14" />
-            <span class="crumbs__current">Торги</span>
-        </nav>
+        <Breadcrumbs Items="@(new Crumb[]
+                     {
+                         new("Активы", Href: "/create-asset"),
+                         new(CurrentAsset.Draft.Name, IsAsset: true),
+                         new("Торги")
+                     })" />
 
         @* ── PageHeader: H1 + одна строка контекста · до двух действий ───────── *@
-        <header class="page-head">
-            <div class="page-head__title">
-                <h1>Торги</h1>
-                <p class="page-head__context">
-                    @if (isRunning)
-                    {
-                        <text>Сессия идёт <span class="num-sm">@status.Elapsed</span> · агентов в работе <span class="num-sm">@agents.Count</span></text>
-                    }
-                    else
-                    {
-                        <text>Сессия остановлена · состав агентов задаётся до запуска</text>
-                    }
-                </p>
-            </div>
-            <div class="page-head__actions">
+        <PageHead Title="Торги">
+            <Context>
+                @if (isRunning)
+                {
+                    <text>Сессия идёт <span class="num-sm">@status.Elapsed</span> · агентов в работе <span class="num-sm">@agents.Count</span></text>
+                }
+                else
+                {
+                    <text>Сессия остановлена · состав агентов задаётся до запуска</text>
+                }
+            </Context>
+            <Actions>
                 <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
                 @if (isRunning)
                 {
@@ -169,8 +165,8 @@
                                Disabled="startBlocked"
                                OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
                 }
-            </div>
-        </header>
+            </Actions>
+        </PageHead>
 
         @* ── Рабочая область: рельс 280 · центр · рельс 340 ──────────────────── *@
         <div class="workspace">

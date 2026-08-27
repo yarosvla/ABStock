@@ -33,38 +33,34 @@
     <main class="news-page">
 
         @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
-        <nav class="crumbs" aria-label="Навигационная цепочка">
-            <a href="/create-asset">Активы</a>
-            <Icon Name="chevron-right" Size="14" />
-            <span class="crumbs__asset">@asset.Draft.Name<Icon Name="chevron-down" Size="14" /></span>
-            <Icon Name="chevron-right" Size="14" />
-            <span class="crumbs__current">Новости</span>
-        </nav>
+        <Breadcrumbs Items="@(new Crumb[]
+                     {
+                         new("Активы", Href: "/create-asset"),
+                         new(asset.Draft.Name, IsAsset: true),
+                         new("Новости")
+                     })" />
 
         @* ── PageHeader: H1 + одна строка контекста · до двух действий ───────── *@
-        <header class="page-head">
-            <div class="page-head__title">
-                <h1>Новости</h1>
-                <p class="page-head__context">
-                    @if (analyzedAt is not null && errorMessage is null)
-                    {
-                        <text>Сигнал рассчитан в <span class="num-sm">@analyzedAt.Value.ToString("HH:mm:ss")</span></text>
-                    }
-                    else
-                    {
-                        <text>Текст новости превращается в сигнал, на который реагирует новостной агент</text>
-                    }
-                    <text> · </text><span class="num-sm">@asset.Symbol</span>
-                    <text> · новостей в сессии </text><span class="num-sm">@entries.Count</span>
-                </p>
-            </div>
-            @if (isRunning && (hasResult || errorMessage is not null))
-            {
-                <div class="page-head__actions">
+        <PageHead Title="Новости">
+            <Context>
+                @if (analyzedAt is not null && errorMessage is null)
+                {
+                    <text>Сигнал рассчитан в <span class="num-sm">@analyzedAt.Value.ToString("HH:mm:ss")</span></text>
+                }
+                else
+                {
+                    <text>Текст новости превращается в сигнал, на который реагирует новостной агент</text>
+                }
+                <text> · </text><span class="num-sm">@asset.Symbol</span>
+                <text> · новостей в сессии </text><span class="num-sm">@entries.Count</span>
+            </Context>
+            <Actions>
+                @if (isRunning && (hasResult || errorMessage is not null))
+                {
                     <AppButton Variant="primary" OnClick="StartNewEntry">Новая новость</AppButton>
-                </div>
-            }
-        </header>
+                }
+            </Actions>
+        </PageHead>
 
         @* ── Полоса связи — одна на экран (раздел 9.19) ──────────────────────
              До анализа во всех шести шагах прочерк: формула появляется

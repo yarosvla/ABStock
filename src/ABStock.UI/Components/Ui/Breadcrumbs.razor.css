@@ -1,0 +1,47 @@
+/* Крошки — раздел 13. Здесь только раскладка и токены: ни одного голого
+   значения цвета, шрифта, радиуса и отступа (раздел 18.3). */
+
+.crumbs-line {
+    /* Страницы — вертикальные флекс-колонки, и полоса крошек в них не тянется
+       и не ужимается: её высота задаётся содержимым. */
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.crumbs {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.crumbs a { color: var(--text-3); text-decoration: none; }
+.crumbs a:hover { color: var(--text-2); }
+
+/* Icon — дочерний компонент, до него скоуп страницы не достаёт без ::deep. */
+.crumbs ::deep .ui-icon { color: var(--text-4); }
+
+/* Имя актива и его статус — один элемент пути. Внутренний .crumbs__name
+   держит имя со свитчером, внешний зазор отделяет от них чип. */
+.crumbs__asset { display: flex; align-items: center; gap: var(--s-2); color: var(--text-2); }
+.crumbs__name { display: flex; align-items: center; gap: var(--s-1); }
+
+.crumbs__current { color: var(--text-2); }
+
+/* Чип статуса актива — раздел 9.6. Высота чипа зафиксирована там в 22px,
+   отдельного токена под неё в design-system.css нет. */
+.crumbs__chip {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 22px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    background: var(--acc-soft);
+    font: var(--t-caption);
+    color: var(--text-2);
+}

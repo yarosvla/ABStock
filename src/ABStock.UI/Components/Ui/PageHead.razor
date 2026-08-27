@@ -1,0 +1,46 @@
+@* PageHeader — раздел 13: H1 плюс одна строка контекста, справа до двух
+   действий (первичное светлое и вторичное).
+
+   Заголовок принимается двумя способами: строкой — обычный случай, и
+   слотом <TitleContent> — когда рядом с именем стоят тикер, чипы и бейдж
+   источника, как на «Создании актива». *@
+
+<header class="page-head">
+    <div class="page-head__title">
+        @if (TitleContent is not null)
+        {
+            @TitleContent
+        }
+        else
+        {
+            <h1>@Title</h1>
+        }
+
+        @if (Context is not null)
+        {
+            <p class="page-head__context @ContextClass">@Context</p>
+        }
+    </div>
+
+    @if (Actions is not null)
+    {
+        <div class="page-head__actions">@Actions</div>
+    }
+</header>
+
+@code {
+    /// <summary>Заголовок страницы. Существительное (раздел 17).</summary>
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Заголовок разметкой — когда рядом с именем стоят тикер и чипы.</summary>
+    [Parameter] public RenderFragment? TitleContent { get; set; }
+
+    /// <summary>Одна строка контекста под заголовком.</summary>
+    [Parameter] public RenderFragment? Context { get; set; }
+
+    /// <summary>Модификатор строки контекста, например is-warn.</summary>
+    [Parameter] public string? ContextClass { get; set; }
+
+    /// <summary>До двух действий справа.</summary>
+    [Parameter] public RenderFragment? Actions { get; set; }
+}
