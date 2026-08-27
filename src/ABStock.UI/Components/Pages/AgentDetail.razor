@@ -355,7 +355,7 @@
 
     // --- Chart payloads ----------------------------------------------------
 
-    private List<LinePoint> BuildEquitySeries()
+    private List<ChartPoint> BuildEquitySeries()
     {
         var series = report?.PriceSeries;
         if (series is null || series.Count == 0)
@@ -364,7 +364,7 @@
         }
 
         var trades = Trades;
-        var points = new List<LinePoint>(series.Count);
+        var points = new List<ChartPoint>(series.Count);
         var tradeIndex = 0;
         var cash = InitialCash;
         var position = InitialPosition;
@@ -390,13 +390,15 @@
             }
 
             var equity = cash + position * pricePoint.Price;
-            points.Add(new LinePoint(pricePoint.Time.ToUnixTimeSeconds(), equity));
+            points.Add(new ChartPoint(pricePoint.Time.ToUnixTimeSeconds(), equity));
         }
 
-        return Downsample(BucketByInterval(DedupeBySecond(points), IntervalSeconds), MaxChartPoints);
+        return ChartSeries.Downsample(
+            ChartSeries.BucketByInterval(ChartSeries.DedupeBySecond(points), IntervalSeconds),
+            MaxChartPoints);
     }
 
-    private List<LinePoint> BuildPriceSeries()
+    private List<ChartPoint> BuildPriceSeries()
     {
         var series = report?.PriceSeries;
         if (series is null || series.Count == 0)
@@ -405,38 +407,12 @@
         }
 
         var points = series
-            .Select(p => new LinePoint(p.Time.ToUnixTimeSeconds(), p.Price))
+            .Select(p => new ChartPoint(p.Time.ToUnixTimeSeconds(), p.Price))
             .ToList();
 
-        return Downsample(BucketByInterval(DedupeBySecond(points), IntervalSeconds), MaxChartPoints);
-    }
-
-    // Collapse a 1s-granularity series into candle-close points for the selected timeframe.
-    private static List<LinePoint> BucketByInterval(List<LinePoint> points, int intervalSec)
-    {
-        if (intervalSec <= 1 || points.Count == 0)
-        {
-            return points;
-        }
-
-        var result = new List<LinePoint>();
-        long currentBucket = points[0].Time / intervalSec;
-        var last = points[0];
-
-        foreach (var point in points)
-        {
-            var bucket = point.Time / intervalSec;
-            if (bucket != currentBucket)
-            {
-                result.Add(last);
-                currentBucket = bucket;
-            }
-
-            last = point;
-        }
-
-        result.Add(last);
-        return result;
+        return ChartSeries.Downsample(
+            ChartSeries.BucketByInterval(ChartSeries.DedupeBySecond(points), IntervalSeconds),
+            MaxChartPoints);
     }
 
     // Aggregate thousands of individual trades into a handful of time buckets so the
@@ -466,50 +442,6 @@
         }
 
         return markers.OrderBy(m => m.Time).ToList();
-    }
-
-    // Thin a dense series down to ~maxPoints by uniform stride, always keeping the last point.
-    private static List<LinePoint> Downsample(List<LinePoint> points, int maxPoints)
-    {
-        if (points.Count <= maxPoints)
-        {
-            return points;
-        }
-
-        var step = (int)Math.Ceiling(points.Count / (double)maxPoints);
-        var result = new List<LinePoint>(maxPoints + 1);
-        for (var i = 0; i < points.Count; i += step)
-        {
-            result.Add(points[i]);
-        }
-
-        if (result[^1].Time != points[^1].Time)
-        {
-            result.Add(points[^1]);
-        }
-
-        return result;
-    }
-
-    // Lightweight-charts requires strictly ascending, unique time keys (seconds).
-    private static List<LinePoint> DedupeBySecond(List<LinePoint> points)
-    {
-        var result = new List<LinePoint>(points.Count);
-        long? lastTime = null;
-        foreach (var point in points)
-        {
-            if (lastTime == point.Time && result.Count > 0)
-            {
-                result[^1] = point;
-            }
-            else
-            {
-                result.Add(point);
-                lastTime = point.Time;
-            }
-        }
-
-        return result;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -582,6 +514,5 @@
     }
 
     private sealed record TradeRow(string Time, string Side, string SideClass, string Price, string Quantity);
-    private sealed record LinePoint(long Time, decimal Value);
     private sealed record TradeMarker(long Time, string Position, string Color, string Shape, string Text);
 }
