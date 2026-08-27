@@ -1,0 +1,25 @@
+/* Шапка страницы — раздел 13. Канонические значения взяты с «Торгов» и
+   «Новостей»; «Создание актива» отступает от них четырьмя строками в своём
+   собственном .razor.css, и там же написано, чем именно. */
+
+.page-head {
+    flex: none;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--s-5);
+}
+
+.page-head__title { display: flex; flex-direction: column; gap: var(--s-1); }
+
+/* ::deep, а не прямой селектор: заголовок приходит и своей разметкой
+   компонента, и слотом <TitleContent> со страницы — у них разные скоупы. */
+.page-head__title ::deep h1 { font: var(--t-display); }
+
+.page-head__context { margin: 0; font: var(--t-caption); color: var(--text-3); }
+.page-head__context.is-warn { color: var(--warn-500); }
+
+/* Число в строке контекста светлее текста вокруг: данные — герой (раздел 1). */
+.page-head__context ::deep .num-sm { color: var(--text-2); }
+
+.page-head__actions { display: flex; align-items: center; gap: var(--s-2); }

@@ -1,0 +1,24 @@
+@* Чип состояния сессии — раздел 13: статус стоит рядом с путём, а не внутри
+   него. Точка дышит, только пока сессия действительно идёт (раздел 9.6). *@
+
+<span class="session-chip">
+    <StatusDot Tone="@(Running ? "up" : "muted")" Live="Running" />
+    <span class="session-chip__text">
+        @if (Running)
+        {
+            <text>сессия идёт <span class="num-xs">@Elapsed</span></text>
+        }
+        else
+        {
+            <text>сессия остановлена</text>
+        }
+    </span>
+</span>
+
+@code {
+    /// <summary>Сессия идёт.</summary>
+    [Parameter] public bool Running { get; set; }
+
+    /// <summary>Время от старта прогона, ЧЧ:ММ:СС (раздел 10).</summary>
+    [Parameter] public string Elapsed { get; set; } = "";
+}

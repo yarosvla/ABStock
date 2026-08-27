@@ -19,35 +19,17 @@
 
     <main class="create-page">
 
-        @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
-        <nav class="crumbs" aria-label="Навигационная цепочка">
-            <a href="/create-asset">Активы</a>
-            @if (HasSessionAsset)
-            {
-                <Icon Name="chevron-right" Size="14" />
-                @* Статус актива — чипом рядом с именем, внутри одного элемента пути.
-                   Между «›» он читался бы как ещё один раздел (раздел 13). *@
-                <span class="crumbs__asset">
-                    <span class="crumbs__name">@SessionAsset.Draft.Name<Icon Name="chevron-down" Size="14" /></span>
-                    @if (SessionAsset.IsFallback)
-                    {
-                        <span class="chip">Демо-контекст</span>
-                    }
-                </span>
-            }
-            <Icon Name="chevron-right" Size="14" />
-            <span class="crumbs__current">Создание актива</span>
-        </nav>
+        @* ── Крошки · Активы › Актив › Раздел (раздел 13) ─────────────────────
+             Статус актива — чипом рядом с именем, внутри одного элемента пути.
+             Между «›» он читался бы как ещё один раздел. *@
+        <Breadcrumbs Items="@BuildCrumbs()" />
 
         @if (profile is null)
         {
             @* ══════════════ Форма и загрузка ══════════════ *@
-            <header class="page-head">
-                <div class="page-head__title">
-                    <h1>Создание актива</h1>
-                    <p class="page-head__context">Опишите компанию словами — система соберёт профиль, по которому рынок будет реагировать на новости.</p>
-                </div>
-            </header>
+            <PageHead Title="Создание актива">
+                <Context>Опишите компанию словами — система соберёт профиль, по которому рынок будет реагировать на новости.</Context>
+            </PageHead>
 
             @if (isGenerating)
             {
@@ -262,8 +244,8 @@
         else
         {
             @* ══════════════ Профиль ══════════════ *@
-            <header class="page-head">
-                <div class="page-head__title">
+            <PageHead ContextClass="@(IsFallbackProfile ? "is-warn" : null)">
+                <TitleContent>
                     <div class="asset">
                         <h1>@profile.Name</h1>
                         <span class="asset__rule" aria-hidden="true"></span>
@@ -279,13 +261,13 @@
                         }
                         <span class="badge badge--@(IsFallbackProfile ? "warn" : "acc")">@SourceBadge</span>
                     </div>
-                    <p class="page-head__context @(IsFallbackProfile ? "is-warn" : null)">@SourceNote</p>
-                </div>
-                <div class="page-head__actions">
+                </TitleContent>
+                <Context>@SourceNote</Context>
+                <Actions>
                     <AppButton Variant="secondary" OnClick="SecondaryAction">@SecondaryActionLabel</AppButton>
                     <AppButton Variant="primary" Href="/trading">Перейти к торгам</AppButton>
-                </div>
-            </header>
+                </Actions>
+            </PageHead>
 
             @* Полоса связи — одна на экран (раздел 9.19) *@
             <CausalityStrip Class="rise rise-1" Label="Как профиль связан с рынком">
@@ -568,6 +550,20 @@
     /// названия оставляло в пути пустой элемент «Активы ›  › Создание актива».
     /// </summary>
     private bool HasSessionAsset => !string.IsNullOrWhiteSpace(SessionAsset.Draft.Name);
+
+    private Crumb[] BuildCrumbs() =>
+        HasSessionAsset
+            ? [
+                new("Активы", Href: "/create-asset"),
+                new(SessionAsset.Draft.Name,
+                    IsAsset: true,
+                    ChipText: SessionAsset.IsFallback ? "Демо-контекст" : null),
+                new("Создание актива")
+              ]
+            : [
+                new("Активы", Href: "/create-asset"),
+                new("Создание актива")
+              ];
 
     private string Symbol => ActiveAssetDefaults.BuildSymbol(profile?.Name ?? assetName);
 

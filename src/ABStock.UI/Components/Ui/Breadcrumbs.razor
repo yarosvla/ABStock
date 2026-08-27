@@ -1,0 +1,51 @@
+@* Крошки — раздел 13. Обязательны на каждой странице: Активы › <Актив> ⌄ › <Раздел>.
+
+   Компонент, а не копия разметки на страницу: блок нужен пяти страницам, и
+   пять копий его CSS — это ровно тот механизм, которым дизайн-система
+   расходится сама с собой.
+
+   <Aside> — место справа от пути под чип состояния сессии. Он лежит вне
+   <nav>, потому что состояние — не элемент пути (раздел 13). *@
+
+<div class="crumbs-line">
+    <nav class="crumbs" aria-label="Навигационная цепочка">
+        @for (var i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+
+            @if (i > 0)
+            {
+                <Icon Name="chevron-right" Size="14" />
+            }
+
+            @if (item.IsAsset)
+            {
+                <span class="crumbs__asset">
+                    <span class="crumbs__name">@item.Title<Icon Name="chevron-down" Size="14" /></span>
+                    @if (item.ChipText is not null)
+                    {
+                        <span class="crumbs__chip">@item.ChipText</span>
+                    }
+                </span>
+            }
+            else if (item.Href is not null)
+            {
+                <a href="@item.Href">@item.Title</a>
+            }
+            else
+            {
+                <span class="crumbs__current">@item.Title</span>
+            }
+        }
+    </nav>
+
+    @Aside
+</div>
+
+@code {
+    /// <summary>Путь целиком, от корня к текущему разделу.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<Crumb> Items { get; set; } = [];
+
+    /// <summary>Справа от пути: чип состояния сессии и подобное. Вне &lt;nav&gt;.</summary>
+    [Parameter] public RenderFragment? Aside { get; set; }
+}

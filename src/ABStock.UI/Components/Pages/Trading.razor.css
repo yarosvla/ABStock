@@ -25,37 +25,6 @@
     gap: var(--s-5);
 }
 
-/* ---------- крошки ---------- */
-.crumbs {
-    flex: none;
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    font: var(--t-caption);
-    color: var(--text-3);
-}
-
-.crumbs a { color: var(--text-3); text-decoration: none; }
-.crumbs a:hover { color: var(--text-2); }
-.crumbs .ui-icon { color: var(--text-4); }
-.crumbs__asset { display: flex; align-items: center; gap: var(--s-1); color: var(--text-2); }
-.crumbs__current { color: var(--text-2); }
-
-/* ---------- шапка страницы ---------- */
-.page-head {
-    flex: none;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--s-5);
-}
-
-.page-head__title { display: flex; flex-direction: column; gap: var(--s-1); }
-.page-head__title h1 { font: var(--t-display); }
-.page-head__context { margin: 0; font: var(--t-caption); color: var(--text-3); }
-.page-head__context .num-sm { color: var(--text-2); }
-.page-head__actions { display: flex; align-items: center; gap: var(--s-2); }
-
 /* ============================================================================
    Рабочая область: левый рельс 280 · центр fluid (min 640) · правый рельс 340
    ============================================================================ */
