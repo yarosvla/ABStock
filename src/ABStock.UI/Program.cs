@@ -30,6 +30,9 @@ builder.Services.AddScoped<IActiveAssetContext, ActiveAssetContext>();
 // симуляция: лента живёт ровно столько же, сколько прогон, чьи события
 // показывает, и переживает перезагрузку страницы вместе с ним.
 builder.Services.AddSingleton<ISessionNewsFeed, SessionNewsFeed>();
+// Стоимость портфеля по типам агентов с начала прогона — тоже singleton и по
+// той же причине. Читает её страница «Агенты».
+builder.Services.AddSingleton<IAgentEquityHistory, AgentEquityHistory>();
 
 if (builder.Environment.IsDevelopment())
 {
@@ -40,6 +43,12 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 var app = builder.Build();
+
+// В историю портфеля пишет тик, а не страница, поэтому подписка на OnTick
+// должна существовать до первого тика. Ленивое создание отдало бы сервису
+// первый тик только после того, как кто-то откроет «Агентов», — начало
+// сессии было бы потеряно, а 100 % отсчитывались бы от середины прогона.
+_ = app.Services.GetRequiredService<IAgentEquityHistory>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
