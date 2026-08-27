@@ -94,7 +94,6 @@ body {
 .create-asset-shell .glass-card,
 .trading-shell .glass-card,
 .news-shell .glass-card,
-.agents-shell .glass-card,
 .profile-shell .glass-card {
     position: relative;
     overflow: hidden;
@@ -109,7 +108,6 @@ body {
 .create-asset-shell .glass-card::before,
 .trading-shell .glass-card::before,
 .news-shell .glass-card::before,
-.agents-shell .glass-card::before,
 .profile-shell .glass-card::before {
     content: "";
     position: absolute;
@@ -124,7 +122,6 @@ body {
 .create-asset-shell .glass-card > *,
 .trading-shell .glass-card > *,
 .news-shell .glass-card > *,
-.agents-shell .glass-card > *,
 .profile-shell .glass-card > * {
     position: relative;
     z-index: 1;
@@ -132,7 +129,6 @@ body {
 
 .trading-shell .page-heading,
 .news-shell .page-heading,
-.agents-shell .page-heading,
 .profile-shell .page-heading {
     display: flex;
     align-items: flex-end;
@@ -144,7 +140,6 @@ body {
 
 .trading-shell .page-heading h1,
 .news-shell .page-heading h1,
-.agents-shell .page-heading h1,
 .profile-shell .page-heading h1,
 .create-asset-shell .page-header h1 {
     margin: 0;
@@ -157,7 +152,6 @@ body {
 
 .trading-shell .page-heading p:last-child,
 .news-shell .page-heading p:last-child,
-.agents-shell .page-heading p:last-child,
 .profile-shell .page-heading p:last-child,
 .create-asset-shell .page-header p {
     max-width: 720px;
@@ -169,7 +163,6 @@ body {
 
 .trading-shell .breadcrumbs,
 .news-shell .breadcrumbs,
-.agents-shell .breadcrumbs,
 .profile-shell .breadcrumbs {
     display: inline-flex;
     align-items: center;
@@ -191,8 +184,6 @@ body {
 .trading-shell .breadcrumbs span,
 .news-shell .breadcrumbs a,
 .news-shell .breadcrumbs span,
-.agents-shell .breadcrumbs a,
-.agents-shell .breadcrumbs span,
 .profile-shell .breadcrumbs a,
 .profile-shell .breadcrumbs span {
     color: inherit;
@@ -201,7 +192,6 @@ body {
 
 .trading-shell .breadcrumbs .bi,
 .news-shell .breadcrumbs .bi,
-.agents-shell .breadcrumbs .bi,
 .profile-shell .breadcrumbs .bi {
     font-size: 10px;
     opacity: 0.62;
@@ -231,18 +221,15 @@ body {
 .create-asset-shell .workflow-progress,
 .trading-shell .status-strip,
 .news-shell .panel-title > span,
-.agents-shell .panel-heading > span,
 .profile-shell .panel-heading > span {
     border-color: var(--app-pill-border);
 }
 
 .trading-shell .panel-heading h2,
 .news-shell .panel-title h2,
-.agents-shell .panel-heading h2,
 .profile-shell .panel-heading h2,
 .trading-shell .asset-card h2,
 .news-shell .asset-card h2,
-.agents-shell .agent-asset-card h2,
 .profile-shell .identity-card h2 {
     color: var(--app-text);
     font-size: 17px;
@@ -251,7 +238,6 @@ body {
 
 .trading-shell .asset-meta span,
 .news-shell .asset-meta span,
-.agents-shell .asset-face p,
 .profile-shell .identity-tags span {
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(255, 255, 255, 0.05);
@@ -259,7 +245,6 @@ body {
 
 .trading-shell .metric-card,
 .news-shell .metric-card,
-.agents-shell .summary-card,
 .profile-shell .profile-metric {
     border-color: var(--app-border);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
@@ -267,28 +252,24 @@ body {
 
 .trading-shell .metric-card strong,
 .news-shell .metric-card strong,
-.agents-shell .summary-card strong,
 .profile-shell .profile-metric strong {
     color: var(--app-text);
 }
 
 .trading-shell .positive,
 .news-shell .positive,
-.agents-shell .positive,
 .profile-shell .positive {
     color: var(--app-positive) !important;
 }
 
 .trading-shell .negative,
 .news-shell .negative,
-.agents-shell .negative,
 .profile-shell .negative {
     color: var(--app-negative) !important;
 }
 
 .trading-shell .warning,
 .news-shell .warning,
-.agents-shell .warning,
 .profile-shell .warning {
     color: var(--app-warning) !important;
 }
@@ -296,7 +277,6 @@ body {
 @media (max-width: 900px) {
     .trading-shell .page-heading h1,
     .news-shell .page-heading h1,
-    .agents-shell .page-heading h1,
     .profile-shell .page-heading h1,
     .create-asset-shell .page-header h1 {
         font-size: clamp(26px, 7vw, 32px);
@@ -304,7 +284,6 @@ body {
 
     .trading-shell .breadcrumbs,
     .news-shell .breadcrumbs,
-    .agents-shell .breadcrumbs,
     .profile-shell .breadcrumbs {
         width: fit-content;
         flex-wrap: wrap;
