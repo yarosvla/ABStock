@@ -276,9 +276,18 @@ public sealed class NotificationFeed : INotificationFeed, IDisposable
 
             if (!_positions.TryGetValue(agent.Name, out var previous))
             {
-                // Первый тик агента: его стартовая позиция — не переход.
-                _positions[agent.Name] = current;
-                continue;
+                // Первый тик агента. Взять за точку отсчёта то, что видно
+                // сейчас, нельзя: агенты открывают позицию на первом же тике,
+                // и самое интересное событие сессии — первое открытие — было
+                // бы проглочено вместе с точкой отсчёта.
+                //
+                // Агент, вышедший в сессию пустым (портфель равен деньгам),
+                // начинал с нуля, и точка отсчёта — ноль: переход поймается
+                // тут же. Агент, заведённый сразу с позицией, ничего не
+                // открывал — для него отсчёт от того, что есть.
+                previous = agent.InitialPortfolioValue == agent.InitialCash
+                    ? 0m
+                    : current;
             }
 
             _positions[agent.Name] = current;
