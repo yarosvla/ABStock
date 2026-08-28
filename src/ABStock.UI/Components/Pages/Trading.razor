@@ -16,6 +16,7 @@
 @inject IServiceProvider Services
 @inject IWebHostEnvironment Environment
 @inject IJSRuntime JS
+@inject IUserPreferences Preferences
 @inject IActiveAssetContext ActiveAssetContext
 @inject ISessionNewsFeed NewsFeed
 @inject ISimulationHistoryReader SimulationHistoryReader
@@ -258,7 +259,7 @@
                         </div>
                         <Segmented TValue="string"
                                    Label="Таймфрейм"
-                                   Items="@(Timeframes.Select(t => new SegmentedItem<string>(t.Key, t.Label)).ToArray())"
+                                   Items="@(Timeframes.All.Select(t => new SegmentedItem<string>(t.Key, t.Label)).ToArray())"
                                    Value="@selectedTimeframe"
                                    ValueChanged="SelectTimeframe" />
                     </Head>
@@ -624,18 +625,11 @@
 </div>
 
 @code {
-    private static readonly TimeframeDefinition[] Timeframes =
-    [
-        new("10s", "10s", TimeSpan.FromSeconds(10)),
-        new("30s", "30s", TimeSpan.FromSeconds(30)),
-        new("1m", "1m", TimeSpan.FromMinutes(1)),
-        new("5m", "5m", TimeSpan.FromMinutes(5)),
-        new("15m", "15m", TimeSpan.FromMinutes(15)),
-        new("1h", "1h", TimeSpan.FromHours(1))
-    ];
-
-    private static readonly IReadOnlyDictionary<string, TimeframeDefinition> TimeframesByKey =
-        Timeframes.ToDictionary(item => item.Key, StringComparer.Ordinal);
+    // Список таймфреймов переехал в Services/Timeframes: тот же список
+    // рисуется на «Профиле» в настройке «таймфрейм по умолчанию», и два
+    // списка подписей разошлись бы при первой же правке.
+    private static readonly IReadOnlyDictionary<string, TimeframeOption> TimeframesByKey =
+        Timeframes.All.ToDictionary(item => item.Key, StringComparer.Ordinal);
 
     private static readonly DebugScenarioSupportAgent[] ScenarioSupportAgents =
     [
@@ -667,7 +661,9 @@
     private ChartSummaryData ChartSummary => BuildChartSummaryData(GetSelectedTimeframeState(), latestTick, lastChartUpdate);
     private AssetParameter[] AssetParameters => BuildAssetParameters();
 
-    private string selectedTimeframe = "30s";
+    // Значение по умолчанию совпадает с дефолтом настройки: пока настройки
+    // не прочитаны, на экране ровно то, что было здесь до её появления.
+    private string selectedTimeframe = Timeframes.DefaultKey;
     private SimulationTickResult? latestTick;
     private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
     private DateTimeOffset runStartedAt = DateTimeOffset.Now;
@@ -816,14 +812,42 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            await ApplyPreferredTimeframeAsync();
+        }
+
         if (pendingChartSync is not null)
         {
             await TrySyncChartAsync();
         }
     }
 
+    /// <summary>
+    /// Таймфрейм по умолчанию с «Профиля». Применяется после первой
+    /// отрисовки, а не в OnInitialized: настройка лежит в localStorage, а до
+    /// первой отрисовки JS-интеропа в Blazor Server не существует.
+    ///
+    /// EnsureLoadedAsync идемпотентен — макет вызывает его же, и кто из двоих
+    /// успел первым, неважно.
+    /// </summary>
+    private async Task ApplyPreferredTimeframeAsync()
+    {
+        await Preferences.EnsureLoadedAsync();
+
+        var preferred = Preferences.DefaultTimeframe;
+
+        if (preferred == selectedTimeframe)
+        {
+            return;
+        }
+
+        SelectTimeframe(preferred);
+        StateHasChanged();
+    }
+
     private static Dictionary<string, TimeframeSeriesState> CreateTimeframeSeriesStates() =>
-        Timeframes.ToDictionary(item => item.Key, item => new TimeframeSeriesState(item), StringComparer.Ordinal);
+        Timeframes.All.ToDictionary(item => item.Key, item => new TimeframeSeriesState(item), StringComparer.Ordinal);
 
     private void PrimeFromSnapshot(SimulationTickResult tickResult, DateTimeOffset receivedAt)
     {
@@ -956,7 +980,7 @@
 
         foreach (var liveEvent in liveEvents)
         {
-            foreach (var timeframe in Timeframes)
+            foreach (var timeframe in Timeframes.All)
             {
                 var result = AppendLiveEvent(timeframeSeriesStates[timeframe.Key], liveEvent);
                 if (!result.Changed || timeframe.Key != selectedTimeframe)
@@ -1463,7 +1487,7 @@
 
     private void ApplyLiveEventToAllTimeframes(LivePriceEvent liveEvent)
     {
-        foreach (var timeframe in Timeframes)
+        foreach (var timeframe in Timeframes.All)
         {
             AppendLiveEvent(timeframeSeriesStates[timeframe.Key], liveEvent);
         }
@@ -2195,7 +2219,6 @@ Projection, IReadOnlyList<BarRect> Bars);
         string BorderColor,
         string WickColor);
     private sealed record LivePriceEvent(DateTimeOffset Timestamp, decimal Price);
-    private sealed record TimeframeDefinition(string Key, string Label, TimeSpan Duration);
     private sealed record TimeframeAppendResult(bool Changed, bool CreatedNewBar);
     private sealed record DebugScenarioStep(OrderSide Side, decimal Quantity, int DelayMs);
     private sealed record DebugScenarioSupportAgent(string Key, AgentType Type, decimal Cash, decimal Position);
@@ -2219,12 +2242,12 @@ Projection, IReadOnlyList<BarRect> Bars);
 
     private sealed class TimeframeSeriesState
     {
-        public TimeframeSeriesState(TimeframeDefinition definition)
+        public TimeframeSeriesState(TimeframeOption definition)
         {
             Definition = definition;
         }
 
-        public TimeframeDefinition Definition { get; }
+        public TimeframeOption Definition { get; }
         public List<AggregatedCandle> Candles { get; } = [];
     }
 
