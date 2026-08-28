@@ -25,6 +25,11 @@ builder.Services.AddABStockAI();
 builder.Services.AddABStockPersistence(
     builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
 builder.Services.AddScoped<IActiveAssetContext, ActiveAssetContext>();
+// Настройки интерфейса — scoped, и это осознанно: источник истины лежит в
+// localStorage браузера, а сервис лишь кэш на время жизни контура. Singleton
+// раздавал бы всем открытым вкладкам чужой акцент, потому что настройки
+// принадлежат браузеру, а не серверу.
+builder.Services.AddScoped<IUserPreferences, UserPreferences>();
 // Хронология новостей сессии — одна на весь продукт (DESIGN.md 13):
 // её читают и «Новости», и левый рельс «Торгов». Singleton, как и сама
 // симуляция: лента живёт ровно столько же, сколько прогон, чьи события

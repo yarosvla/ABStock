@@ -1,6 +1,8 @@
 @using ABStock.Application.Simulation
+@using ABStock.UI.Services
 @implements IDisposable
 @inject ISimulationRunner SimulationRunner
+@inject IUserPreferences Preferences
 
 @* Оболочка приложения — раздел 13. Шапка 56px, стекло (под ней реально
    проезжает контент), нижняя кромка --line-1. Активный раздел — --text-1
@@ -94,7 +96,13 @@
 @code {
     [Parameter] public string ActivePage { get; set; } = "CreateAsset";
     [Parameter] public bool ShowClock { get; set; } = false;
-    [Parameter] public string AvatarInitials { get; set; } = "АК";
+
+    /// <summary>
+    /// Инициалы считаются из имени оператора, а не задаются параметром.
+    /// Пока здесь стояла константа «АК», шапка и «Профиль» показывали разных
+    /// людей на одном экране.
+    /// </summary>
+    private string AvatarInitials => UserPreferences.GetInitials(Preferences.OperatorName);
 
     // Ровно пять разделов — раздел 16.
     private static readonly NavSection[] Sections =
@@ -121,6 +129,11 @@
 
     protected override void OnInitialized()
     {
+        // Имя оператора и переключатели уведомлений живут в настройках, а
+        // шапка показывает и то, и другое: без подписки инициалы и счётчик
+        // застыли бы на значениях, прочитанных при создании контура.
+        Preferences.Changed += HandlePreferencesChanged;
+
         SimulationRunner.OnTick += HandleSimulationTick;
 
         // После остановки тики прекращаются, поэтому одной подписки на OnTick
@@ -129,6 +142,8 @@
     }
 
     private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandlePreferencesChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void ToggleNotifications() => IsNotificationsOpen = !IsNotificationsOpen;
 
@@ -142,6 +157,7 @@
     {
         SimulationRunner.OnTick -= HandleSimulationTick;
         SimulationRunner.OnStateChanged -= HandleStateChanged;
+        Preferences.Changed -= HandlePreferencesChanged;
     }
 
     // Источника уведомлений в MVP нет, поэтому список пуст: раздел 16 запрещает
