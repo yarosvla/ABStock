@@ -380,7 +380,7 @@ main.news-page ::deep .ui-causality__note {
     height: 22px;
     padding: 0 var(--s-3);
     border-radius: var(--r-pill);
-    background: var(--acc-soft);
+    background: var(--fill-soft);
     font: var(--t-caption);
     color: var(--text-2);
 }

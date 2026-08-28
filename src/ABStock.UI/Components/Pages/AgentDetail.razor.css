@@ -65,7 +65,7 @@
     height: 22px;
     padding: 0 var(--s-3);
     border-radius: var(--r-pill);
-    background: var(--acc-soft);
+    background: var(--fill-soft);
     font: var(--t-caption);
     color: var(--text-2);
 }
@@ -186,7 +186,7 @@
     height: 22px;
     padding: 0 var(--s-2);
     border-radius: var(--r-pill);
-    background: var(--acc-soft);
+    background: var(--fill-soft);
     font: var(--n-sm);
     color: var(--text-2);
 }
