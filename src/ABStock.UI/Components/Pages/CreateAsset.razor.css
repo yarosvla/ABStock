@@ -160,17 +160,10 @@
 
 .field__error .ui-icon { flex: none; }
 
-/* ---------- поля ввода (9.3) ---------- */
-.input {
-    height: var(--h-ctl-md);
-    padding: 0 10px;
-    background: var(--gph-750);
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-sm);
-    font: var(--t-body-sm);
-    color: var(--text-1);
-}
-
+/* ---------- поля ввода (9.3) ----------
+   Однострочное поле уехало в кит (Components/Ui/TextField): такое же нужно
+   «Профилю» под имя оператора. Многострочное остаётся здесь — это другой
+   контрол со своим ростом по содержимому. */
 .textarea {
     /* 6 строк по умолчанию, дальше поле растёт по мере ввода и скроллится
        внутри себя (раздел 7.1). field-sizing поддержан не везде — там поле
@@ -188,17 +181,14 @@
     text-wrap: pretty;
 }
 
-.input::placeholder,
 .textarea::placeholder { color: var(--text-4); }
 
-.input:focus,
 .textarea:focus {
     outline: none;
     border-color: var(--acc-line);
     box-shadow: 0 0 0 2px var(--acc-soft);
 }
 
-.input.is-invalid,
 .textarea.is-invalid { border-color: var(--down-500); }
 
 /* ---------- плитки типа актива ---------- */
@@ -313,41 +303,8 @@
 .select__option:hover { background: var(--gph-750); color: var(--text-1); }
 .select__option.is-chosen { background: var(--acc-soft); color: var(--text-1); }
 
-/* ---------- переключатель ---------- */
-.toggle {
-    display: flex;
-    align-items: center;
-    flex: none;
-    width: 34px;
-    height: 20px;
-    padding: 0 2px;
-    background: var(--gph-700);
-    border: 1px solid var(--line-2);
-    border-radius: var(--r-pill);
-    cursor: pointer;
-    transition: background var(--d-fast) var(--e-out);
-}
-
-.toggle__knob {
-    width: 14px;
-    height: 14px;
-    border-radius: var(--r-pill);
-    background: var(--text-4);
-    transition: transform var(--d-fast) var(--e-out), background var(--d-fast) var(--e-out);
-}
-
-.toggle.is-on {
-    background: var(--acc-500);
-    border-color: transparent;
-}
-
-.toggle.is-on .toggle__knob {
-    background: var(--acc-ink);
-    transform: translateX(14px);
-}
-
-.toggle__text { font: var(--t-body-sm); color: var(--text-3); }
-.toggle__text.is-on { color: var(--text-1); }
+/* Переключатель уехал в кит (Components/Ui/Toggle): такой же нужен
+   «Профилю» под три настройки уведомлений. */
 
 /* ---------- подвал формы ---------- */
 .form__foot {

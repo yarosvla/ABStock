@@ -1,0 +1,31 @@
+/* Поле ввода — раздел 9.3. */
+
+.ui-field { display: flex; min-width: 0; }
+
+.ui-field__input {
+    width: 100%;
+    height: var(--h-ctl-md);
+    padding: 0 10px;
+    background: var(--gph-750);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    font: var(--t-body-sm);
+    color: var(--text-1);
+}
+
+.ui-field__input::placeholder { color: var(--text-4); }
+
+/* Кромка поля в фокусе — интерактив, значит акцент (раздел 3.1). */
+.ui-field__input:focus {
+    outline: none;
+    border-color: var(--acc-line);
+    box-shadow: 0 0 0 2px var(--acc-soft);
+}
+
+/* Валидация формы — охра. Красный означает падение цены и ничего больше. */
+.ui-field__input.is-invalid--warn { border-color: var(--warn-500); }
+
+/* Ошибка ввода в смысле 9.3. */
+.ui-field__input.is-invalid--down { border-color: var(--down-500); }
+
+.ui-field__input:disabled { color: var(--text-4); cursor: default; }

@@ -1,0 +1,46 @@
+@* Тумблер — включённое положение красится акцентом (раздел 3.1).
+
+   Компонент, а не локальные классы страницы: тумблер нужен «Созданию
+   актива» и «Профилю», и две копии одной разметки с одинаковым видом и
+   разным кодом — ровно тот механизм, которым дизайн-система расходится
+   сама с собой.
+
+   Это button role="switch", а не <input type="checkbox">: раздел 9.2.1
+   запрещает нативные контролы браузера — у них своя типографика, свои
+   цвета и своя высота. *@
+
+<span class="ui-toggle-row @Class">
+    <button class="ui-toggle @(Value ? "is-on" : null)" type="button"
+            role="switch"
+            aria-checked="@(Value ? "true" : "false")"
+            aria-label="@Label"
+            aria-labelledby="@LabelledBy"
+            disabled="@Disabled"
+            @onclick="Flip">
+        <span class="ui-toggle__knob"></span>
+    </button>
+
+    @if (Text is not null)
+    {
+        <span class="ui-toggle__text @(Value ? "is-on" : null)">@Text</span>
+    }
+</span>
+
+@code {
+    [Parameter] public bool Value { get; set; }
+    [Parameter] public EventCallback<bool> ValueChanged { get; set; }
+
+    /// <summary>Подпись справа от тумблера. Не ставится, если состояние понятно без неё.</summary>
+    [Parameter] public string? Text { get; set; }
+
+    /// <summary>Название для чтения с экрана, когда рядом нет своего лейбла.</summary>
+    [Parameter] public string? Label { get; set; }
+
+    /// <summary>id внешнего лейбла — когда подпись стоит слева, как в строке настройки.</summary>
+    [Parameter] public string? LabelledBy { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private Task Flip() => Disabled ? Task.CompletedTask : ValueChanged.InvokeAsync(!Value);
+}
