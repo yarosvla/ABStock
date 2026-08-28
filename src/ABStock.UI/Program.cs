@@ -38,6 +38,9 @@ builder.Services.AddSingleton<ISessionNewsFeed, SessionNewsFeed>();
 // Стоимость портфеля по типам агентов с начала прогона — тоже singleton и по
 // той же причине. Читает её страница «Агенты».
 builder.Services.AddSingleton<IAgentEquityHistory, AgentEquityHistory>();
+// Лента уведомлений колокольчика — singleton по тем же двум причинам:
+// показывает прогон, а прогон один на сервер, и пишет в неё тик.
+builder.Services.AddSingleton<INotificationFeed, NotificationFeed>();
 
 if (builder.Environment.IsDevelopment())
 {
@@ -54,6 +57,10 @@ var app = builder.Build();
 // первый тик только после того, как кто-то откроет «Агентов», — начало
 // сессии было бы потеряно, а 100 % отсчитывались бы от середины прогона.
 _ = app.Services.GetRequiredService<IAgentEquityHistory>();
+
+// Лента уведомлений — по той же причине: запуск торгов и первые переходы
+// позиций через ноль случаются раньше, чем кто-нибудь откроет колокольчик.
+_ = app.Services.GetRequiredService<INotificationFeed>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

@@ -3,6 +3,7 @@
 @implements IDisposable
 @inject ISimulationRunner SimulationRunner
 @inject IUserPreferences Preferences
+@inject INotificationFeed NotificationFeed
 
 @* Оболочка приложения — раздел 13. Шапка 56px, стекло (под ней реально
    проезжает контент), нижняя кромка --line-1. Активный раздел — --text-1
@@ -68,25 +69,40 @@
                 <AppButton Variant="ghost" Size="26" OnClick="ClearNotifications">Очистить</AppButton>
             </div>
 
+            @* Строка — раздел 9.14 и 2: без иконки, время моноширинное, вид
+               события различается подписью, а не цветной плашкой. *@
             <div class="notif__list">
-                @if (Notifications.Count > 0)
+                @if (Visible.Count > 0)
                 {
-                    @foreach (var notification in Notifications)
+                    @foreach (var notification in Visible)
                     {
                         <div class="notif__item @(notification.IsRead ? null : "is-unread")">
                             <span class="notif__dot" aria-hidden="true"></span>
-                            <Icon Name="@notification.Icon" Size="16" />
                             <div class="notif__body">
+                                <span class="notif__kind label">@KindLabel(notification.Kind)</span>
                                 <strong>@notification.Title</strong>
-                                <p>@notification.Message</p>
+                                <p>@notification.Detail</p>
                             </div>
-                            <span class="notif__time num-xs">@notification.Time</span>
+                            <time class="notif__time num-xs" datetime="@notification.At.ToString("O")">@notification.At.ToString("HH:mm:ss")</time>
                         </div>
                     }
                 }
+                else if (HasHiddenByFilter)
+                {
+                    @* Честная причина пустоты: события есть, но их вид выключен
+                       на «Профиле». Пустое состояние «уведомлений нет» здесь
+                       было бы неправдой. *@
+                    <EmptyState IconName="bell" Title="Все виды событий выключены"
+                                Description="Включить их можно в настройках интерфейса.">
+                        <Action>
+                            <AppButton Variant="secondary" Size="26" Href="/profile">Открыть «Профиль»</AppButton>
+                        </Action>
+                    </EmptyState>
+                }
                 else
                 {
-                    <EmptyState IconName="bell" Title="Уведомлений нет" />
+                    <EmptyState IconName="bell" Title="Событий пока нет"
+                                Description="Запустите торги — здесь появится хронология сессии." />
                 }
             </div>
         </div>
@@ -118,7 +134,35 @@
     private bool IsTradingActive => SimulationRunner.IsRunning;
     private string MarketStatusLabel => IsTradingActive ? "Торги активны" : "Торги остановлены";
     private string Clock => DateTimeOffset.Now.ToString("HH:mm:ss");
-    private int UnreadNotificationsCount => Notifications.Count(n => !n.IsRead);
+
+    /// <summary>
+    /// Фильтрация происходит ЗДЕСЬ, при отображении, а не при записи в ленту:
+    /// выключенный на «Профиле» вид перестаёт показываться, но события не
+    /// теряются, и включение обратно возвращает их.
+    /// </summary>
+    private IReadOnlyList<NotificationEntry> Visible =>
+        NotificationFeed.Entries.Where(entry => IsKindEnabled(entry.Kind)).ToArray();
+
+    /// <summary>События в ленте есть, но все их виды выключены.</summary>
+    private bool HasHiddenByFilter => NotificationFeed.Entries.Count > 0;
+
+    private bool IsKindEnabled(NotificationKind kind) => kind switch
+    {
+        NotificationKind.Trade => Preferences.NotifyTrades,
+        NotificationKind.News => Preferences.NotifyNews,
+        _ => Preferences.NotifySystem
+    };
+
+    private static string KindLabel(NotificationKind kind) => kind switch
+    {
+        NotificationKind.Trade => "сделки",
+        NotificationKind.News => "новости",
+        _ => "система"
+    };
+
+    // Счётчик считает по тому же фильтру, что и список: иначе колокольчик
+    // показывал бы число, которого в открытом списке не найти.
+    private int UnreadNotificationsCount => Visible.Count(entry => !entry.IsRead);
 
     private string NotificationSummaryText => UnreadNotificationsCount switch
     {
@@ -133,6 +177,7 @@
         // шапка показывает и то, и другое: без подписки инициалы и счётчик
         // застыли бы на значениях, прочитанных при создании контура.
         Preferences.Changed += HandlePreferencesChanged;
+        NotificationFeed.Changed += HandleNotificationsChanged;
 
         SimulationRunner.OnTick += HandleSimulationTick;
 
@@ -145,11 +190,23 @@
 
     private void HandlePreferencesChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private void ToggleNotifications() => IsNotificationsOpen = !IsNotificationsOpen;
+    private void HandleNotificationsChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void ToggleNotifications()
+    {
+        IsNotificationsOpen = !IsNotificationsOpen;
+
+        // Открыли список — значит прочитали. Счётчик непрочитанного, который
+        // не сбрасывается при просмотре, перестаёт что-либо значить.
+        if (IsNotificationsOpen)
+        {
+            NotificationFeed.MarkAllRead();
+        }
+    }
 
     private void CloseNotifications() => IsNotificationsOpen = false;
 
-    private void ClearNotifications() => Notifications.Clear();
+    private void ClearNotifications() => NotificationFeed.Clear();
 
     private void HandleSimulationTick(SimulationTickResult tick) => _ = InvokeAsync(StateHasChanged);
 
@@ -158,18 +215,8 @@
         SimulationRunner.OnTick -= HandleSimulationTick;
         SimulationRunner.OnStateChanged -= HandleStateChanged;
         Preferences.Changed -= HandlePreferencesChanged;
+        NotificationFeed.Changed -= HandleNotificationsChanged;
     }
 
-    // Источника уведомлений в MVP нет, поэтому список пуст: раздел 16 запрещает
-    // изобретать функциональность, а раздел 14 требует честного пустого состояния.
-    private readonly List<NotificationModel> Notifications = [];
-
     private sealed record NavSection(string Key, string Href, string Title);
-
-    private sealed record NotificationModel(
-        string Title,
-        string Message,
-        string Time,
-        string Icon,
-        bool IsRead);
 }

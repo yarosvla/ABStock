@@ -162,7 +162,10 @@
 
 .notif__item {
     display: grid;
-    grid-template-columns: var(--s-2) 16px 1fr auto;
+    /* Три колонки, а не четыре: иконку из строки убрал раздел 9.20 —
+       она допустима в заголовке панели и внутри контролов, но не в каждой
+       строке списка. Вид события несёт подпись .notif__kind. */
+    grid-template-columns: var(--s-2) 1fr auto;
     align-items: start;
     gap: var(--s-2);
     padding: var(--s-2) var(--s-3);
@@ -170,7 +173,6 @@
 }
 
 .notif__item:hover { background: var(--acc-soft); }
-.notif__item .ui-icon { color: var(--text-3); margin-top: 1px; }
 
 /* непрочитанное — точка слева, а не полоса по краю */
 .notif__dot {
@@ -184,6 +186,7 @@
 .notif__item.is-unread .notif__dot { background: var(--acc-line); }
 
 .notif__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notif__kind { color: var(--text-4); }
 .notif__body strong { font: var(--t-body-sm); font-weight: 500; color: var(--text-1); }
 .notif__body p { margin: 0; font: var(--t-caption); color: var(--text-3); }
 .notif__time { color: var(--text-4); }
