@@ -1,0 +1,44 @@
+/* Тумблер. Включённое положение — заливка акцента, ручка на --acc-ink. */
+
+.ui-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.ui-toggle {
+    display: flex;
+    align-items: center;
+    flex: none;
+    width: 34px;
+    height: 20px;
+    padding: 0 2px;
+    background: var(--gph-700);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    transition: background var(--d-fast) var(--e-out);
+}
+
+.ui-toggle__knob {
+    width: 14px;
+    height: 14px;
+    border-radius: var(--r-pill);
+    background: var(--text-4);
+    transition: transform var(--d-fast) var(--e-out), background var(--d-fast) var(--e-out);
+}
+
+.ui-toggle.is-on {
+    background: var(--acc-500);
+    border-color: transparent;
+}
+
+.ui-toggle.is-on .ui-toggle__knob {
+    background: var(--acc-ink);
+    transform: translateX(14px);
+}
+
+.ui-toggle:disabled { cursor: default; opacity: 0.5; }
+
+.ui-toggle__text { font: var(--t-body-sm); color: var(--text-3); }
+.ui-toggle__text.is-on { color: var(--text-1); }

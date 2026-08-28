@@ -105,12 +105,14 @@
                                     <span class="field__no">02</span>
                                     <label class="label" for="asset-name">Название</label>
                                 </div>
-                                <input id="asset-name" class="input @(NameInvalid ? "is-invalid" : null)"
-                                       type="text" maxlength="120"
-                                       placeholder="Например, Гелиос Энерго"
-                                       aria-invalid="@(NameInvalid ? "true" : "false")"
-                                       aria-describedby="@(NameInvalid ? "asset-name-error" : null)"
-                                       @bind="assetName" @bind:event="oninput" @bind:after="TouchForm" />
+                                <TextField Id="asset-name"
+                                           Value="assetName"
+                                           ValueChanged="SetAssetName"
+                                           MaxLength="120"
+                                           Placeholder="Например, Гелиос Энерго"
+                                           Invalid="NameInvalid"
+                                           InvalidTone="down"
+                                           DescribedBy="@(NameInvalid ? "asset-name-error" : null)" />
                                 @if (NameInvalid)
                                 {
                                     <span id="asset-name-error" class="field__error">
@@ -184,13 +186,10 @@
                                     <div class="param">
                                         <span class="param__label" id="support-label">Государственная поддержка</span>
                                         <div class="param__control">
-                                            <button class="toggle @(includeGovernmentSupport ? "is-on" : null)" type="button"
-                                                    role="switch" aria-labelledby="support-label"
-                                                    aria-checked="@(includeGovernmentSupport ? "true" : "false")"
-                                                    @onclick="ToggleGovernmentSupport">
-                                                <span class="toggle__knob"></span>
-                                            </button>
-                                            <span class="toggle__text @(includeGovernmentSupport ? "is-on" : null)">@(includeGovernmentSupport ? "учитывать" : "не учитывать")</span>
+                                            <Toggle Value="includeGovernmentSupport"
+                                                    ValueChanged="SetGovernmentSupport"
+                                                    LabelledBy="support-label"
+                                                    Text="@(includeGovernmentSupport ? "учитывать" : "не учитывать")" />
                                         </div>
                                     </div>
 
@@ -707,10 +706,16 @@
         SyncDraft();
     }
 
-    private void ToggleGovernmentSupport()
+    private void SetGovernmentSupport(bool value)
     {
-        includeGovernmentSupport = !includeGovernmentSupport;
+        includeGovernmentSupport = value;
         SyncDraft();
+    }
+
+    private void SetAssetName(string value)
+    {
+        assetName = value;
+        TouchForm();
     }
 
     private void ClearForm()
