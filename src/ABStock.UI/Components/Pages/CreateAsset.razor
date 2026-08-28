@@ -8,6 +8,7 @@
 @using ABStock.UI.Services
 @inject IAssetProfileService AssetProfileService
 @inject IActiveAssetContext ActiveAssetContext
+@inject INotificationFeed NotificationFeed
 @inject ISimulationRunner SimulationRunner
 
 <PageTitle>Создание актива</PageTitle>
@@ -827,6 +828,13 @@
             draftIndustry = draft.Industry;
             profile = generated;
             ActiveAssetContext.SetProfile(draft, generated);
+
+            // Лента уведомлений — singleton, IActiveAssetContext — scoped,
+            // поэтому подпиской создание актива не поймать: о нём сообщает
+            // страница, как «Новости» сообщают ленте о введённой новости.
+            NotificationFeed.NoteAssetCreated(
+                draft.Name,
+                ActiveAssetDefaults.BuildSymbol(draft.Name));
         }
         finally
         {
