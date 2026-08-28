@@ -1,892 +1,463 @@
+/* ============================================================================
+   Профиль — раскладка. Только раскладка: цвета, шрифты и тени берутся
+   токенами из design-system.css (раздел 18.3).
+
+   Экран нарративный, 8 + 4 (раздел 8). Слева настройки, справа состояние на
+   сейчас и итоги — роли колонок те же, что рельсов во всём продукте
+   (раздел 13).
+   ============================================================================ */
+
 .profile-shell {
-    --bg-app: #05070d;
-    --bg-sidebar: rgba(7, 11, 20, .72);
-    --bg-panel: rgba(13, 21, 36, .72);
-    --bg-card-hover: rgba(20, 34, 56, .88);
-    --border-soft: rgba(255, 255, 255, .08);
-    --border-default: rgba(255, 255, 255, .13);
-    --border-strong: rgba(85, 199, 255, .32);
-    --text-primary: #f8fbff;
-    --text-secondary: #c2ccda;
-    --text-muted: #7e8ba1;
-    --accent-purple: #8e74ff;
-    --accent-green: #36d98a;
-    --accent-red: #ff6b5f;
-    --accent-blue: #55c7ff;
-    --active-nav-bg: rgba(124, 92, 255, .14);
-    --active-nav-border: rgba(85, 199, 255, .28);
-    --success-bg: rgba(54, 217, 138, .1);
-    --shadow-top: 0 10px 36px rgba(0, 0, 0, .18);
-    --shadow-panel: 0 22px 62px rgba(0, 0, 0, .22);
-    min-height: 100svh;
-    padding-top: 64px;
-    color: var(--text-primary);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    letter-spacing: 0;
-    overflow-x: hidden;
-    background:
-        linear-gradient(120deg, rgba(124, 92, 255, .075), transparent 31%),
-        linear-gradient(240deg, rgba(85, 199, 255, .075), transparent 34%),
-        radial-gradient(circle at 78% 18%, rgba(54, 217, 138, .05), transparent 28rem),
-        linear-gradient(135deg, #05070d 0%, #091123 48%, #10161d 100%);
-    isolation: isolate;
-}
-
-.profile-shell *,
-.profile-shell *::before,
-.profile-shell *::after {
-    box-sizing: border-box;
-}
-
-.profile-shell a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.profile-shell button {
-    font: inherit;
-}
-
-.profile-shell::before,
-.profile-shell::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-}
-
-.profile-shell::before {
-    opacity: .28;
-    background-image:
-        linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
-    background-size: 72px 72px;
-    mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 88%, transparent 100%);
-}
-
-.profile-shell::after {
-    opacity: .3;
-    background-image:
-        radial-gradient(circle, rgba(255, 255, 255, .72) 0 1px, transparent 1.5px),
-        radial-gradient(circle, rgba(185, 201, 255, .48) 0 1px, transparent 1.5px);
-    background-position: 20px 28px, 92px 76px;
-    background-size: 180px 150px, 220px 190px;
-    mask-image: radial-gradient(circle at center, #000 0%, #000 72%, transparent 100%);
-}
-
-.top-navigation {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    height: 56px;
-    display: grid;
-    grid-template-columns: 180px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 20px;
-    padding: 0 20px;
-    border-bottom: 1px solid var(--border-soft);
-    background: color-mix(in srgb, var(--bg-sidebar) 88%, transparent);
-    box-shadow: var(--shadow-top);
-    backdrop-filter: blur(22px);
-}
-
-.brand {
-    min-width: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    width: fit-content;
-}
-
-.brand-mark {
-    width: 34px;
-    height: 34px;
-    display: inline-grid;
-    place-items: center;
-    border: 1px solid var(--border-soft);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, .06);
-    backdrop-filter: blur(14px);
-    overflow: hidden;
-}
-
-.brand-mark img {
-    width: 28px;
-    height: 24px;
-    display: block;
-    object-fit: contain;
-    object-position: center;
-}
-
-.brand-name {
-    color: var(--text-primary);
-    font-size: 18px;
-    font-weight: 650;
-}
-
-.nav-links {
-    min-width: 0;
-    display: flex;
-    justify-content: center;
-    gap: clamp(10px, 1.25vw, 22px);
-    color: var(--text-muted);
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-.nav-links a {
-    min-height: 32px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 8px;
-    border: 1px solid transparent;
-    border-radius: 999px;
-    color: var(--text-secondary);
-}
-
-.nav-links a:hover,
-.nav-links a.active {
-    color: var(--text-primary);
-    background: var(--active-nav-bg);
-    border-color: var(--active-nav-border);
-}
-
-.nav-actions {
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-}
-
-.market-status,
-.clock-chip,
-.date-chip {
-    min-height: 28px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
-    font-size: 12px;
-}
-
-.market-status {
-    padding: 0 14px;
-    border: 1px solid rgba(54, 217, 138, .22);
-    border-radius: 999px;
-    color: #a3efc9;
-    background: rgba(54, 217, 138, .1);
-    font-weight: 650;
-}
-
-.market-status span {
-    width: 7px;
-    height: 7px;
-    border-radius: 999px;
-    background: var(--accent-green);
-}
-
-.clock-chip,
-.date-chip {
-    color: var(--text-secondary);
-}
-
-.icon-button,
-.avatar-button {
-    border: 1px solid var(--border-soft);
-    color: var(--text-secondary);
-    background: rgba(255, 255, 255, .06);
-    backdrop-filter: blur(14px);
-}
-
-.icon-button {
     position: relative;
-    width: 32px;
-    height: 32px;
-    display: inline-grid;
-    place-items: center;
-    border-radius: 7px;
+    z-index: var(--z-content);
+    min-height: 100vh;
 }
 
-.notification-badge {
-    position: absolute;
-    top: -5px;
-    right: -4px;
-    min-width: 16px;
-    height: 16px;
-    display: inline-grid;
-    place-items: center;
-    border-radius: 999px;
-    color: #ffffff;
-    background: var(--accent-purple);
-    font-size: 10px;
-    font-weight: 700;
-}
-
-.avatar-button {
-    width: 34px;
-    height: 34px;
-    display: inline-grid;
-    place-items: center;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 650;
-}
-
-.profile-main {
-    width: 100%;
-    max-width: 1500px;
-    min-height: calc(100svh - 64px);
-    display: grid;
-    gap: 14px;
+.profile-page {
+    max-width: var(--page-max);
     margin: 0 auto;
-    padding: 8px clamp(18px, 2.5vw, 34px) 32px;
-}
-
-.page-heading {
-    min-height: 82px;
-    display: flex;
-    align-items: end;
-}
-
-.breadcrumbs {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 26px;
-    margin: 0 0 8px;
-    padding: 0 10px;
-    border: 1px solid rgba(85, 199, 255, .2);
-    border-radius: 999px;
-    color: #b9c9ff;
-    background: linear-gradient(90deg, rgba(124, 92, 255, .14), rgba(85, 199, 255, .07));
-    font-size: 11px;
-    font-weight: 680;
-}
-
-.page-heading h1 {
-    margin: 0;
-    color: var(--text-primary);
-    font-size: clamp(32px, 4vw, 54px);
-    line-height: .96;
-    font-weight: 760;
-}
-
-.page-heading p:last-child {
-    margin: 6px 0 0;
-    max-width: 690px;
-    color: rgba(248, 251, 255, .72);
-    font-size: 14px;
-}
-
-.glass-card {
-    position: relative;
-    min-width: 0;
-    border: 1px solid var(--border-default);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
-    box-shadow: var(--shadow-panel);
-    backdrop-filter: blur(22px);
-    overflow: hidden;
+    padding: var(--s-5) var(--page-pad) var(--s-10);
 }
 
 .profile-grid {
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr) 340px;
-    gap: 14px;
-    align-items: stretch;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--gutter);
+    align-items: start;   /* колонки выравниваются по верху, не по низу (7.1) */
+    margin-top: var(--s-5);
 }
 
-.profile-sidebar,
-.profile-content,
-.profile-activity {
-    min-width: 0;
+.col {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--s-5);
+    min-width: 0;
 }
 
-.profile-sidebar > :last-child,
-.profile-content > :last-child,
-.profile-activity > :last-child {
-    flex-grow: 1;
-}
-
-.identity-card,
-.security-card,
-.preferences-card,
-.settings-card,
-.activity-card,
-.notification-card {
-    padding: 16px;
-}
-
-.identity-card {
-    display: grid;
-    justify-items: start;
-    gap: 10px;
-}
-
-.profile-avatar {
-    width: 74px;
-    height: 74px;
-    display: inline-grid;
-    place-items: center;
-    border: 1px solid rgba(142, 116, 255, .42);
-    border-radius: 999px;
-    color: #ffffff;
-    background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-    box-shadow: 0 18px 44px rgba(124, 92, 255, .2);
-    font-size: 23px;
-    font-weight: 780;
-}
-
-.identity-card h2 {
-    margin: 4px 0 0;
-    font-size: 21px;
-    font-weight: 740;
-}
-
-.identity-card p {
-    margin: 0;
-    color: var(--text-secondary);
-    font-size: 13px;
-}
-
-.identity-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 7px;
-}
-
-.identity-tags span {
-    min-height: 25px;
-    display: inline-flex;
-    align-items: center;
-    padding: 0 9px;
-    border: 1px solid rgba(85, 199, 255, .18);
-    border-radius: 999px;
-    color: var(--text-secondary);
-    background: rgba(255, 255, 255, .045);
-    font-size: 11px;
-    font-weight: 650;
-}
-
-.panel-heading {
+/* ---------- полоса потери связи (раздел 14) ---------- */
+.offline {
+    position: sticky;
+    top: var(--h-nav);
+    z-index: var(--z-content);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: var(--s-4);
+    margin-top: var(--s-4);
+    padding: var(--s-2) var(--s-4);
+    background: var(--warn-soft);
+    border: 1px solid var(--warn-500);
+    border-radius: var(--r-md);
 }
 
-.panel-heading h2 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 720;
-}
-
-.panel-heading span {
-    color: var(--text-muted);
-    font-size: 12px;
-}
-
-.profile-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.profile-metric {
-    min-height: 86px;
-    padding: 13px 14px;
-}
-
-.profile-metric span,
-.profile-metric small {
-    display: block;
-    color: var(--text-muted);
-    font-size: 11.5px;
-}
-
-.profile-metric strong {
-    display: block;
-    margin-top: 8px;
-    color: var(--text-primary);
-    font-size: 21px;
-    font-weight: 740;
-}
-
-.profile-metric small {
-    margin-top: 6px;
-    color: var(--text-secondary);
-}
-
-.preference-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.preference-grid article {
-    display: grid;
-    gap: 7px;
-    min-height: 96px;
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, .075);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, .035);
-}
-
-.preference-grid .bi {
-    color: var(--accent-blue);
-    font-size: 18px;
-}
-
-.preference-grid span,
-.settings-list span,
-.security-row span,
-.notification-row span {
-    color: var(--text-muted);
-    font-size: 12px;
-}
-
-.preference-grid strong,
-.settings-list strong,
-.security-row strong,
-.notification-row strong {
-    color: var(--text-primary);
-    font-size: 13px;
-    font-weight: 720;
-}
-
-.settings-list,
-.activity-list {
-    display: grid;
-    gap: 0;
-}
-
-.settings-list div,
-.security-row,
-.notification-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: center;
-    min-height: 38px;
-    border-top: 1px solid rgba(255, 255, 255, .07);
-}
-
-.settings-list span {
+.offline__text {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--s-2);
+    font: var(--t-body-sm);
+    color: var(--warn-500);
 }
 
-.settings-list .bi,
-.security-row .bi {
-    color: var(--accent-blue);
-}
-
-.security-row {
-    grid-template-columns: 18px 1fr auto;
-}
-
-.activity-list article {
-    display: grid;
-    grid-template-columns: 54px 1fr;
-    gap: 10px;
-    padding: 10px 0;
-    border-top: 1px solid rgba(255, 255, 255, .07);
-}
-
-.activity-list time {
-    color: var(--text-muted);
-    font-size: 12px;
-    font-variant-numeric: tabular-nums;
-}
-
-.activity-list strong,
-.activity-list span {
-    display: block;
-}
-
-.activity-list strong {
-    color: var(--text-primary);
-    font-size: 13px;
-}
-
-.activity-list span {
-    margin-top: 3px;
-    color: var(--text-muted);
-    font-size: 12px;
-}
-
-.positive {
-    color: var(--accent-green) !important;
-}
-
-.negative {
-    color: var(--accent-red) !important;
-}
-
-@media (max-width: 1360px) {
-    .top-navigation {
-        grid-template-columns: 164px minmax(0, 1fr) auto;
-    }
-
-    .nav-links {
-        justify-content: flex-start;
-        overflow-x: auto;
-        scrollbar-width: none;
-    }
-
-    .clock-chip,
-    .date-chip {
-        display: none;
-    }
-
-    .profile-grid {
-        grid-template-columns: 280px minmax(0, 1fr);
-    }
-
-    .profile-activity {
-        grid-column: 1 / -1;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    }
-}
-
-@media (max-width: 1080px) {
-    .top-navigation {
-        height: auto;
-        min-height: 88px;
-        grid-template-columns: 1fr auto;
-        align-content: center;
-        row-gap: 8px;
-        padding: 10px 16px;
-    }
-
-    .profile-shell {
-        padding-top: 108px;
-    }
-
-    .nav-links {
-        grid-column: 1 / -1;
-        order: 3;
-        padding-bottom: 2px;
-    }
-
-    .profile-grid,
-    .profile-activity,
-    .profile-metrics {
-        grid-template-columns: 1fr;
-    }
-
-    .preference-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 700px) {
-    .brand-name,
-    .market-status {
-        display: none;
-    }
-
-    .profile-shell {
-        padding-top: 124px;
-    }
-
-    .profile-main {
-        padding: 14px;
-    }
-
-    .page-heading h1 {
-        font-size: 34px;
-    }
-
-    .preference-grid,
-    .settings-list div,
-    .security-row,
-    .notification-row,
-    .activity-list article {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* ── Interactive Profile ── */
-.edit-name-btn {
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    font-size: 14px;
-    cursor: pointer;
-    opacity: 0.4;
-    transition: opacity 0.2s, color 0.2s;
-    margin-left: 8px;
-    vertical-align: middle;
-}
-
-#identity-title:hover .edit-name-btn {
-    opacity: 1;
-}
-
-.edit-name-btn:hover {
-    color: var(--accent-purple);
-}
-
-.name-edit {
-    display: inline-flex;
+/* ============================================================================
+   Оператор
+   ============================================================================ */
+.operator {
+    display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 5px;
+    gap: var(--s-4);
+    flex-wrap: wrap;
 }
 
-.name-edit input {
-    background: var(--bg-input);
-    border: 1px solid var(--accent-purple);
-    color: var(--text-primary);
-    font-size: 20px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 4px;
-    outline: none;
-    width: 200px;
-}
-
-.name-edit button {
-    background: var(--accent-green);
-    color: #fff;
-    border: none;
-    border-radius: 4px;
-    width: 28px;
-    height: 28px;
+.operator__avatar {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background 0.2s;
+    flex: none;
+    width: var(--s-8);
+    height: var(--s-8);
+    border-radius: var(--r-pill);
+    background: var(--gph-700);
+    font: var(--t-micro);
+    color: var(--text-2);
 }
 
-.name-edit button:hover {
-    background: #2cb370;
+.operator__id { flex: 1; min-width: 0; }
+.operator__id h3 { font: var(--t-h3); color: var(--text-1); }
+.operator__id p { margin: 0; font: var(--t-caption); color: var(--text-3); }
+
+.operator__edit {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    flex: 1;
+    min-width: 0;
 }
 
-.interactive-settings {
+.operator__edit ::deep .ui-field { width: 260px; }
+.operator__hint { font: var(--t-caption); color: var(--text-4); }
+
+/* Валидация — охра. Красный означает падение цены и ничего больше (раздел 3).
+   На артборде 06 это нарисовано красным; здесь прав раздел 3. */
+.operator__error {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    width: 100%;
+    margin: 0;
+    font: var(--t-caption);
+    color: var(--warn-500);
+}
+
+.operator__error ::deep .ui-icon { flex: none; }
+
+/* ============================================================================
+   Акцент: палитра и живой предпросмотр.
+   Это визуальный объект экрана (раздел 7.2): на экране настроек он
+   порождается настройкой, а не данными.
+   ============================================================================ */
+.accent {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+    gap: var(--s-4);
+    align-items: start;
+}
+
+.swatches {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--s-2);
+}
+
+.swatch {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-}
-
-.setting-toggle {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    background: var(--bg-input);
+    gap: var(--s-2);
+    padding: var(--s-2);
+    background: var(--gph-800);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-md);
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background var(--d-fast) var(--e-out), border-color var(--d-fast) var(--e-out);
 }
 
-.setting-toggle:hover {
-    background: var(--bg-card-hover);
+.swatch:hover { background: var(--gph-750); border-color: var(--line-3); }
+
+/* Выбранный помечается обводкой --acc-line, а не галочкой поверх цвета:
+   галочка закрывает собой то, что человек и пришёл разглядывать. */
+.swatch.is-chosen {
+    background: var(--acc-soft);
+    border-color: var(--acc-line);
 }
 
-.setting-toggle span {
+/* Образец — портрет пресета из тех же трёх токенов, которыми акцент живёт
+   в системе: заливка кнопки, тонкая линия, подложка выбранного. Один только
+   квадрат заливки не показал бы, что линия и подложка тоже сменят тон. */
+.swatch__stage {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: var(--text-secondary);
-    font-size: 13px;
+    gap: var(--s-2);
+    height: var(--s-8);
+    padding: 0 var(--s-2);
+    border-radius: var(--r-sm);
+    background: var(--gph-850);
+    overflow: hidden;
 }
 
-.setting-toggle span .bi {
-    color: var(--accent-purple);
-    font-size: 15px;
+.swatch__fill {
+    width: var(--s-6);
+    height: var(--s-3);
+    border-radius: var(--r-xs);
+    background: var(--acc-500);
 }
 
-.toggle-switch {
+.swatch__line {
+    width: var(--s-5);
+    height: 2px;
+    border-radius: var(--r-pill);
+    background: var(--acc-line);
+}
+
+.swatch__soft {
+    position: absolute;
+    left: var(--s-2);
+    right: var(--s-2);
+    bottom: var(--s-1);
+    height: var(--s-2);
+    border-radius: var(--r-xs);
+    background: var(--acc-soft);
+}
+
+.swatch__name {
+    font: var(--t-caption);
+    color: var(--text-3);
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.swatch.is-chosen .swatch__name { color: var(--text-1); }
+
+/* Обещание, которое доказывает колонка «Не меняется никогда» справа. */
+.accent__promise {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-top: var(--s-2);
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+/* ---------- предпросмотр ---------- */
+.preview {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-5);
+    padding-left: var(--s-5);
+}
+
+.preview__col {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--s-2);
+    min-width: 0;
+}
+
+.preview__col > ::deep .ui-btn { flex: none; }
+.preview__field { width: 100%; }
+
+.preview__rows {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.preview__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    height: var(--h-row);
+    padding: 0 var(--s-2);
+    border-bottom: 1px solid var(--line-1);
+    font: var(--t-body-sm);
+    color: var(--text-2);
+}
+
+/* Выбранная строка — как в таблице (9.8): --gph-700 плюс левая полоса 2px. */
+.preview__row.is-selected {
+    background: var(--gph-700);
+    box-shadow: inset 2px 0 0 var(--acc-line);
+    color: var(--text-1);
+}
+
+.preview__badges { display: flex; gap: var(--s-2); }
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    font: var(--t-caption);
+    font-weight: 500;
+}
+
+.badge--up   { background: var(--up-soft);   color: var(--up-400); }
+.badge--down { background: var(--down-soft); color: var(--down-400); }
+
+/* Депт-бар — рыночная форма, и она обязана не отреагировать на смену
+   акцента: это и есть доказательство обещания в подписи колонки. */
+.preview__depth {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.preview__level {
     position: relative;
-    width: 44px;
-    height: 24px;
-    background: var(--border-default);
-    border-radius: 24px;
-    transition: background 0.3s;
-}
-
-.toggle-switch.active {
-    background: var(--accent-green);
-}
-
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-    position: absolute;
-}
-
-.toggle-switch i {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    background: #fff;
-    border-radius: 50%;
-    transition: transform 0.3s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-
-.toggle-switch.active i {
-    transform: translateX(20px);
-}
-
-/* Final profile alignment */
-
-.profile-shell {
-    padding-top: 56px;
-    background:
-        linear-gradient(180deg, rgba(9, 17, 31, .98), rgba(7, 11, 20, .98)),
-        radial-gradient(circle at 78% 18%, rgba(54, 217, 138, .04), transparent 24rem);
-}
-
-.profile-shell::before {
-    opacity: .18;
-}
-
-.profile-shell::after {
-    opacity: .16;
-}
-
-.profile-main {
-    max-width: 1480px;
-    min-height: calc(100svh - 56px);
-    gap: 12px;
-    padding: 10px clamp(18px, 2.2vw, 28px) 28px;
-}
-
-.page-heading {
-    min-height: auto;
-    padding-top: 4px;
-}
-
-.breadcrumbs {
-    min-height: auto;
-    margin: 0 0 6px;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--text-secondary);
-    font-size: 12px;
-    font-weight: 560;
-}
-
-.page-heading h1 {
-    font-size: clamp(24px, 2vw, 30px);
-    line-height: 1.08;
-    font-weight: 700;
-}
-
-.page-heading p:last-child {
-    max-width: 660px;
-    color: var(--text-secondary);
-    line-height: 1.45;
-}
-
-.glass-card {
-    background: rgba(13, 21, 36, .92);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
-    backdrop-filter: blur(16px);
-}
-
-.interactive-settings {
-    gap: 10px;
-}
-
-.setting-toggle {
-    min-height: 46px;
-    padding: 8px 12px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, .04);
-}
-
-.setting-toggle span {
-    font-size: 12.5px;
-}
-
-.toggle-switch {
-    width: 38px;
-    height: 20px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, .14);
-}
-
-.toggle-switch.active {
-    background: rgba(54, 217, 138, .92);
-}
-
-.toggle-switch i {
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, .28);
-}
-
-.toggle-switch.active i {
-    transform: translateX(18px);
-}
-
-.settings-card .setting-toggle {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    gap: var(--s-3);
+    height: var(--h-row-dense);
+    padding: 0 var(--s-2);
+    overflow: hidden;
 }
 
-.settings-card .toggle-switch {
-    width: 38px !important;
-    height: 20px !important;
-    min-height: 20px !important;
-    display: inline-flex !important;
+.preview__bar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.preview__bar--up   { background: var(--up-bar); }
+.preview__bar--down { background: var(--down-bar); }
+
+.preview__level .num-sm { position: relative; }
+.preview__qty { color: var(--text-2); }
+
+/* ============================================================================
+   Настройки интерфейса
+   ============================================================================ */
+.settings {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Строка настройки: высота по содержимому, разделитель только снизу,
+   без иконок (раздел 9.20 — иконка в заголовке панели и внутри контролов). */
+/* Строка с подписью в две строки — --h-row-tall (раздел 8), а не
+   произвольная высота: плотность в системе задана токенами. */
+.setting {
+    display: flex;
     align-items: center;
-    flex: 0 0 auto;
-    padding: 0 !important;
-    border: 0;
-    border-radius: 999px;
+    justify-content: space-between;
+    gap: var(--s-5);
+    min-height: var(--h-row-tall);
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--line-1);
 }
 
-.settings-card .toggle-switch i {
-    top: 2px;
-    left: 2px;
-    width: 16px;
-    height: 16px;
-    border-radius: 999px;
+.setting:last-child { border-bottom-width: 0; }
+
+.setting__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.setting__name { font: var(--t-h3); color: var(--text-1); }
+.setting__note { font: var(--t-caption); color: var(--text-3); }
+
+/* Подзаголовок группы — хайрлайном, а не вложенной коробкой (7.2).
+   Лейбл и пояснение стоят в одной строке: вторая строка под пояснение
+   уводила страницу за 1080, а сведений в ней ровно на полстроки. */
+.settings__group {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-4);
+    padding-top: var(--s-3);
+    padding-bottom: var(--s-2);
 }
 
-.settings-card .toggle-switch {
-    width: 34px !important;
-    height: 18px !important;
-    min-height: 18px !important;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, .12);
+.settings__group-note { font: var(--t-caption); color: var(--text-3); }
+
+/* ============================================================================
+   Правая колонка
+   ============================================================================ */
+.kv { margin: 0; display: flex; flex-direction: column; }
+
+.kv__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
+    height: var(--h-row);
+    border-bottom: 1px solid var(--line-1);
 }
 
-.settings-card .toggle-switch.active {
-    background: rgba(54, 217, 138, .88);
+.kv__row:last-child { border-bottom-width: 0; }
+
+.kv dt { font: var(--t-body-sm); color: var(--text-3); }
+
+.kv dd {
+    margin: 0;
+    font: var(--t-body-sm);
+    color: var(--text-1);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.settings-card .toggle-switch i {
-    top: 2px;
-    left: 2px;
-    width: 14px;
-    height: 14px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, .24);
+.kv__state { display: inline-flex; align-items: center; gap: var(--s-2); }
+
+/* Итоги: компактный список «подпись — значение», числа моно по правому
+   краю. НЕ четыре одинаковые плитки — правило 9.1 их прямо запрещает. */
+.totals { margin: 0; display: flex; flex-direction: column; }
+
+.totals__row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
+    height: var(--h-row);
+    border-bottom: 1px solid var(--line-1);
 }
 
-.settings-card .toggle-switch.active i {
-    transform: translateX(16px);
+.totals__row:last-child { border-bottom-width: 0; }
+
+.totals dt { font: var(--t-body-sm); color: var(--text-3); }
+.totals dd { margin: 0; color: var(--text-1); }
+.totals .nodata { color: var(--text-4); }
+
+.totals__empty {
+    margin: var(--s-3) 0 0;
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+/* ---------- последние события ----------
+   Длинный список скроллится ВНУТРИ панели, а не страницей (раздел 9.8):
+   экран целиком обязан помещаться в 1080 по высоте. Без этого десять
+   событий уводили страницу на 1276 и обрезались нижней границей экрана. */
+.events {
+    display: flex;
+    flex-direction: column;
+    max-height: 296px;
+    overflow-y: auto;
+}
+
+.event {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--s-2) 0;
+    border-bottom: 1px solid var(--line-1);
+}
+
+.event:last-child { border-bottom-width: 0; }
+
+.event__head { display: flex; align-items: baseline; gap: var(--s-2); min-width: 0; }
+.event__time { color: var(--text-3); flex: none; }
+
+.event__title {
+    font: var(--t-body-sm);
+    font-weight: 500;
+    color: var(--text-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.event__text {
+    margin: 0;
+    font: var(--t-caption);
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.num-xs { font: var(--n-xs); font-variant-numeric: tabular-nums; }
+
+/* ============================================================================
+   Узкие экраны. Приоритет — отсутствие горизонтального скролла (раздел 8).
+   ============================================================================ */
+/* Ниже --bp-md палитра и предпросмотр остаются РЯДОМ: перенос
+   предпросмотра под палитру уводил страницу с 1080 на 1258, а раздел 9.8
+   требует, чтобы экран целиком помещался в 1080. Уже палитра, а не выше
+   раскладка. */
+@media (max-width: 1440px) {
+    .profile-page { padding-left: var(--s-5); padding-right: var(--s-5); }
+    .accent { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-4); }
+    .preview { padding-left: var(--s-4); gap: var(--s-4); }
+    .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* На 1280 остаются те же четыре образца в ряд: три давали лишнюю строку
+   палитры и уводили страницу за 1080, а места под четыре хватает — образец
+   узкий, в нём только полоска и одно слово. Сжимается подпись, не сетка. */
+@media (max-width: 1280px) {
+    .swatch { padding: var(--s-1) var(--s-2) var(--s-2); }
+    .events { max-height: 240px; }
 }

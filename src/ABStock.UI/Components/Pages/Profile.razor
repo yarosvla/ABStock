@@ -5,206 +5,538 @@
 @using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
+@using static ABStock.UI.Services.NumberFormat
 @implements IDisposable
 @inject ISimulationHistoryReader SimulationHistoryReader
 @inject IActiveAssetContext ActiveAssetContext
 @inject ISimulationRunner SimulationRunner
+@inject IUserPreferences Preferences
 
 <PageTitle>Профиль</PageTitle>
+
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
 <div class="profile-shell">
     <TopNavigation ActivePage="Profile" ShowClock="true" />
 
-    <main class="profile-main">
-        <header class="page-heading">
-            <div>
-                <p class="breadcrumbs">
-                    <a href="/create-asset">Создание актива</a>
-                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
-                    <span>Профиль</span>
-                </p>
-                <h1>Профиль</h1>
-                <p>Рабочие настройки, история симуляций и текущий контекст актива @CurrentAsset.Draft.Name</p>
+    <main class="profile-page">
+
+        @* Крошки — раздел 13. Чипа сессии на этой странице нет: «Профиль»
+           не про прогон, а про настройки. *@
+        <Breadcrumbs Items="@(new Crumb[]
+                     {
+                         new("Активы", Href: "/create-asset"),
+                         new(CurrentAsset.Draft.Name, IsAsset: true),
+                         new("Профиль")
+                     })" />
+
+        <PageHead Title="Профиль">
+            <Context>Настройки интерфейса и итоги работы</Context>
+        </PageHead>
+
+        @if (loadFailed)
+        {
+            @* Раздел 14: липкая полоса --warn-500, данные под ней приглушаются,
+               но не исчезают. Настройки при этом работают — они в браузере. *@
+            <div class="offline" role="status">
+                <span class="offline__text">
+                    <Icon Name="wifi-off" Size="16" />
+                    Итоги не читаются — нет связи с хранилищем истории
+                </span>
+                <AppButton Variant="secondary" Size="26" OnClick="ReloadHistory">Переподключиться</AppButton>
             </div>
-        </header>
+        }
 
-        <section class="profile-grid" aria-label="Профиль ABStock">
-            <aside class="profile-sidebar">
-                <section class="glass-card identity-card" aria-labelledby="identity-title">
-                    <span class="profile-avatar" aria-hidden="true">@AvatarInitials</span>
-                    @if (isEditingName)
-                    {
-                        <div class="name-edit">
-                            <input type="text" @bind="userName" @bind:event="oninput" @onkeyup="HandleNameKey" autofocus />
-                            <button @onclick="SaveName"><i class="bi bi-check2"></i></button>
-                        </div>
-                    }
-                    else
-                    {
-                        <h2 id="identity-title">@userName <button class="edit-name-btn" @onclick="EditName" aria-label="Редактировать имя"><i class="bi bi-pencil"></i></button></h2>
-                    }
-                    <p>Оператор симуляции · ABStock</p>
-                    <div class="identity-tags">
-                        <span>@CurrentAsset.Symbol</span>
-                        <span>@GetAssetTypeLabel(CurrentAsset.Draft.AssetType)</span>
-                    </div>
-                </section>
+        <div class="profile-grid">
 
-                <section class="glass-card security-card" aria-labelledby="security-title">
-                    <div class="panel-heading">
-                        <h2 id="security-title">Безопасность</h2>
-                        <span>локально</span>
-                    </div>
-                    @foreach (var item in SecurityItems)
-                    {
-                        <div class="security-row">
-                            <i class="bi @item.Icon" aria-hidden="true"></i>
-                            <span>@item.Label</span>
-                            <strong class="@item.ClassName">@item.Value</strong>
-                        </div>
-                    }
-                </section>
-            </aside>
+            @* ── Левая колонка: настройки. Визуальный объект экрана — живой
+                 предпросмотр, порождённый настройкой, а не данными (7.2). ── *@
+            <div class="col col--main">
 
-            <section class="profile-content">
-                <section class="profile-metrics" aria-label="Статистика профиля">
-                    @foreach (var metric in ProfileMetrics)
-                    {
-                        <article class="glass-card profile-metric @metric.ClassName">
-                            <span>@metric.Label</span>
-                            <strong>@metric.Value</strong>
-                            <small>@metric.Detail</small>
-                        </article>
-                    }
-                </section>
+                <Panel Title="Оператор" Class="rise rise-1">
+                    <ChildContent>
+                        <div class="operator">
+                            <span class="operator__avatar" aria-hidden="true">@Initials</span>
 
-                <section class="glass-card preferences-card" aria-labelledby="preferences-title">
-                    <div class="panel-heading">
-                        <h2 id="preferences-title">Торговые предпочтения</h2>
-                        <span>демо-набор</span>
-                    </div>
-                    <div class="preference-grid">
-                        @foreach (var preference in TradingPreferences)
-                        {
-                            <article>
-                                <i class="bi @preference.Icon" aria-hidden="true"></i>
-                                <span>@preference.Label</span>
-                                <strong>@preference.Value</strong>
-                            </article>
-                        }
-                    </div>
-                </section>
-
-                <section class="glass-card settings-card" aria-labelledby="settings-title">
-                    <div class="panel-heading">
-                        <h2 id="settings-title">Настройки интерфейса</h2>
-                        <span>без сохранения</span>
-                    </div>
-                    <div class="settings-list interactive-settings">
-                        <label class="setting-toggle">
-                            <span>
-                                <i class="bi bi-speedometer2" aria-hidden="true"></i> Компактный режим
-                            </span>
-                            <div class="toggle-switch @(IsCompactMode ? "active" : "")">
-                                <input type="checkbox" @bind="IsCompactMode" />
-                                <i></i>
-                            </div>
-                        </label>
-                        <label class="setting-toggle">
-                            <span>
-                                <i class="bi bi-bell-fill" aria-hidden="true"></i> Звуковые уведомления
-                            </span>
-                            <div class="toggle-switch @(SoundEnabled ? "active" : "")">
-                                <input type="checkbox" @bind="SoundEnabled" />
-                                <i></i>
-                            </div>
-                        </label>
-                    </div>
-                </section>
-            </section>
-
-            <aside class="profile-activity">
-                <section class="glass-card activity-card" aria-labelledby="activity-title">
-                    <div class="panel-heading">
-                        <h2 id="activity-title">Активность</h2>
-                        <span>сегодня</span>
-                    </div>
-                    <div class="activity-list">
-                        @if (ActivityItems.Count == 0)
-                        {
-                            <article>
-                                <time>—</time>
-                                <div>
-                                    <strong>История пока пуста</strong>
-                                    <span>После запуска симуляций и сделок здесь появятся реальные события.</span>
+                            @if (isEditingName)
+                            {
+                                <div class="operator__edit">
+                                    <TextField @ref="nameField"
+                                               Value="nameDraft"
+                                               ValueChanged="SetNameDraft"
+                                               MaxLength="60"
+                                               Label="Имя оператора"
+                                               Invalid="nameError"
+                                               OnKeyDown="HandleNameKey" />
+                                    <span class="operator__hint">Enter — сохранить, Esc — отменить</span>
                                 </div>
-                            </article>
+
+                                @if (nameError)
+                                {
+                                    @* Охра, а не рыночный красный: раздел 3 —
+                                       --up-* и --down-* не используются для
+                                       валидации, красный означает падение цены. *@
+                                    <p class="operator__error">
+                                        <Icon Name="alert" Size="14" />
+                                        Имя не может быть пустым
+                                    </p>
+                                }
+                            }
+                            else
+                            {
+                                <div class="operator__id">
+                                    <h3>@Preferences.OperatorName</h3>
+                                    <p>Оператор симуляции</p>
+                                </div>
+                                <AppButton Variant="ghost" Size="26" OnClick="StartEditingName">Изменить</AppButton>
+                            }
+                        </div>
+                    </ChildContent>
+                </Panel>
+
+                <Panel Title="Акцент интерфейса" Class="rise rise-2">
+                    <MetaContent>@UserPreferences.GetAccentLabel(Preferences.Accent)</MetaContent>
+                    <ChildContent>
+                        <div class="accent">
+
+                            @* Радиогруппа, а не набор кнопок: стрелками между
+                               образцами, пробелом или Enter выбор. Выбранный
+                               помечается обводкой --acc-line, а не галочкой
+                               поверх цвета. *@
+                            <div class="swatches"
+                                 role="radiogroup"
+                                 aria-label="Акцент интерфейса"
+                                 @onkeydown="HandleSwatchKey">
+                                @for (var i = 0; i < UserPreferences.Accents.Count; i++)
+                                {
+                                    var index = i;
+                                    var preset = UserPreferences.Accents[index];
+                                    var isChosen = preset.Key == Preferences.Accent;
+                                    <button type="button"
+                                            class="swatch @(isChosen ? "is-chosen" : null)"
+                                            data-accent="@preset.Key"
+                                            role="radio"
+                                            aria-checked="@(isChosen ? "true" : "false")"
+                                            tabindex="@(isChosen ? 0 : -1)"
+                                            title="@preset.Label"
+                                            @ref="swatchRefs[index]"
+                                            @onclick="() => ChooseAccent(preset.Key)">
+                                        @* Образец собран из тех же трёх токенов,
+                                           что несут акцент в системе: заливка,
+                                           линия, подложка. Не картинка цвета —
+                                           маленький портрет пресета. *@
+                                        <span class="swatch__stage" aria-hidden="true">
+                                            <span class="swatch__fill"></span>
+                                            <span class="swatch__line"></span>
+                                            <span class="swatch__soft"></span>
+                                        </span>
+                                        <span class="swatch__name">@preset.Label</span>
+                                    </button>
+                                }
+                            </div>
+
+                            <div class="preview hairline-left">
+                                <div class="preview__col">
+                                    <span class="label">С акцентом</span>
+
+                                    <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
+
+                                    <TextField Value="@CurrentAsset.Draft.Name"
+                                               Label="Пример поля в фокусе"
+                                               Class="preview__field" />
+
+                                    <div class="preview__rows">
+                                        <div class="preview__row">
+                                            <span>Трендовый</span>
+                                            <span class="num-sm up">@Pnl2(18_240m)</span>
+                                        </div>
+                                        <div class="preview__row is-selected">
+                                            <span>Контр-тренд</span>
+                                            <span class="num-sm down">@Pnl2(-6_110m)</span>
+                                        </div>
+                                    </div>
+
+                                    @* Компоненты кита настоящие, а состояние у них
+                                       своё: живая настройка таймфрейма стоит ниже,
+                                       в «Настройках интерфейса», и второй такой же
+                                       рабочий контрол на одном экране был бы дублем
+                                       (раздел 9.0). Здесь он показывает акцент. *@
+                                    <Segmented TValue="string"
+                                               Items="@PreviewTimeframes"
+                                               Value="@previewTimeframe"
+                                               ValueChanged="@(value => previewTimeframe = value)"
+                                               Label="Пример переключателя" />
+
+                                    <Toggle Value="previewToggle"
+                                            ValueChanged="@(value => previewToggle = value)"
+                                            Text="@(previewToggle ? "Включено" : "Выключено")"
+                                            Label="Пример тумблера" />
+                                </div>
+
+                                <div class="preview__col preview__col--fixed">
+                                    <span class="label">Не меняется никогда</span>
+
+                                    <div class="preview__rows">
+                                        <div class="preview__row">
+                                            <span>Трендовый</span>
+                                            <span class="num-sm up">@Pnl2(18_240m)</span>
+                                        </div>
+                                        <div class="preview__row">
+                                            <span>Контр-тренд</span>
+                                            <span class="num-sm down">@Pnl2(-6_110m)</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="preview__badges">
+                                        <span class="badge badge--up">Позитивная</span>
+                                        <span class="badge badge--down">Негативная</span>
+                                    </div>
+
+                                    @* Депт-бар — рыночная форма. Он и числа рядом
+                                       обязаны не отреагировать на смену акцента:
+                                       это и есть доказательство обещания ниже. *@
+                                    <div class="preview__depth">
+                                        <div class="preview__level">
+                                            <span class="preview__bar preview__bar--down" style="width:72%"></span>
+                                            <span class="num-sm down">124,24</span>
+                                            <span class="num-sm preview__qty">1 460</span>
+                                        </div>
+                                        <div class="preview__level">
+                                            <span class="preview__bar preview__bar--up" style="width:54%"></span>
+                                            <span class="num-sm up">124,12</span>
+                                            <span class="num-sm preview__qty">1 320</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="accent__promise hairline-top">
+                                Акцент меняет только элементы управления — цвета рынка, агентов и
+                                графиков не меняются никогда. Значения в предпросмотре условные.
+                            </p>
+                        </div>
+                    </ChildContent>
+                </Panel>
+
+                <Panel Title="Настройки интерфейса" Class="rise rise-3">
+                    <MetaContent>применяются сразу</MetaContent>
+                    <ChildContent>
+                        <div class="settings">
+
+                            <div class="setting">
+                                <div class="setting__text">
+                                    <span class="setting__name" id="tf-label">Таймфрейм по умолчанию</span>
+                                    <span class="setting__note">С него открывается график на «Торгах».</span>
+                                </div>
+                                <Segmented TValue="string"
+                                           Items="@PreviewTimeframes"
+                                           Value="@Preferences.DefaultTimeframe"
+                                           ValueChanged="SetTimeframe"
+                                           Label="Таймфрейм по умолчанию" />
+                            </div>
+
+                            <div class="settings__group hairline-top">
+                                <span class="label">Уведомления</span>
+                                <span class="settings__group-note">Что показывает колокольчик в шапке.</span>
+                            </div>
+
+                            <div class="setting">
+                                <div class="setting__text">
+                                    <span class="setting__name" id="n-trades">Сделки</span>
+                                    <span class="setting__note">Когда агент открывает или закрывает позицию.</span>
+                                </div>
+                                <Toggle Value="Preferences.NotifyTrades"
+                                        ValueChanged="SetNotifyTrades"
+                                        LabelledBy="n-trades" />
+                            </div>
+
+                            <div class="setting">
+                                <div class="setting__text">
+                                    <span class="setting__name" id="n-news">Новости по активу</span>
+                                    <span class="setting__note">Введённая новость и её сигнал.</span>
+                                </div>
+                                <Toggle Value="Preferences.NotifyNews"
+                                        ValueChanged="SetNotifyNews"
+                                        LabelledBy="n-news" />
+                            </div>
+
+                            <div class="setting">
+                                <div class="setting__text">
+                                    <span class="setting__name" id="n-system">Системные события</span>
+                                    <span class="setting__note">Запуск и остановка торгов, создание актива.</span>
+                                </div>
+                                <Toggle Value="Preferences.NotifySystem"
+                                        ValueChanged="SetNotifySystem"
+                                        LabelledBy="n-system" />
+                            </div>
+                        </div>
+                    </ChildContent>
+                </Panel>
+            </div>
+
+            @* ── Правая колонка: состояние на сейчас и итоги (раздел 13). ── *@
+            <div class="col col--side">
+
+                <Panel Title="Текущий контекст" Class="rise rise-2">
+                    <ChildContent>
+                        <dl class="kv">
+                            <div class="kv__row">
+                                <dt>Актив</dt>
+                                <dd>@CurrentAsset.Draft.Name</dd>
+                            </div>
+                            <div class="kv__row">
+                                <dt>Символ</dt>
+                                <dd class="num-sm">@CurrentAsset.Symbol</dd>
+                            </div>
+                            <div class="kv__row">
+                                <dt>Тип</dt>
+                                <dd>@AgentDisplay.GetAssetTypeLabel(CurrentAsset.Draft.AssetType) · @CurrentAsset.Draft.Industry</dd>
+                            </div>
+                            <div class="kv__row">
+                                <dt>Торги</dt>
+                                <dd class="kv__state">
+                                    <StatusDot Tone="@(IsRunning ? "up" : "muted")" Live="IsRunning" />
+                                    @if (IsRunning && SessionStartedAt is not null)
+                                    {
+                                        <text>идут с <span class="num-sm">@SessionStartedAt.Value.ToString("HH:mm")</span></text>
+                                    }
+                                    else if (IsRunning)
+                                    {
+                                        <text>идут</text>
+                                    }
+                                    else
+                                    {
+                                        <text>остановлены</text>
+                                    }
+                                </dd>
+                            </div>
+                        </dl>
+                    </ChildContent>
+                </Panel>
+
+                <Panel Title="Итоги работы" Class="rise rise-3">
+                    <MetaContent>за всё время</MetaContent>
+                    <ChildContent>
+                        @if (isLoading)
+                        {
+                            <div class="totals">
+                                @for (var i = 0; i < 4; i++)
+                                {
+                                    <div class="totals__row">
+                                        <Skeleton Width="120px" Height="16px" />
+                                        <Skeleton Width="56px" Height="16px" />
+                                    </div>
+                                }
+                            </div>
                         }
                         else
                         {
-                            @foreach (var item in ActivityItems)
-                            {
-                                <article>
-                                    <time>@item.Time</time>
-                                    <div>
-                                        <strong>@item.Title</strong>
-                                        <span>@item.Detail</span>
+                            @* Компактный список «подпись — значение», а не четыре
+                               одинаковые плитки: правило 9.1 их прямо запрещает. *@
+                            <dl class="totals">
+                                @foreach (var total in Totals)
+                                {
+                                    <div class="totals__row">
+                                        <dt>@total.Label</dt>
+                                        <dd class="num-sm @(HasRuns ? null : "nodata")">@total.Value</dd>
                                     </div>
-                                </article>
+                                }
+                            </dl>
+
+                            @if (!HasRuns)
+                            {
+                                <p class="totals__empty">Итоги появятся после первой сессии.</p>
                             }
                         }
-                    </div>
-                </section>
+                    </ChildContent>
+                </Panel>
 
-                <section class="glass-card notification-card" aria-labelledby="notifications-title">
-                    <div class="panel-heading">
-                        <h2 id="notifications-title">Уведомления</h2>
-                        <span>3 канала</span>
-                    </div>
-                    @foreach (var item in NotificationItems)
-                    {
-                        <div class="notification-row">
-                            <span>@item.Label</span>
-                            <strong class="@item.ClassName">@item.Value</strong>
-                        </div>
-                    }
-                </section>
-            </aside>
-        </section>
+                <Panel Title="Последние события" Class="rise rise-4">
+                    @* Общего числа событий GetOverview не возвращает, поэтому в
+                       шапке стоит фактическая длина списка, а не выдуманное
+                       «7 из 128». *@
+                    <MetaContent>
+                        @if (!isLoading && Activity.Count > 0)
+                        {
+                            <text>последние <span class="num-sm">@Activity.Count</span></text>
+                        }
+                    </MetaContent>
+                    <ChildContent>
+                        @if (isLoading)
+                        {
+                            <div class="events">
+                                @for (var i = 0; i < 4; i++)
+                                {
+                                    <div class="event">
+                                        <Skeleton Width="100%" Height="14px" />
+                                        <Skeleton Width="60%" Height="12px" />
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else if (Activity.Count == 0)
+                        {
+                            <EmptyState IconName="clock"
+                                        Title="События ещё не записаны"
+                                        Description="Создайте актив и запустите торги — здесь появится хронология.">
+                                <Action>
+                                    <AppButton Variant="primary" Size="32" Href="/create-asset">Создать актив</AppButton>
+                                </Action>
+                            </EmptyState>
+                        }
+                        else
+                        {
+                            <div class="events">
+                                @foreach (var item in Activity)
+                                {
+                                    <article class="event">
+                                        <div class="event__head">
+                                            <time class="event__time num-xs" datetime="@item.At.ToString("O")">@item.At.ToString("HH:mm:ss")</time>
+                                            <span class="event__title">@item.Title</span>
+                                        </div>
+                                        <p class="event__text" title="@item.Detail">@item.Detail</p>
+                                    </article>
+                                }
+                            </div>
+                        }
+                    </ChildContent>
+                </Panel>
+            </div>
+        </div>
     </main>
 </div>
 
 @code {
+    /// <summary>
+    /// Как часто перечитывается сводка истории. GetOverview — несколько
+    /// агрегатных запросов, и делать их на каждый тик значило бы долбить базу
+    /// с каждого открытого «Профиля».
+    /// </summary>
     private const int HistoryRefreshTickInterval = 5;
 
     private SimulationHistoryOverview historyOverview = new(0, 0, 0, 0, []);
     private int ticksSinceHistoryRefresh;
+    private bool isLoading = true;
+    private bool loadFailed;
+
+    /// <summary>Состояние компонентов предпросмотра. Ничего не настраивает.</summary>
+    private string previewTimeframe = Timeframes.DefaultKey;
+    private bool previewToggle = true;
+
+    private bool isEditingName;
+    private bool nameError;
+    private string nameDraft = string.Empty;
+    private TextField? nameField;
+
+    /// <summary>
+    /// Ссылки на образцы. Нужны затем, что палитра — радиогруппа с бегущим
+    /// tabindex: после перехода стрелкой фокус обязан уехать на новый
+    /// выбранный образец, иначе он останется на старом, у которого tabindex
+    /// уже −1, и следующая стрелка ничего не найдёт.
+    /// </summary>
+    private readonly ElementReference[] swatchRefs = new ElementReference[UserPreferences.Accents.Count];
+
     private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
-    private ProfileMetric[] ProfileMetrics => BuildProfileMetrics();
-    private ProfilePreference[] TradingPreferences => BuildTradingPreferences();
-    private IReadOnlyList<ActivityItem> ActivityItems => BuildActivityItems();
+    private bool IsRunning => SimulationRunner.IsRunning;
+    private string Initials => UserPreferences.GetInitials(Preferences.OperatorName);
+    private bool HasRuns => historyOverview.RunCount > 0;
 
-    private bool IsCompactMode { get; set; } = true;
-    private bool SoundEnabled { get; set; } = false;
+    private static readonly SegmentedItem<string>[] PreviewTimeframes =
+        Timeframes.All.Select(option => new SegmentedItem<string>(option.Key, option.Label)).ToArray();
 
-    private string userName = "Алексей Ковалёв";
-    private bool isEditingName = false;
+    /// <summary>
+    /// Время начала сессии — из той же сводки прогона, что у чипа сессии на
+    /// «Торгах» и «Агентах». Четвёртого счётчика здесь нет: два источника
+    /// одного и того же времени расходятся по построению.
+    /// </summary>
+    private DateTimeOffset? SessionStartedAt
+    {
+        get
+        {
+            var runId = SimulationRunner.CurrentRunId;
+
+            if (runId == Guid.Empty)
+            {
+                return null;
+            }
+
+            try
+            {
+                return SimulationHistoryReader.GetRun(runId)?.StartedAt.ToLocalTime();
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+    }
+
+    private TotalRow[] Totals =>
+    [
+        new("Сессий", Format(historyOverview.RunCount)),
+        new("Активов создано", Format(historyOverview.DistinctAssetCount)),
+        new("Сделок", Format(historyOverview.TotalTradeCount)),
+        new("Тиков рынка", Format(historyOverview.TotalTickCount))
+    ];
+
+    /// <summary>Нет данных — «—», не «0» (раздел 10).</summary>
+    private string Format(int value) => HasRuns ? Count0(value) : "—";
+
+    private IReadOnlyList<ActivityRow> Activity =>
+        historyOverview.RecentActivity
+            .Select(item => new ActivityRow(item.OccurredAt.ToLocalTime(), item.Title, item.Detail))
+            .ToArray();
 
     protected override void OnInitialized()
     {
         LoadHistory();
         SimulationRunner.OnTick += HandleSimulationTick;
+        SimulationRunner.OnStateChanged += HandleStateChanged;
+        Preferences.Changed += HandlePreferencesChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Preferences.EnsureLoadedAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        SimulationRunner.OnTick -= HandleSimulationTick;
+        SimulationRunner.OnStateChanged -= HandleStateChanged;
+        Preferences.Changed -= HandlePreferencesChanged;
     }
 
     private void LoadHistory()
     {
-        historyOverview = SimulationHistoryReader.GetOverview(10);
+        try
+        {
+            historyOverview = SimulationHistoryReader.GetOverview(10);
+            loadFailed = false;
+        }
+        catch (Exception)
+        {
+            // Данные под полосой приглушаются, но не исчезают (раздел 14):
+            // прошлые итоги остаются на экране, полоса говорит, что они старые.
+            loadFailed = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ReloadHistory()
+    {
+        isLoading = true;
+        LoadHistory();
     }
 
     private void HandleSimulationTick(SimulationTickResult tickResult)
     {
-        // GetOverview issues several aggregate queries; refresh periodically instead of
-        // on every tick to avoid hammering the database for each open Profile circuit.
         if (++ticksSinceHistoryRefresh < HistoryRefreshTickInterval)
         {
             return;
@@ -218,82 +550,110 @@
         });
     }
 
-    public void Dispose()
+    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandlePreferencesChanged() => _ = InvokeAsync(StateHasChanged);
+
+    // ─────────────────────────────── акцент ───────────────────────────────
+
+    private Task ChooseAccent(string key) => Preferences.SetAccentAsync(key);
+
+    /// <summary>
+    /// Стрелками влево-вправо (и вверх-вниз) переход между образцами, выбор
+    /// применяется сразу: это радиогруппа, и так она себя и ведёт.
+    /// Home и End — на края палитры.
+    /// </summary>
+    private async Task HandleSwatchKey(KeyboardEventArgs args)
     {
-        SimulationRunner.OnTick -= HandleSimulationTick;
+        var presets = UserPreferences.Accents;
+        var current = presets.ToList().FindIndex(preset => preset.Key == Preferences.Accent);
+
+        if (current < 0)
+        {
+            current = 0;
+        }
+
+        var next = args.Key switch
+        {
+            "ArrowRight" or "ArrowDown" => (current + 1) % presets.Count,
+            "ArrowLeft" or "ArrowUp" => (current - 1 + presets.Count) % presets.Count,
+            "Home" => 0,
+            "End" => presets.Count - 1,
+            _ => -1
+        };
+
+        if (next < 0)
+        {
+            return;
+        }
+
+        await ChooseAccent(presets[next].Key);
+
+        // Перерисовка уже прошла по событию Changed — переставляем фокус на
+        // тот образец, который стал выбранным.
+        await InvokeAsync(StateHasChanged);
+        await swatchRefs[next].FocusAsync();
     }
 
-    private string AvatarInitials
+    // ───────────────────────────── настройки ─────────────────────────────
+
+    private Task SetTimeframe(string key) => Preferences.SetDefaultTimeframeAsync(key);
+
+    private Task SetNotifyTrades(bool value) => Preferences.SetNotifyTradesAsync(value);
+
+    private Task SetNotifyNews(bool value) => Preferences.SetNotifyNewsAsync(value);
+
+    private Task SetNotifySystem(bool value) => Preferences.SetNotifySystemAsync(value);
+
+    // ───────────────────────────── имя оператора ─────────────────────────────
+
+    private void StartEditingName()
     {
-        get
+        nameDraft = Preferences.OperatorName;
+        nameError = false;
+        isEditingName = true;
+    }
+
+    private void SetNameDraft(string value)
+    {
+        nameDraft = value;
+
+        // Ошибка гаснет по мере ввода: держать её, пока человек уже исправился,
+        // значит ругаться на то, чего больше нет.
+        if (nameError && !string.IsNullOrWhiteSpace(value))
         {
-            var parts = userName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0) return "АК";
-            if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
-            return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+            nameError = false;
         }
     }
 
-    private void EditName() => isEditingName = true;
-    private void SaveName() => isEditingName = false;
-    private void HandleNameKey(KeyboardEventArgs e)
+    private async Task HandleNameKey(KeyboardEventArgs args)
     {
-        if (e.Key == "Enter")
-            SaveName();
+        if (args.Key == "Escape")
+        {
+            isEditingName = false;
+            nameError = false;
+            return;
+        }
+
+        if (args.Key != "Enter")
+        {
+            return;
+        }
+
+        // Пустое имя не сохраняется: решать за человека, что он имел в виду
+        // пустой строкой, страница не должна.
+        if (await Preferences.TrySetOperatorNameAsync(nameDraft))
+        {
+            isEditingName = false;
+            nameError = false;
+        }
+        else
+        {
+            nameError = true;
+        }
     }
 
-    private static SecurityItem[] SecurityItems =>
-    [
-        new("bi-hdd-network", "Среда", "локальная", "positive"),
-        new("bi-shield-check", "История", "persisted", "positive"),
-        new("bi-person-lock", "Авторизация", "демо", "")
-    ];
+    private sealed record TotalRow(string Label, string Value);
 
-    private static NotificationItem[] NotificationItems =>
-    [
-        new("Сделки и исполнение", "включено", "positive"),
-        new("Новости по активу", "включено", "positive"),
-        new("Системные события", "тихо", "")
-    ];
-
-    private ProfileMetric[] BuildProfileMetrics() =>
-    [
-        new("Сессий", historyOverview.RunCount.ToString(), "persisted runs", historyOverview.RunCount > 0 ? "positive" : string.Empty),
-        new("Активов создано", historyOverview.DistinctAssetCount.ToString(), $"текущий: {CurrentAsset.Symbol}", historyOverview.DistinctAssetCount > 0 ? "positive" : string.Empty),
-        new("Тестовых сделок", historyOverview.TotalTradeCount.ToString("N0"), "persisted history", historyOverview.TotalTradeCount > 0 ? "positive" : string.Empty),
-        new("Тиков рынка", historyOverview.TotalTickCount.ToString("N0"), "история симуляций", historyOverview.TotalTickCount > 0 ? "positive" : string.Empty)
-    ];
-
-    private ProfilePreference[] BuildTradingPreferences() =>
-    [
-        new("bi-currency-exchange", "Валюта", "RUB"),
-        new("bi-clock-history", "Горизонт", "интрадей"),
-        new("bi-bar-chart", "График", "свечи"),
-        new("bi-list-columns", "Стакан", "8 уровней"),
-        new("bi-robot", "Агенты", "4 стратегии"),
-        new("bi-newspaper", "Актив", CurrentAsset.Symbol)
-    ];
-
-    private IReadOnlyList<ActivityItem> BuildActivityItems() =>
-        historyOverview.RecentActivity
-            .Select(item => new ActivityItem(
-                item.OccurredAt.ToLocalTime().ToString("HH:mm"),
-                item.Title,
-                item.Detail))
-            .ToArray();
-
-    private static string GetAssetTypeLabel(AssetType assetType) => assetType switch
-    {
-        AssetType.Stock => "Акция",
-        AssetType.Bond => "Облигация",
-        AssetType.Commodity => "Товар",
-        AssetType.Crypto => "Криптоактив",
-        _ => assetType.ToString()
-    };
-
-    private sealed record ProfileMetric(string Label, string Value, string Detail, string ClassName);
-    private sealed record ProfilePreference(string Icon, string Label, string Value);
-    private sealed record SecurityItem(string Icon, string Label, string Value, string ClassName);
-    private sealed record ActivityItem(string Time, string Title, string Detail);
-    private sealed record NotificationItem(string Label, string Value, string ClassName);
+    private sealed record ActivityRow(DateTimeOffset At, string Title, string Detail);
 }
