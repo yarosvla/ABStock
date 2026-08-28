@@ -290,7 +290,12 @@
                             </div>
                             <div class="kv__row">
                                 <dt>Тип</dt>
-                                <dd>@AgentDisplay.GetAssetTypeLabel(CurrentAsset.Draft.AssetType) · @CurrentAsset.Draft.Industry</dd>
+                                @* Отрасль приписывается через разделитель, только
+                                   если она задана: иначе в строке остаётся
+                                   висячая точка «Акция ·». *@
+                                <dd>
+                                    @AgentDisplay.GetAssetTypeLabel(CurrentAsset.Draft.AssetType)@(string.IsNullOrWhiteSpace(CurrentAsset.Draft.Industry) ? null : $" · {CurrentAsset.Draft.Industry}")
+                                </dd>
                             </div>
                             <div class="kv__row">
                                 <dt>Торги</dt>
