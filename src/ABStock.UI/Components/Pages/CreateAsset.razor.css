@@ -91,7 +91,7 @@
     height: 22px;
     padding: 0 var(--s-2);
     border-radius: var(--r-pill);
-    background: var(--acc-soft);
+    background: var(--fill-soft);
     font: var(--t-caption);
     color: var(--text-2);
 }
@@ -109,7 +109,6 @@
     font-weight: 500;
 }
 
-.badge--acc  { background: var(--acc-soft);  color: var(--text-1); }
 .badge--warn { background: var(--warn-soft); color: var(--warn-500); }
 
 .nodata { color: var(--text-4); }

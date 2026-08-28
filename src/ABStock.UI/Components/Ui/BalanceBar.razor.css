@@ -1,4 +1,9 @@
-/* Полоса баланса — раздел 9.18. Половины различаются светлотой, не цветом. */
+/* Полоса баланса — раздел 9.18. Половины различаются светлотой, не цветом.
+
+   Светлота графита, а не акцент: полоса показывает данные (баланс факторов
+   профиля), а акцент данные не красит никогда (раздел 3.1). Пока здесь
+   стояли --acc-600 / --acc-ink / --acc-soft, смена акцента перекрашивала
+   соотношение факторов заодно с кнопкой. */
 
 .ui-balance {
     display: flex;
@@ -20,13 +25,13 @@
 }
 
 .ui-balance__half--positive {
-    background: var(--acc-600);
-    color: var(--acc-ink);
+    background: var(--gph-400);
+    color: var(--gph-950);
 }
 
 .ui-balance__half--negative {
     justify-content: flex-end;
-    background: var(--acc-soft);
+    background: var(--fill-soft);
     border-color: var(--line-3);
     color: var(--text-2);
 }

@@ -75,7 +75,9 @@
     transform: translateX(-50%);
 }
 
-.ui-scale__marker--acc  { background: var(--acc-500); }
+/* Маркер стоит на значении, то есть на данных: --text-1, а не акцент
+   (раздел 3.1). Имя модификатора оставлено прежним — его знают страницы. */
+.ui-scale__marker--acc  { background: var(--text-1); }
 .ui-scale__marker--warn { background: var(--warn-500); }
 
 /* ---------- названия зон по центру сегментов ---------- */
