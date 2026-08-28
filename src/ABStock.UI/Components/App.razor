@@ -14,6 +14,59 @@
     <ImportMap />
     <link rel="icon" type="image/png" href="@Assets["favicon.png"]" />
     <HeadOutlet />
+
+    @* Акцент интерфейса — раздел 3.1. Скрипт стоит в конце <head> и
+       выполняется ДО первой отрисовки: примени мы акцент из Blazor, человек
+       увидел бы вспышку графита и только потом выбранный цвет.
+
+       Инлайн, а не модуль: модуль откладывается до разбора документа, то
+       есть ровно до того момента, которого мы избегаем.
+
+       Всё обёрнуто в try/catch: в приватном режиме и при запрете на данные
+       сайта само обращение к localStorage бросает исключение, и страница не
+       должна из-за настройки не открыться. Значение сверяется со списком —
+       испорченное или чужое молча игнорируется, остаётся графит. *@
+    <script>
+        (function () {
+            var KEYS = {
+                accent: 'abstock.accent',
+                timeframe: 'abstock.timeframe',
+                notifyTrades: 'abstock.notify.trades',
+                notifyNews: 'abstock.notify.news',
+                notifySystem: 'abstock.notify.system',
+                operatorName: 'abstock.operator.name'
+            };
+            var ACCENTS = ['graphite', 'steel', 'ultramarine', 'azure', 'turquoise',
+                           'lavender', 'amethyst', 'orchid', 'brass', 'copper'];
+
+            function read(key) {
+                try { return window.localStorage.getItem(key); } catch (e) { return null; }
+            }
+
+            function applyAccent(value) {
+                // Графит — это отсутствие атрибута: :root уже содержит его
+                // значения, и лишний атрибут только даёт второй источник истины.
+                if (value && value !== 'graphite' && ACCENTS.indexOf(value) >= 0) {
+                    document.documentElement.dataset.accent = value;
+                } else {
+                    delete document.documentElement.dataset.accent;
+                }
+            }
+
+            applyAccent(read(KEYS.accent));
+
+            window.abstockPrefs = {
+                get: function (key) { return read(key); },
+                set: function (key, value) {
+                    try { window.localStorage.setItem(key, value); } catch (e) { /* режим без хранилища */ }
+                },
+                setAccent: function (value) {
+                    applyAccent(value);
+                    window.abstockPrefs.set(KEYS.accent, value);
+                }
+            };
+        })();
+    </script>
 </head>
 
 <body>
