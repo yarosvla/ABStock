@@ -10,14 +10,13 @@ namespace ABStock.UI.Services;
 /// </summary>
 public static class AgentDisplay
 {
-    public static string GetTypeLabel(AgentType type) => type switch
-    {
-        AgentType.TrendFollowing => "Трендовый",
-        AgentType.CounterTrend => "Контр-тренд",
-        AgentType.MarketMaker => "Маркет-мейкер",
-        AgentType.NewsDriven => "Новостной",
-        _ => type.ToString()
-    };
+    /// <summary>
+    /// Названия живут в ABStock.Shared: их показывает не только интерфейс, но
+    /// и читатель истории, который собирает из них строку события сессии.
+    /// Пока таблиц было две, «Профиль» показывал «TrendFollowing» там, где
+    /// «Агенты» показывали «Трендовый».
+    /// </summary>
+    public static string GetTypeLabel(AgentType type) => AgentTypeNames.Label(type);
 
     /// <summary>
     /// Тон типа агента для StatusDot и подсветки строк. Цвет типа один и тот
