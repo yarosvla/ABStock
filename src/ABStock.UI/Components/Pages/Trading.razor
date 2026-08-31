@@ -1,4 +1,4 @@
-@page "/trading"
+﻿@page "/trading"
 @rendermode InteractiveServer
 @using ABStock.Application.MarketHistory
 @using ABStock.Application.Simulation
@@ -667,7 +667,7 @@
         pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime: true);
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         SimulationRunner.OnTick += HandleTick;
         NewsFeed.Changed += HandleNewsFeedChanged;
@@ -678,7 +678,14 @@
             LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
         }
 
-        await EnsureSimulationAsync();
+        // Заход на страницу торги НЕ запускает. Раньше отсюда вызывался
+        // EnsureSimulationAsync, и переход по ссылке сам стартовал сессию: из-за
+        // этого «торги не запущены» и «торги остановлены» на этой странице были
+        // ненаблюдаемы, кнопка «Запустить торги» — недостижима, а кнопка
+        // остановки бессмысленна, потому что любой возврат запускал прогон
+        // заново. Запуск — явное действие человека, и живёт оно в одном месте:
+        // в кнопке ниже.
+        UpdateRunSummary();
     }
 
     private async Task EnsureSimulationAsync()
