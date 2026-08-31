@@ -42,11 +42,6 @@ builder.Services.AddSingleton<IAgentEquityHistory, AgentEquityHistory>();
 // показывает прогон, а прогон один на сервер, и пишет в неё тик.
 builder.Services.AddSingleton<INotificationFeed, NotificationFeed>();
 
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddABStockSimulationDiagnostics();
-}
-
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
