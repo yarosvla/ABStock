@@ -2,19 +2,13 @@
 @layout CreateAssetLayout
 @rendermode InteractiveServer
 @using ABStock.Application.MarketHistory
-@using ABStock.Application.Simulation.Diagnostics
 @using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
-@using Microsoft.AspNetCore.Hosting
-@using Microsoft.Extensions.DependencyInjection
-@using Microsoft.Extensions.Hosting
 @implements IDisposable
 @implements IAsyncDisposable
 @inject ISimulationRunner SimulationRunner
 @inject IMarketCandleReader CandleReader
-@inject IServiceProvider Services
-@inject IWebHostEnvironment Environment
 @inject IJSRuntime JS
 @inject IUserPreferences Preferences
 @inject IActiveAssetContext ActiveAssetContext
@@ -631,13 +625,6 @@
     private static readonly IReadOnlyDictionary<string, TimeframeOption> TimeframesByKey =
         Timeframes.All.ToDictionary(item => item.Key, StringComparer.Ordinal);
 
-    private static readonly DebugScenarioSupportAgent[] ScenarioSupportAgents =
-    [
-        new("scenario-maker-boost", AgentType.MarketMaker, 240_000m, 220m),
-        new("scenario-trend-boost-a", AgentType.TrendFollowing, 220_000m, 140m),
-        new("scenario-trend-boost-b", AgentType.TrendFollowing, 200_000m, 120m)
-    ];
-
     private const decimal DemoStartPrice = 124.35m;
     private const int MetricHistoryLimit = 72;
     private const int VisibleOrderBookDepth = 50;
@@ -652,11 +639,6 @@
     private StatusStripData Status => BuildStatusStripData(latestTick);
 
     private TradeRow[] RecentTrades => BuildTradeRows(tradeHistory);
-
-    private ISimulationDebugControl? DebugControl =>
-        Environment.IsDevelopment()
-            ? Services.GetService<ISimulationDebugControl>()
-            : null;
 
     private ChartSummaryData ChartSummary => BuildChartSummaryData(GetSelectedTimeframeState(), latestTick, lastChartUpdate);
     private AssetParameter[] AssetParameters => BuildAssetParameters();
@@ -682,21 +664,9 @@
     private readonly List<decimal> askMetricHistory = [];
     private readonly List<decimal> volumeMetricHistory = [];
     private readonly List<Trade> tradeHistory = [];
-    private readonly HashSet<string> activeScenarioSupportAgentKeys = [];
     private readonly HashSet<string> loadedHistoryTimeframes = [];
     private SimulationRunSummary? currentRunSummary;
     private Guid observedRunId = Guid.Empty;
-    private string debugAgentName = "Manual";
-    private OrderSide debugOrderSide = OrderSide.Buy;
-    private OrderType debugOrderType = OrderType.Limit;
-    private decimal? debugOrderPrice = DemoStartPrice;
-    private decimal debugOrderQuantity = 1m;
-    private AgentType debugAgentType = AgentType.TrendFollowing;
-    private decimal debugAgentCash = 100_000m;
-    private decimal debugAgentPosition = 10m;
-    private string? debugMessage;
-    private bool isRunningDebugScenario;
-    private CancellationTokenSource? debugScenarioCts;
 
     private TimeframeSeriesState GetSelectedTimeframeState() => timeframeSeriesStates[selectedTimeframe];
 
@@ -1007,223 +977,6 @@
             : BuildIncrementalChartSyncPayload(selectedSeries.Candles[^1], forceScrollToRealtime: false);
     }
 
-    private void SubmitDebugOrder()
-    {
-        var debugControl = DebugControl;
-        if (debugControl is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var result = debugControl.SubmitOrder(new SimulationDebugOrderRequest(
-                debugAgentName,
-                debugOrderSide,
-                debugOrderType,
-                debugOrderType == OrderType.Market ? null : debugOrderPrice,
-                debugOrderQuantity));
-
-            debugMessage = $"Заявка: принято {result.AcceptedOrders.Count}, сделок {result.Trades.Count}, отказов {result.RejectedOrders.Count}";
-        }
-        catch (Exception exception)
-        {
-            debugMessage = exception.Message;
-        }
-    }
-
-    private void AddDebugAgent()
-    {
-        var debugControl = DebugControl;
-        if (debugControl is null)
-        {
-            return;
-        }
-
-        try
-        {
-            var agent = debugControl.AddAgent(new AgentSpec(debugAgentType, debugAgentCash, debugAgentPosition));
-            debugMessage = $"Добавлен агент {agent.Name}";
-        }
-        catch (Exception exception)
-        {
-            debugMessage = exception.Message;
-        }
-    }
-
-    private Task RunBullishScenarioAsync() =>
-        RunDebugScenarioAsync(
-            "Рост",
-            [
-                new DebugScenarioStep(OrderSide.Buy, 1.80m, 1600),
-                new DebugScenarioStep(OrderSide.Buy, 2.15m, 1600),
-                new DebugScenarioStep(OrderSide.Buy, 2.55m, 1800),
-                new DebugScenarioStep(OrderSide.Sell, 0.95m, 1400),
-                new DebugScenarioStep(OrderSide.Buy, 2.75m, 1800),
-                new DebugScenarioStep(OrderSide.Buy, 3.10m, 1800),
-                new DebugScenarioStep(OrderSide.Sell, 1.10m, 1400),
-                new DebugScenarioStep(OrderSide.Buy, 3.35m, 1800),
-                new DebugScenarioStep(OrderSide.Buy, 2.90m, 1600),
-                new DebugScenarioStep(OrderSide.Sell, 1.15m, 1400),
-                new DebugScenarioStep(OrderSide.Buy, 3.50m, 2000),
-                new DebugScenarioStep(OrderSide.Buy, 3.85m, 2000)
-            ],
-            ScenarioSupportAgents);
-
-    private Task RunSelloffScenarioAsync() =>
-        RunDebugScenarioAsync(
-            "Sell-off",
-            [
-                new DebugScenarioStep(OrderSide.Sell, 1.80m, 1600),
-                new DebugScenarioStep(OrderSide.Sell, 2.20m, 1600),
-                new DebugScenarioStep(OrderSide.Sell, 2.60m, 1800),
-                new DebugScenarioStep(OrderSide.Buy, 0.95m, 1400),
-                new DebugScenarioStep(OrderSide.Sell, 2.85m, 1800),
-                new DebugScenarioStep(OrderSide.Sell, 3.15m, 1800),
-                new DebugScenarioStep(OrderSide.Buy, 1.10m, 1400),
-                new DebugScenarioStep(OrderSide.Sell, 3.40m, 1800),
-                new DebugScenarioStep(OrderSide.Sell, 2.95m, 1600),
-                new DebugScenarioStep(OrderSide.Buy, 1.15m, 1400),
-                new DebugScenarioStep(OrderSide.Sell, 3.55m, 2000),
-                new DebugScenarioStep(OrderSide.Sell, 3.90m, 2000)
-            ],
-            ScenarioSupportAgents);
-
-    private Task RunReversalScenarioAsync() =>
-        RunDebugScenarioAsync(
-            "Разворот",
-            [
-                new DebugScenarioStep(OrderSide.Sell, 1.50m, 1400),
-                new DebugScenarioStep(OrderSide.Sell, 1.95m, 1600),
-                new DebugScenarioStep(OrderSide.Sell, 2.40m, 1600),
-                new DebugScenarioStep(OrderSide.Buy, 0.80m, 1200),
-                new DebugScenarioStep(OrderSide.Sell, 2.85m, 1800),
-                new DebugScenarioStep(OrderSide.Sell, 3.20m, 1800),
-                new DebugScenarioStep(OrderSide.Buy, 1.10m, 1200),
-                new DebugScenarioStep(OrderSide.Buy, 2.20m, 1400),
-                new DebugScenarioStep(OrderSide.Buy, 2.65m, 1600),
-                new DebugScenarioStep(OrderSide.Sell, 0.90m, 1200),
-                new DebugScenarioStep(OrderSide.Buy, 3.00m, 1800),
-                new DebugScenarioStep(OrderSide.Buy, 3.35m, 1800),
-                new DebugScenarioStep(OrderSide.Buy, 2.70m, 1600)
-            ],
-            ScenarioSupportAgents);
-
-    private void StopDebugScenario()
-    {
-        debugScenarioCts?.Cancel();
-    }
-
-    private async Task RunDebugScenarioAsync(
-        string scenarioLabel,
-        IReadOnlyList<DebugScenarioStep> steps,
-        IReadOnlyList<DebugScenarioSupportAgent>? supportAgents = null)
-    {
-        var debugControl = DebugControl;
-        if (debugControl is null || steps.Count == 0 || isRunningDebugScenario)
-        {
-            return;
-        }
-
-        isRunningDebugScenario = true;
-        debugScenarioCts = new CancellationTokenSource();
-        var token = debugScenarioCts.Token;
-        var totalTrades = 0;
-        var acceptedOrders = 0;
-        var rejectedOrders = 0;
-        var activatedSupportAgents = ActivateScenarioSupportAgents(debugControl, supportAgents);
-
-        debugMessage = activatedSupportAgents > 0
-            ? $"{scenarioLabel}: сценарий запущен, усилители рынка {activatedSupportAgents}"
-            : $"{scenarioLabel}: сценарий запущен";
-        await InvokeAsync(StateHasChanged);
-
-        try
-        {
-            for (var index = 0; index < steps.Count; index++)
-            {
-                token.ThrowIfCancellationRequested();
-
-                var step = steps[index];
-                var result = SubmitDebugScenarioOrder(
-                    debugControl,
-                    scenarioLabel,
-                    index + 1,
-                    step.Side,
-                    step.Quantity);
-
-                totalTrades += result.Trades.Count;
-                acceptedOrders += result.AcceptedOrders.Count;
-                rejectedOrders += result.RejectedOrders.Count;
-
-                debugMessage = $"{scenarioLabel}: шаг {index + 1}/{steps.Count}, сделок {totalTrades}";
-                await InvokeAsync(StateHasChanged);
-
-                if (index < steps.Count - 1)
-                {
-                    await Task.Delay(step.DelayMs, token);
-                }
-            }
-
-            debugMessage = $"{scenarioLabel}: завершён, принято {acceptedOrders}, сделок {totalTrades}, отказов {rejectedOrders}";
-        }
-        catch (OperationCanceledException)
-        {
-            debugMessage = $"{scenarioLabel}: сценарий остановлен";
-        }
-        catch (Exception exception)
-        {
-            debugMessage = exception.Message;
-        }
-        finally
-        {
-            isRunningDebugScenario = false;
-            debugScenarioCts?.Dispose();
-            debugScenarioCts = null;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-
-    private static SubmitResult SubmitDebugScenarioOrder(
-        ISimulationDebugControl debugControl,
-        string scenarioLabel,
-        int stepIndex,
-        OrderSide side,
-        decimal quantity)
-    {
-        return debugControl.SubmitOrder(new SimulationDebugOrderRequest(
-            $"{scenarioLabel}-{stepIndex:00}",
-            side,
-            OrderType.Market,
-            null,
-            quantity));
-    }
-
-    private int ActivateScenarioSupportAgents(
-        ISimulationDebugControl debugControl,
-        IReadOnlyList<DebugScenarioSupportAgent>? supportAgents)
-    {
-        if (supportAgents is not { Count: > 0 })
-        {
-            return 0;
-        }
-
-        var activated = 0;
-
-        foreach (var supportAgent in supportAgents)
-        {
-            if (!activeScenarioSupportAgentKeys.Add(supportAgent.Key))
-            {
-                continue;
-            }
-
-            debugControl.AddAgent(new AgentSpec(supportAgent.Type, supportAgent.Cash, supportAgent.Position));
-            activated++;
-        }
-
-        return activated;
-    }
-
     private void ResetViewState()
     {
         latestTick = null;
@@ -1243,7 +996,6 @@
         seenTradeIds.Clear();
         processedTradeIds.Clear();
         loadedHistoryTimeframes.Clear();
-        activeScenarioSupportAgentKeys.Clear();
 
         foreach (var state in timeframeSeriesStates.Values)
         {
@@ -2146,14 +1898,12 @@ maxY)
     {
         SimulationRunner.OnTick -= HandleTick;
         NewsFeed.Changed -= HandleNewsFeedChanged;
-        debugScenarioCts?.Cancel();
     }
 
     public async ValueTask DisposeAsync()
     {
         SimulationRunner.OnTick -= HandleTick;
         NewsFeed.Changed -= HandleNewsFeedChanged;
-        debugScenarioCts?.Cancel();
 
         if (tradingChartModule is null)
         {
@@ -2220,8 +1970,6 @@ Projection, IReadOnlyList<BarRect> Bars);
         string WickColor);
     private sealed record LivePriceEvent(DateTimeOffset Timestamp, decimal Price);
     private sealed record TimeframeAppendResult(bool Changed, bool CreatedNewBar);
-    private sealed record DebugScenarioStep(OrderSide Side, decimal Quantity, int DelayMs);
-    private sealed record DebugScenarioSupportAgent(string Key, AgentType Type, decimal Cash, decimal Position);
     private sealed class AggregatedCandle
     {
         public AggregatedCandle(DateTimeOffset timestamp, decimal open, decimal high, decimal low, decimal close)
