@@ -24,7 +24,13 @@ builder.Services.AddABStockApplication();
 builder.Services.AddABStockAI();
 builder.Services.AddABStockPersistence(
     builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
-builder.Services.AddScoped<IActiveAssetContext, ActiveAssetContext>();
+// Актив сессии — singleton, как и сама симуляция: актив в сессии один, и он
+// принадлежит прогону, а не вкладке. Scoped переживал переходы по ссылкам, но
+// не перезагрузку страницы, не вход по прямому адресу и не переход со
+// статически отрисованной приветственной: «Торги» в свежем контуре не
+// находили актива и перезапускали прогон демонстрационной заглушкой посреди
+// сессии, которая торгует настоящим активом.
+builder.Services.AddSingleton<IActiveAssetContext, ActiveAssetContext>();
 // Настройки интерфейса — scoped, и это осознанно: источник истины лежит в
 // localStorage браузера, а сервис лишь кэш на время жизни контура. Singleton
 // раздавал бы всем открытым вкладкам чужой акцент, потому что настройки

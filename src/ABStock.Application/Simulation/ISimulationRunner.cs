@@ -19,6 +19,20 @@ public interface ISimulationRunner
 
     bool IsRunning { get; }
 
+    /// <summary>
+    /// Название актива, которым торгует идущий прогон, — из конфигурации, с
+    /// которой его запустили. Когда торги не идут — <see langword="null"/>,
+    /// не пустая строка и не имя прошлого прогона.
+    /// </summary>
+    /// <remarks>
+    /// Знание принадлежит раннеру, а не контексту интерфейса: контекст актива
+    /// живёт в скоупе контура, а приветственная страница отрисовывается
+    /// статически, в скоупе запроса, где его уже нет. Читается тем же замком
+    /// и тем же условием, что <see cref="IsRunning"/>, поэтому разойтись с
+    /// ним не может.
+    /// </remarks>
+    string? CurrentAssetName { get; }
+
     Task StartAsync(SimulationConfig config, CancellationToken ct = default);
 
     Task StopAsync();
