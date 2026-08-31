@@ -1,4 +1,4 @@
-@page "/agents"
+﻿@page "/agents"
 @rendermode InteractiveServer
 @using ABStock.Application.MarketHistory
 @using ABStock.Application.Simulation
@@ -275,8 +275,19 @@
 
     private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
 
-    private AgentRosterView Roster =>
-        AgentRoster.Build(latestTick?.Agents ?? [], latestTick?.Decisions ?? []);
+    /// <summary>
+    /// Состав сессии: из текущего тика, а когда тиков больше нет — из истории
+    /// прогона. Раннер обнуляет Current при остановке, и страница, читающая
+    /// только тик, после остановки гасла целиком: ни таблицы, ни итогов, ни
+    /// графика. Разбирать сессию приходят как раз после её конца.
+    /// </summary>
+    private IReadOnlyList<AgentSnapshot> SessionAgents =>
+        latestTick?.Agents is { Count: > 0 } agents ? agents : EquityHistory.LastAgents;
+
+    private IReadOnlyList<AgentDecision> SessionDecisions =>
+        latestTick?.Agents is { Count: > 0 } ? latestTick.Decisions : EquityHistory.LastDecisions;
+
+    private AgentRosterView Roster => AgentRoster.Build(SessionAgents, SessionDecisions);
 
     /// <summary>
     /// Число сделок за сессию берётся из сводки прогона — там же, откуда его
@@ -299,7 +310,7 @@
     /// Порядок типов тот же, что в таблице.
     /// </summary>
     private LegendItem[] Legend =>
-        (latestTick?.Agents ?? [])
+        SessionAgents
             .GroupBy(agent => agent.Type)
             .OrderBy(group => group.Key)
             .Select(group =>
@@ -347,7 +358,16 @@
     /// </summary>
     private void UpdateRunSummary()
     {
+        // Прогон закончился — раннер обнулил CurrentRunId, и спрашивать сводку
+        // стало не у кого. Идентификатор берётся из истории прогона: она знает,
+        // какому прогону принадлежат её ряды и состав, и переживает остановку.
+        // Без этого число сделок и время старта обнулялись бы ровно тогда,
+        // когда человек приходит разбирать закончившуюся сессию.
         var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty)
+        {
+            runId = EquityHistory.RunId;
+        }
 
         if (runId == Guid.Empty)
         {
