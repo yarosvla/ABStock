@@ -1,8 +1,35 @@
 ﻿@page "/not-found"
-@layout MainLayout
+@rendermode InteractiveServer
+
+@* Страница не найдена. Оболочка та же, что у всех разделов (раздел 13):
+   фон, шапка, страница. Содержимое — одно пустое состояние по 9.15: знак,
+   заголовок, одна строка пояснения, одно действие.
+
+   Активного раздела в шапке нет намеренно: 404 не принадлежит ни одному из
+   пяти разделов, и подсветить здесь нечего. Часов тоже нет — они говорят о
+   времени сессии, а эта страница к сессии не относится.
+
+   Скромно и без выдумок: у страницы нет утверждённого макета, и всё, что
+   ей нужно, уже есть в ките. *@
 
 <PageTitle>Страница не найдена</PageTitle>
 
-<h1>Страница не найдена</h1>
-<p>Такого раздела в ABStock нет. Вернитесь к созданию актива.</p>
-<a class="btn btn-primary" href="/create-asset">Создание актива</a>
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
+
+<div class="notfound-shell">
+    <TopNavigation ActivePage="None" />
+
+    <main class="notfound-page">
+        <Panel>
+            <ChildContent>
+                <EmptyState IconName="search"
+                            Title="Страница не найдена"
+                            Description="Такого раздела нет — проверьте адрес.">
+                    <Action>
+                        <AppButton Variant="primary" Href="/">На главную</AppButton>
+                    </Action>
+                </EmptyState>
+            </ChildContent>
+        </Panel>
+    </main>
+</div>
