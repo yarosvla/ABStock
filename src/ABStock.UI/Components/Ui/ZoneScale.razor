@@ -69,7 +69,6 @@
     [Parameter] public bool Compact { get; set; }
 
     /// <summary>Число знаков после запятой у значения и границ.</summary>
-    [Parameter] public int Digits { get; set; } = 2;
 
     [Parameter] public string? Class { get; set; }
 
@@ -125,7 +124,7 @@
         }
     }
 
-    private string Format(decimal value) => value.ToString("F" + Digits);
+    private string Format(decimal value) => value.ToString("F2");
 
     private string AriaLabel
     {
