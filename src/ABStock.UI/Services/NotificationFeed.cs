@@ -31,8 +31,10 @@ public interface INotificationFeed
     event Action? Changed;
 
     /// <summary>
-    /// Актив создан. Зовётся со страницы, а не ловится подпиской:
-    /// <see cref="IActiveAssetContext"/> — scoped, и singleton его не видит.
+    /// Актив создан. Зовётся со страницы, а не ловится подпиской: у
+    /// <see cref="IActiveAssetContext"/> нет события об изменении, и заводить
+    /// его ради одной записи в ленту незачем — так же, как «Новости»
+    /// сообщают ленте о введённой новости.
     /// </summary>
     void NoteAssetCreated(string assetName, string symbol);
 

@@ -21,55 +21,81 @@ public interface IActiveAssetContext
     void Clear();
 }
 
+/// <summary>
+/// Актив в сессии один (DESIGN.md 16), и живёт он ровно столько же, сколько
+/// торговый прогон, — то есть сколько singleton <see cref="ABStock.Application.Simulation.ISimulationRunner"/>.
+/// Отсюда singleton и здесь, тем же рассуждением, что у <see cref="ISessionNewsFeed"/>.
+///
+/// Scoped переживал переходы по ссылкам между интерактивными страницами:
+/// enhanced navigation не перезагружает документ и не рвёт контур. Но не
+/// переживал перезагрузку страницы, вход по прямому адресу и переход со
+/// статически отрисованной приветственной — а симуляция при этом продолжала
+/// идти. «Торги» в свежем контуре не находили актива, подставляли
+/// демонстрационную заглушку и перезапускали ею прогон: кнопка на титульном
+/// экране обещала «Вернуться к торгам · Гелиос Энерго», а на экране торгов
+/// оказывался «КвантЭнерго».
+///
+/// Отсюда требование к состоянию: singleton читают несколько контуров сразу,
+/// поэтому вместо четырёх изменяемых свойств здесь один снимок, который
+/// заменяется целиком. Читатель берёт его одним обращением и не может
+/// увидеть черновик от одной правки вместе с профилем от другой.
+/// </summary>
 public sealed class ActiveAssetContext : IActiveAssetContext
 {
-    public ActiveAssetDraft? Draft { get; private set; }
+    private readonly Lock _sync = new();
+    private volatile Snapshot _snapshot = Snapshot.Empty;
 
-    public AssetProfile? Profile { get; private set; }
+    public ActiveAssetDraft? Draft => _snapshot.Draft;
 
-    public DateTimeOffset? UpdatedAt { get; private set; }
+    public AssetProfile? Profile => _snapshot.Profile;
 
-    public int Revision { get; private set; }
+    public DateTimeOffset? UpdatedAt => _snapshot.UpdatedAt;
+
+    public int Revision => _snapshot.Revision;
 
     public ActiveAssetView GetView()
     {
-        var draft = Draft ?? ActiveAssetDefaults.DemoDraft;
-        var profile = Profile ?? ActiveAssetDefaults.BuildProfile(draft);
+        // Один снимок на весь метод. Четыре отдельных чтения полей пришлись бы
+        // на разные состояния, и вид склеил бы черновик одной правки с
+        // профилем другой — актив с именем от нового описания и факторами от
+        // старого.
+        var snapshot = _snapshot;
+
+        var draft = snapshot.Draft ?? ActiveAssetDefaults.DemoDraft;
+        var profile = snapshot.Profile ?? ActiveAssetDefaults.BuildProfile(draft);
 
         return new ActiveAssetView(
             draft,
             profile,
             ActiveAssetDefaults.BuildSymbol(draft.Name),
-            Draft is null,
+            snapshot.Draft is null,
             profile.Source,
-            UpdatedAt ?? DateTimeOffset.Now);
+            snapshot.UpdatedAt ?? DateTimeOffset.Now);
     }
 
-    public void SetDraft(ActiveAssetDraft draft)
+    /// <summary>Черновик без профиля: описание изменилось, профиль устарел.</summary>
+    public void SetDraft(ActiveAssetDraft draft) => Replace(draft, profile: null);
+
+    public void SetProfile(ActiveAssetDraft draft, AssetProfile profile) => Replace(draft, profile);
+
+    public void Clear() => Replace(draft: null, profile: null);
+
+    private void Replace(ActiveAssetDraft? draft, AssetProfile? profile)
     {
-        Draft = draft;
-        Profile = null;
-        Touch();
+        lock (_sync)
+        {
+            _snapshot = new Snapshot(draft, profile, DateTimeOffset.Now, _snapshot.Revision + 1);
+        }
     }
 
-    public void SetProfile(ActiveAssetDraft draft, AssetProfile profile)
+    /// <summary>Состояние целиком. Заменяется, а не правится по полю.</summary>
+    private sealed record Snapshot(
+        ActiveAssetDraft? Draft,
+        AssetProfile? Profile,
+        DateTimeOffset? UpdatedAt,
+        int Revision)
     {
-        Draft = draft;
-        Profile = profile;
-        Touch();
-    }
-
-    public void Clear()
-    {
-        Draft = null;
-        Profile = null;
-        Touch();
-    }
-
-    private void Touch()
-    {
-        UpdatedAt = DateTimeOffset.Now;
-        Revision++;
+        public static readonly Snapshot Empty = new(null, null, null, 0);
     }
 }
 

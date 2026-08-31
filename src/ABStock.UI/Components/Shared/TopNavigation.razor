@@ -11,7 +11,12 @@
 
 <nav class="topnav glass glass--nav" aria-label="Основная навигация">
     <div class="topnav__left">
-        <a class="topnav__brand" href="/">ABStock</a>
+        @* Знак слева от слова — раздел 9.22. Цвет знака наследуется от ссылки
+           (--text-1) и на смену акцента не отзывается. *@
+        <a class="topnav__brand" href="/">
+            <BrandMark />
+            <span>ABStock</span>
+        </a>
 
         <div class="topnav__links">
             @foreach (var item in Sections)

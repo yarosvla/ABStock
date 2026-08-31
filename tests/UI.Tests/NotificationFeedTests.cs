@@ -274,16 +274,22 @@ public class NotificationFeedTests
         public Guid CurrentRunId { get; private set; } = Guid.Empty;
         public bool IsRunning { get; private set; }
 
+        // Имя актива дублёр держит той же парой, что и настоящий раннер:
+        // есть прогон — есть имя, нет прогона — null.
+        public string? CurrentAssetName { get; private set; }
+
         public void Start()
         {
             CurrentRunId = Guid.NewGuid();
             IsRunning = true;
+            CurrentAssetName = "Гелиос Энерго";
             OnStateChanged?.Invoke();
         }
 
         public void Stop()
         {
             IsRunning = false;
+            CurrentAssetName = null;
             OnStateChanged?.Invoke();
         }
 

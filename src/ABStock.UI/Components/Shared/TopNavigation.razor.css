@@ -24,10 +24,24 @@
 }
 
 .topnav__brand {
+    display: inline-flex;
+    align-items: center;
+    /* Зазор знак — слово, артборд 03: половина бокса знака. Величина
+       оптическая, а не шаг раскладки, поэтому не из шкалы --s-*. */
+    gap: 10px;
     font: var(--t-h3);
     color: var(--text-1);
     letter-spacing: -0.015em;
     text-decoration: none;
+}
+
+/* Знак выше прописных, а не равен им (артборд 03): он разрежен просветом и,
+   уравненный по прописным, читался бы мельче слова.
+   ::deep — знак приходит своей разметкой из BrandMark, до неё скоуп шапки
+   без этого не достаёт. */
+.topnav__brand ::deep .brand-mark {
+    width: 18px;
+    height: 18px;
 }
 
 .topnav__links {

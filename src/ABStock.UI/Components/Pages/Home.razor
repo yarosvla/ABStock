@@ -1,74 +1,99 @@
 ﻿@page "/"
+@using ABStock.Application.Simulation
+@using ABStock.UI.Services
+@inject ISimulationRunner SimulationRunner
+
+@* Приветственная страница — титульный экран, не лендинг. Три вещи: знак,
+   одно предложение, одно действие.
+
+   Визуальный объект экрана — знак (раздел 7.2): у титульной страницы нет ни
+   данных, ни настроек, и форму здесь несёт он. Дорисовывать бегущую строку
+   котировок, поддельный график или анимированный фон запрещено разделами 2
+   и 10: выдуманные числа на первом же экране обесценивают настоящие на всех
+   следующих. Ни одного числа на этой странице нет.
+
+   Навигации приложения здесь нет: шапка с пунктами появляется после входа.
+
+   Режим отрисовки статический, @rendermode не задан намеренно (не «забыт»).
+   Интерактивности здесь не требуется — две ссылки и ни одного обработчика, —
+   а статическая отрисовка даёт мгновенную первую отрисовку на самом первом
+   экране продукта. *@
 
 <PageTitle>ABStock</PageTitle>
 
-<main class="welcome-shell">
-    <div class="market-backdrop" aria-hidden="true">
-        <div class="star-field"></div>
-        <div class="cosmic-rings">
-            <span></span>
-            <span></span>
-        </div>
-        <div class="market-grid"></div>
-        <div class="price-lanes">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-        <div class="cosmic-points">
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-            <span></span>
-        </div>
-        <div class="ticker-strip ticker-top">
-            <div>
-                <span>ABST +4.18%</span>
-                <span>AI IDX 1284.42</span>
-                <span>VOL 82.6M</span>
-                <span>RISK LOW</span>
-                <span>ALPHA +1.73</span>
-                <span>ABST +4.18%</span>
-                <span>AI IDX 1284.42</span>
-                <span>VOL 82.6M</span>
-                <span>RISK LOW</span>
-                <span>ALPHA +1.73</span>
-            </div>
-        </div>
-        <div class="ticker-strip ticker-bottom">
-            <div>
-                <span>PORTFOLIO +12.4%</span>
-                <span>SIGNAL BUY</span>
-                <span>SPREAD 0.08</span>
-                <span>MODEL READY</span>
-                <span>RETURN +6.2%</span>
-                <span>PORTFOLIO +12.4%</span>
-                <span>SIGNAL BUY</span>
-                <span>SPREAD 0.08</span>
-                <span>MODEL READY</span>
-                <span>RETURN +6.2%</span>
-            </div>
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
+
+@{
+    // Оба значения снимаются ОДИН раз. IsRunning и CurrentAssetName —
+    // два чтения синглтона, который живёт своим циклом тиков, и сессия
+    // может остановиться между ними. Состояние страницы определяет
+    // isRunning; имя — только суффикс на кнопке, и его отсутствие при
+    // isRunning = true нормально.
+    var isRunning = SimulationRunner.IsRunning;
+    var assetName = SessionAssetName(SimulationRunner.CurrentAssetName);
+}
+
+<main class="welcome">
+    <div class="welcome__group">
+        <span class="welcome__mark"><BrandMark /></span>
+
+        @* Слово «ABStock» на странице ровно один раз. *@
+        <h1 class="welcome__name">ABStock</h1>
+
+        <p class="welcome__lead">Вы создаёте актив, торговые агенты торгуют им каждый по своей стратегии, а вы вводите новости и видите, как решения агентов складываются в цену.</p>
+
+        <div class="welcome__actions">
+            @if (isRunning)
+            {
+                @* Сессия идёт — человек с большей вероятностью вернулся
+                   продолжить, а не начать заново, поэтому возврат первичный,
+                   а создание уходит вниз текстовой ссылкой. *@
+                @* @if стоит с новой строки не для красоты: приписанный
+                   вплотную к слову, «торгам@if» попадает под правило Razor
+                   про адреса почты и выводится текстом как есть. *@
+                <AppButton Variant="primary" Size="40" Href="/trading">
+                    Вернуться к торгам
+                    @if (assetName is not null)
+                    {
+                        <span class="welcome__asset">·&#160;@assetName</span>
+                    }
+                </AppButton>
+
+                <AppButton Variant="ghost" Size="32" Href="/create-asset" Class="welcome__secondary">Создать актив</AppButton>
+            }
+            else
+            {
+                @* Кнопка называет действие, а не «Начать» — раздел 17. *@
+                <AppButton Variant="primary" Size="40" Href="/create-asset">Создать актив</AppButton>
+            }
         </div>
     </div>
-
-    <section class="welcome-hero" aria-labelledby="welcome-title">
-        <a class="welcome-brand" href="/" aria-label="ABStock">
-            <span class="welcome-logo" aria-hidden="true">
-                <img src="images/abstock-logo.png" alt="" />
-            </span>
-            <span>ABStock</span>
-        </a>
-
-        <p class="welcome-kicker">AI-платформа для рынка активов</p>
-        <h1 id="welcome-title">ABStock</h1>
-        <p class="welcome-lead">Создавайте активы и запускайте торговые идеи быстрее</p>
-        <p class="welcome-copy">Опишите актив, получите AI-профиль и переходите к анализу торговых сценариев в одном рабочем пространстве.</p>
-
-        <a class="start-button" href="/create-asset">
-            <span>Начать</span>
-            <i class="bi bi-arrow-right" aria-hidden="true"></i>
-        </a>
-    </section>
 </main>
+
+@code {
+    /// <summary>
+    /// Название актива для подписи кнопки — или <see langword="null"/>, если
+    /// показывать нечего.
+    /// </summary>
+    /// <remarks>
+    /// Торги можно запустить, не создав актив: «Торги» берут актив через
+    /// <c>IActiveAssetContext.GetView()</c>, а тот подставляет
+    /// демонстрационную заглушку, когда настоящего актива нет, — и её имя
+    /// уезжает в конфигурацию прогона. На титульном экране такое имя было бы
+    /// поддельным, поэтому заглушка отсекается по имени: сверять больше не с
+    /// чем, признак «это демо» до раннера не доходит и доходить не должен.
+    /// Совпадение настоящего названия с демонстрационным просто снимет
+    /// суффикс — это безопасный отказ, в отличие от обратного.
+    /// </remarks>
+    private static string? SessionAssetName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        return string.Equals(name, ActiveAssetDefaults.DemoDraft.Name, StringComparison.Ordinal)
+            ? null
+            : name;
+    }
+}

@@ -10,7 +10,12 @@
     <link rel="stylesheet" href="@Assets["design-system.css"]" />
     <link rel="stylesheet" href="@Assets["ABStock.UI.styles.css"]" />
     <ImportMap />
-    <link rel="icon" type="image/png" href="@Assets["favicon.png"]" />
+    @* Иконка вкладки — раздел 9.22: знак на графитовой подложке, а не знак
+       сам по себе. Панель вкладок бывает светлой, и светлый знак на
+       прозрачном фоне на ней исчезает. Переменные в favicon не работают,
+       поэтому литералы, но взятые из токенов: подложка --gph-900,
+       знак --text-1. *@
+    <link rel="icon" type="image/svg+xml" href="@Assets["favicon.svg"]" />
     <HeadOutlet />
 
     @* Акцент интерфейса — раздел 3.1. Скрипт стоит в конце <head> и

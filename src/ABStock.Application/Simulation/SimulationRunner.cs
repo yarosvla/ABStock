@@ -18,6 +18,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
     private List<ITradeAgent> _agents = [];
     private SimulationTickResult? _current;
     private Guid _currentRunId = Guid.Empty;
+    private string? _assetName;
     private volatile NewsSignal? _pendingNews;
     private int _tick;
 
@@ -43,6 +44,22 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             lock (_sync)
             {
                 return _runTask is { IsCompleted: false };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Имя актива идущего прогона. Читается тем же замком и тем же условием,
+    /// что <see cref="IsRunning"/>: состояние и имя не могут разойтись, и
+    /// имя остановленного прогона наружу не выходит.
+    /// </summary>
+    public string? CurrentAssetName
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _runTask is { IsCompleted: false } ? _assetName : null;
             }
         }
     }
@@ -96,6 +113,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             _exchange = exchange;
             _agents = agents;
             _currentRunId = _marketHistoryStore.StartRun(config, startedAt);
+            _assetName = config.AssetName;
             _tick = 0;
             _current = null;
             _pendingNews = null;
@@ -282,6 +300,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
                 _exchange = null;
                 _agents = [];
                 _currentRunId = Guid.Empty;
+                _assetName = null;
                 _current = null;
                 _pendingNews = null;
             }
