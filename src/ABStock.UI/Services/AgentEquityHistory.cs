@@ -1,20 +1,45 @@
-using ABStock.Application.Simulation;
+﻿using ABStock.Application.Simulation;
 using ABStock.Shared;
 
 namespace ABStock.UI.Services;
 
 /// <summary>
-/// Стоимость портфеля по типам агентов с начала прогона, в процентах от
-/// стартового портфеля типа.
+/// Что «Агенты» знают о прогоне помимо текущего тика: стоимость портфеля по
+/// типам с начала прогона (в процентах от стартового портфеля типа) и
+/// последний известный состав.
 ///
 /// Ряд копится в памяти, а не собирается из <see cref="ABStock.Application.MarketHistory.IAgentStatisticsReader"/>:
 /// девять агентов — это девять обращений к хранилищу на каждый тик, а нужен
 /// один и тот же ряд всем сразу.
+///
+/// Состав хранится здесь по одной причине: он обязан пережить остановку.
+/// Раннер в finally своего цикла обнуляет Current вместе с составом, и после
+/// остановки страница, которая читает только тик, теряет ВСЁ — и таблицу, и
+/// итоги, и график, хотя разбирать сессию человек приходит как раз после
+/// того, как она закончилась. Здесь состав живёт ровно столько же, сколько
+/// ряды: до старта следующего прогона.
 /// </summary>
 public interface IAgentEquityHistory
 {
     /// <summary>Ряд по каждому типу, уже прореженный под график.</summary>
     IReadOnlyDictionary<AgentType, IReadOnlyList<ChartPoint>> Series { get; }
+
+    /// <summary>
+    /// Состав из последнего тика прогона. Пустой, пока в текущем прогоне не
+    /// было ни одного тика.
+    /// </summary>
+    IReadOnlyList<AgentSnapshot> LastAgents { get; }
+
+    /// <summary>Решения агентов из того же последнего тика.</summary>
+    IReadOnlyList<AgentDecision> LastDecisions { get; }
+
+    /// <summary>
+    /// Прогон, которому принадлежат ряды и состав. Нужен, чтобы после
+    /// остановки было у кого спросить сводку: раннер к этому моменту уже
+    /// обнулил CurrentRunId, и свежий контур иначе не знает, какой прогон
+    /// показывать. <see cref="Guid.Empty"/>, пока не было ни одного тика.
+    /// </summary>
+    Guid RunId { get; }
 
     /// <summary>Ряд пополнился — странице пора перерисоваться.</summary>
     event Action? Changed;
@@ -50,6 +75,9 @@ public sealed class AgentEquityHistory : IAgentEquityHistory, IDisposable
 
     private readonly Dictionary<AgentType, List<ChartPoint>> _raw = [];
 
+    private IReadOnlyList<AgentSnapshot> _lastAgents = [];
+    private IReadOnlyList<AgentDecision> _lastDecisions = [];
+
     private Guid _runId = Guid.Empty;
 
     public AgentEquityHistory(ISimulationRunner runner)
@@ -73,6 +101,21 @@ public sealed class AgentEquityHistory : IAgentEquityHistory, IDisposable
         }
     }
 
+    public IReadOnlyList<AgentSnapshot> LastAgents
+    {
+        get { lock (_sync) { return _lastAgents; } }
+    }
+
+    public IReadOnlyList<AgentDecision> LastDecisions
+    {
+        get { lock (_sync) { return _lastDecisions; } }
+    }
+
+    public Guid RunId
+    {
+        get { lock (_sync) { return _runId; } }
+    }
+
     public event Action? Changed;
 
     public void Dispose() => _runner.OnTick -= HandleTick;
@@ -88,6 +131,9 @@ public sealed class AgentEquityHistory : IAgentEquityHistory, IDisposable
             // там же, откуда его берут «Торги». Два источника одного числа
             // разошлись бы на секунду и противоречили бы друг другу.
             var time = DateTimeOffset.Now.ToUnixTimeSeconds();
+
+            _lastAgents = tick.Agents;
+            _lastDecisions = tick.Decisions;
 
             foreach (var group in tick.Agents.GroupBy(agent => agent.Type))
             {
@@ -150,5 +196,7 @@ public sealed class AgentEquityHistory : IAgentEquityHistory, IDisposable
         _runId = runId;
         _baselines.Clear();
         _raw.Clear();
+        _lastAgents = [];
+        _lastDecisions = [];
     }
 }
