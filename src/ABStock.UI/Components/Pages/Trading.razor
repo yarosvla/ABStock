@@ -630,8 +630,6 @@
     private const int VisibleOrderBookDepth = 50;
 
     private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
-    private MarketMetric[] MarketMetrics => BuildMarketMetrics(latestTick);
-
     private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
 
     private SpreadData Spread => BuildSpreadData(latestTick);
@@ -641,8 +639,6 @@
     private TradeRow[] RecentTrades => BuildTradeRows(tradeHistory);
 
     private ChartSummaryData ChartSummary => BuildChartSummaryData(GetSelectedTimeframeState(), latestTick, lastChartUpdate);
-    private AssetParameter[] AssetParameters => BuildAssetParameters();
-
     // Значение по умолчанию совпадает с дефолтом настройки: пока настройки
     // не прочитаны, на экране ровно то, что было здесь до её появления.
     private string selectedTimeframe = Timeframes.DefaultKey;
@@ -652,17 +648,12 @@
     private ElementReference chartViewport;
     private IJSObjectReference? tradingChartModule;
     private bool isChartRegistered;
-    private bool metricsPrimed;
+    private bool tradeHistoryPrimed;
     private bool chartStatePrimed;
     private ChartSyncPayload? pendingChartSync;
-    private decimal previousVolume;
     private readonly HashSet<Guid> seenTradeIds = [];
     private readonly HashSet<Guid> processedTradeIds = [];
     private readonly Dictionary<string, TimeframeSeriesState> timeframeSeriesStates = CreateTimeframeSeriesStates();
-    private readonly List<decimal> priceMetricHistory = [];
-    private readonly List<decimal> bidMetricHistory = [];
-    private readonly List<decimal> askMetricHistory = [];
-    private readonly List<decimal> volumeMetricHistory = [];
     private readonly List<Trade> tradeHistory = [];
     private readonly HashSet<string> loadedHistoryTimeframes = [];
     private SimulationRunSummary? currentRunSummary;
@@ -736,7 +727,7 @@
         lastChartUpdate = receivedAt;
         UpdateRunSummary();
         SyncCompositionFromRun(tickResult);
-        UpdateMetricHistory(tickResult);
+        UpdateTradeHistory(tickResult);
         UpdateChartSeries(tickResult, receivedAt);
         LoadPersistedCandles(selectedTimeframe);
         _ = TrySyncChartAsync();
@@ -821,66 +812,33 @@
 
     private void PrimeFromSnapshot(SimulationTickResult tickResult, DateTimeOffset receivedAt)
     {
-        PrimeMetricHistory(tickResult);
+        PrimeTradeHistory(tickResult);
         PrimeChartSeries(tickResult, receivedAt);
     }
 
-    private void PrimeMetricHistory(SimulationTickResult tickResult)
+    private void PrimeTradeHistory(SimulationTickResult tickResult)
     {
-        if (metricsPrimed)
+        if (tradeHistoryPrimed)
         {
             return;
         }
 
-        priceMetricHistory.Clear();
-        bidMetricHistory.Clear();
-        askMetricHistory.Clear();
-        volumeMetricHistory.Clear();
-
-        var snapshot = tickResult.Snapshot;
-        var prices = snapshot.RecentPrices.Count > 0
-            ? snapshot.RecentPrices
-            : [snapshot.LastPrice];
-
-        foreach (var price in prices.TakeLast(MetricHistoryLimit))
-        {
-            AppendMetricValue(priceMetricHistory, price);
-        }
-
-        var bestBid = snapshot.BestBid ?? snapshot.LastPrice;
-        var bestAsk = snapshot.BestAsk ?? snapshot.LastPrice;
-        var historySeedCount = Math.Clamp(Math.Min(prices.Count, 12), 1, 12);
-        for (var index = 0; index < historySeedCount; index++)
-        {
-            AppendMetricValue(bidMetricHistory, bestBid);
-            AppendMetricValue(askMetricHistory, bestAsk);
-        }
-
         tradeHistory.Clear();
-        var seededTrades = snapshot.RecentTrades
+        var seededTrades = tickResult.Snapshot.RecentTrades
             .OrderBy(trade => trade.ExecutedAt)
             .ToArray();
 
-        if (seededTrades.Length == 0)
+        foreach (var trade in seededTrades)
         {
-            AppendMetricValue(volumeMetricHistory, 0m);
-        }
-        else
-        {
-            foreach (var trade in seededTrades)
+            if (!seenTradeIds.Add(trade.Id))
             {
-                if (!seenTradeIds.Add(trade.Id))
-                {
-                    continue;
-                }
-
-                tradeHistory.Add(trade);
-                AppendMetricValue(volumeMetricHistory, trade.Quantity);
+                continue;
             }
+
+            tradeHistory.Add(trade);
         }
 
-        previousVolume = snapshot.Volume;
-        metricsPrimed = true;
+        tradeHistoryPrimed = true;
     }
 
     private void PrimeChartSeries(SimulationTickResult tickResult, DateTimeOffset receivedAt)
@@ -985,13 +943,8 @@
         runStartedAt = DateTimeOffset.Now;
         lastChartUpdate = DateTimeOffset.Now;
         chartStatePrimed = false;
-        metricsPrimed = false;
-        previousVolume = 0m;
+        tradeHistoryPrimed = false;
         pendingChartSync = null;
-        priceMetricHistory.Clear();
-        bidMetricHistory.Clear();
-        askMetricHistory.Clear();
-        volumeMetricHistory.Clear();
         tradeHistory.Clear();
         seenTradeIds.Clear();
         processedTradeIds.Clear();
@@ -1154,47 +1107,22 @@
         return Math.Round(adjusted / 0.05m, MidpointRounding.AwayFromZero) * 0.05m;
     }
 
-    private void UpdateMetricHistory(SimulationTickResult tickResult)
+    private void UpdateTradeHistory(SimulationTickResult tickResult)
     {
-        if (!metricsPrimed)
+        if (!tradeHistoryPrimed)
         {
-            PrimeMetricHistory(tickResult);
+            PrimeTradeHistory(tickResult);
             return;
         }
 
-        var snapshot = tickResult.Snapshot;
-        AppendMetricValue(priceMetricHistory, snapshot.LastPrice);
-        AppendMetricValue(bidMetricHistory, snapshot.BestBid ?? snapshot.LastPrice);
-        AppendMetricValue(askMetricHistory, snapshot.BestAsk ?? snapshot.LastPrice);
-
-        var newTrades = snapshot.RecentTrades
+        var newTrades = tickResult.Snapshot.RecentTrades
             .Where(trade => seenTradeIds.Add(trade.Id))
             .OrderBy(trade => trade.ExecutedAt)
             .ToArray();
 
-        if (newTrades.Length == 0)
+        foreach (var trade in newTrades)
         {
-            var volumeDelta = Math.Max(0m, snapshot.Volume - previousVolume);
-            AppendMetricValue(volumeMetricHistory, volumeDelta);
-        }
-        else
-        {
-            foreach (var trade in newTrades)
-            {
-                tradeHistory.Add(trade);
-                AppendMetricValue(volumeMetricHistory, trade.Quantity);
-            }
-        }
-
-        previousVolume = snapshot.Volume;
-    }
-
-    private static void AppendMetricValue(List<decimal> values, decimal value)
-    {
-        values.Add(value);
-        if (values.Count > MetricHistoryLimit)
-        {
-            values.RemoveRange(0, values.Count - MetricHistoryLimit);
+            tradeHistory.Add(trade);
         }
     }
 
@@ -1522,52 +1450,6 @@
         return true;
     }
 
-    private MarketMetric[] BuildMarketMetrics(SimulationTickResult? tickResult)
-    {
-        var snapshot = tickResult?.Snapshot;
-        var bestBidQuantity = tickResult?.OrderBook.Bids.FirstOrDefault()?.Quantity ?? 0m;
-        var bestAskQuantity = tickResult?.OrderBook.Asks.FirstOrDefault()?.Quantity ?? 0m;
-        var lastPrice = snapshot?.LastPrice ?? DemoStartPrice;
-        var bestBid = snapshot?.BestBid;
-        var bestAsk = snapshot?.BestAsk;
-        var volume = snapshot?.Volume ?? 0m;
-        var tradeCount = seenTradeIds.Count;
-        var priceAccent = GetChangeClass(priceMetricHistory);
-        var bidAccent = GetChangeClass(bidMetricHistory);
-        var askAccent = GetChangeClass(askMetricHistory);
-
-        return
-        [
-            new("Текущая цена", FormatMoney(lastPrice), tickResult is null ? "ожидание тика" : $"Тик {tickResult.Tick}",
-priceAccent, BuildSparkline(priceMetricHistory), BuildArea(priceMetricHistory), []),
-            new("Лучший bid", FormatNullableMoney(bestBid), $"{FormatQuantity(bestBidQuantity)} шт.", bidAccent,
-BuildSparkline(bidMetricHistory), BuildArea(bidMetricHistory), []),
-            new("Лучший ask", FormatNullableMoney(bestAsk), $"{FormatQuantity(bestAskQuantity)} шт.", askAccent,
-BuildSparkline(askMetricHistory), BuildArea(askMetricHistory), []),
-            new("Объём торгов", FormatQuantity(volume), $"{tradeCount} сделок", "volume", "", "",
-BuildVolumeBars(volumeMetricHistory))
-        ];
-    }
-
-    private AssetParameter[] BuildAssetParameters()
-    {
-        var runStarted = currentRunSummary?.StartedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") ?? "ожидание запуска";
-        var sensitivity = $"{Math.Round(CurrentAsset.Profile.NewsSensitivity * 100m, 0):0}/100";
-        var keywordSummary = string.Join(", ", CurrentAsset.Profile.Keywords.Take(3));
-
-        return
-        [
-            new("Тип актива", GetAssetTypeLabel(CurrentAsset.Draft.AssetType), null),
-            new("Сектор", CurrentAsset.Draft.Industry, null),
-            new("Валюта торгов", "RUB", null),
-            new("Символ", CurrentAsset.Symbol, null),
-            new("Чувствительность к новостям", sensitivity, CurrentAsset.Profile.NewsSensitivity >= 0.7m ? "positive" : null),
-            new("Ключевые теги", string.IsNullOrWhiteSpace(keywordSummary) ? "нет данных" : keywordSummary, null),
-            new("Запуск симуляции", runStarted, null),
-            new("Статус", SimulationRunner.IsRunning ? "Торги активны" : "Ожидание запуска", SimulationRunner.IsRunning ? "positive" : null)
-        ];
-    }
-
     private static OrderBookViewData BuildOrderBookData(OrderBookSnapshot? orderBook)
     {
         var asks = GetVisibleOrderBookLevels(orderBook?.Asks ?? [], reverse: true, isAsk: true);
@@ -1682,8 +1564,6 @@ BuildVolumeBars(volumeMetricHistory))
             $"{spread.Detail}; глубина {FormatQuantity(totalDepth)} шт.");
     }
 
-    private static string FormatNullableMoney(decimal? value) => value is null ? "-" : FormatMoney(value.Value);
-
     private static string FormatMoney(decimal value) => $"{value:F2} ₽";
 
     private static string FormatPrice(decimal value) => value.ToString("F2");
@@ -1701,87 +1581,6 @@ BuildVolumeBars(volumeMetricHistory))
 
         var depth = (int)Math.Ceiling((double)(quantity / maxQuantity * 100m));
         return Math.Clamp(depth, 8, 100);
-    }
-
-    private static string GetChangeClass(IReadOnlyList<decimal> values)
-    {
-        if (values.Count < 2)
-        {
-            return "positive";
-        }
-
-        return values[^1] >= values[0] ? "positive" : "negative";
-    }
-
-    private static string BuildSparkline(IReadOnlyList<decimal> values)
-    {
-        if (values.Count == 0)
-        {
-            return "";
-        }
-
-        return string.Join(" ", BuildChartPoints(values, 6, 94, 12, 30)
-            .Select(point => $"{FormatSvgNumber(point.X)},{FormatSvgNumber(point.Y)}"));
-    }
-
-    private static string BuildArea(IReadOnlyList<decimal> values)
-    {
-        var points = BuildSparkline(values);
-        if (string.IsNullOrWhiteSpace(points))
-        {
-            return "";
-        }
-
-        var firstX = FormatSvgNumber(6);
-        var lastX = FormatSvgNumber(94);
-        return $"{firstX},42 {points} {lastX},42";
-    }
-
-    private static BarRect[] BuildVolumeBars(IReadOnlyList<decimal> values)
-    {
-        const int barCount = 9;
-        const double width = 7;
-        var source = values.Count == 0 ? [0m] : values.TakeLast(barCount).ToArray();
-        var maxValue = Math.Max(source.Max(), 1m);
-        var bars = new BarRect[barCount];
-        var padCount = barCount - source.Length;
-
-        for (var index = 0; index < barCount; index++)
-        {
-            var value = index < padCount ? 0m : source[index - padCount];
-            var height = 6 + (double)(value / maxValue) * 30;
-            var x = 4 + index * 10;
-            bars[index] = new BarRect(x, 38 - height, width, height);
-        }
-
-        return bars;
-    }
-
-    private static Point[] BuildChartPoints(IReadOnlyList<decimal> values, double minX, double maxX, double minY, double
-maxY)
-    {
-        var source = values.Count == 0 ? [0m] : values.ToArray();
-        var average = source.Average(value => value);
-        var maxDeviation = source.Max(value => Math.Abs(value - average));
-        var range = maxDeviation * 2m;
-        var width = maxX - minX;
-        var height = maxY - minY;
-
-        if (source.Length == 1)
-        {
-            return [new Point((minX + maxX) / 2, (minY + maxY) / 2)];
-        }
-
-        return source
-            .Select((value, index) =>
-            {
-                var x = minX + width * index / (source.Length - 1);
-                var ratio = range == 0m ? 0.5 : 0.5 + (double)((value - average) / range);
-                ratio = Math.Clamp(ratio, 0.18, 0.82);
-                var y = maxY - height * ratio;
-                return new Point(x, y);
-            })
-            .ToArray();
     }
 
     private static string GetTradeClass(Trade trade)
@@ -1855,16 +1654,6 @@ maxY)
         return builder.ToString();
     }
 
-    private static string GetAssetTypeLabel(AssetType assetType) =>
-        assetType switch
-        {
-            AssetType.Stock => "Акция",
-            AssetType.Bond => "Облигация",
-            AssetType.Commodity => "Товар",
-            AssetType.Crypto => "Криптоактив",
-            _ => assetType.ToString()
-        };
-
     private static (string Label, string ClassName) GetLiquidity(SimulationTickResult? tickResult, decimal totalDepth)
     {
         if (tickResult?.Snapshot.BestBid is null || tickResult.Snapshot.BestAsk is null)
@@ -1888,9 +1677,6 @@ maxY)
 
         return ("Низкая", "negative");
     }
-
-    private static string FormatSvgNumber(double value) =>
-        value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 
     private void HandleNewsFeedChanged() => _ = InvokeAsync(StateHasChanged);
 
@@ -1924,9 +1710,6 @@ maxY)
         }
     }
 
-    private sealed record MarketMetric(string Label, string Value, string Detail, string Accent, string Sparkline, string
-Projection, IReadOnlyList<BarRect> Bars);
-    private sealed record AssetParameter(string Label, string Value, string? ValueClass);
     private sealed record OrderBookViewData(
         decimal? BestBid,
         decimal? BestAsk,
@@ -1999,6 +1782,4 @@ Projection, IReadOnlyList<BarRect> Bars);
         public List<AggregatedCandle> Candles { get; } = [];
     }
 
-    private sealed record BarRect(double X, double Y, double Width, double Height);
-    private sealed record Point(double X, double Y);
 }

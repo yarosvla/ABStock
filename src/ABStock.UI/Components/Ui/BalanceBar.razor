@@ -22,7 +22,7 @@
     @if (Positive == 0 && Negative == 0)
     {
         <div class="ui-balance__half ui-balance__half--empty" style="flex:1">
-            <span class="ui-balance__caption">@EmptyLabel</span>
+            <span class="ui-balance__caption">нет данных</span>
         </div>
     }
 </div>
@@ -35,7 +35,6 @@
     [Parameter] public string NegativeLabel { get; set; } = "негативных";
 
     /// <summary>Что написать, когда считать нечего. Не «0» — раздел 10.</summary>
-    [Parameter] public string EmptyLabel { get; set; } = "нет данных";
 
     [Parameter] public string? Class { get; set; }
 
@@ -43,6 +42,6 @@
     private static string Flex(int count) => count.ToString(CultureInfo.InvariantCulture);
 
     private string AriaLabel => Positive == 0 && Negative == 0
-        ? EmptyLabel
+        ? "нет данных"
         : $"{Positive} {PositiveLabel} против {Negative} {NegativeLabel}";
 }
