@@ -1,20 +1,43 @@
 ﻿@page "/Error"
-@layout MainLayout
 @using System.Diagnostics
+
+@* Страница ошибки. Оболочка та же, что у «не найдена» (раздел 13), и одно
+   пустое состояние по 9.15.
+
+   Режим отрисовки статический, @rendermode не задан намеренно: HttpContext
+   приходит каскадным параметром, а интерактивному контуру его не передают —
+   идентификатор запроса тогда взять неоткуда.
+
+   Активного раздела в шапке нет: страница не принадлежит ни одному из пяти. *@
 
 <PageTitle>Ошибка</PageTitle>
 
-<h1 class="text-danger">Ошибка</h1>
-<h2 class="text-danger">Не удалось обработать запрос.</h2>
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
-@if (ShowRequestId)
-{
-    <p>
-        <strong>ID запроса:</strong> <code>@RequestId</code>
-    </p>
-}
+<div class="util-shell">
+    <TopNavigation ActivePage="None" />
 
-<p>Подробности доступны в логах приложения.</p>
+    <main class="util-page">
+        <Panel>
+            <ChildContent>
+                <EmptyState IconName="alert"
+                            Title="Не удалось обработать запрос"
+                            Description="Подробности — в логах приложения.">
+                    <Action>
+                        <AppButton Variant="primary" Href="/">На главную</AppButton>
+                    </Action>
+                </EmptyState>
+
+                @if (ShowRequestId)
+                {
+                    @* Идентификатор нужен, чтобы найти запрос в логах, — это
+                       единственное, чем страница полезна. *@
+                    <p class="error__id">ID запроса <span class="num-sm">@RequestId</span></p>
+                }
+            </ChildContent>
+        </Panel>
+    </main>
+</div>
 
 @code{
     [CascadingParameter]
