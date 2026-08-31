@@ -2,61 +2,12 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
-a, .btn-link {
+a {
     color: #006bb7;
-}
-
-.btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
-}
-
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
-}
-
-.content {
-    padding-top: 1.1rem;
 }
 
 h1:focus {
     outline: none;
-}
-
-.valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
-}
-
-.invalid {
-    outline: 1px solid #e50000;
-}
-
-.validation-message {
-    color: #e50000;
-}
-
-.blazor-error-boundary {
-    background: #b32121;
-    padding: 1rem;
-    color: white;
-}
-
-    .blazor-error-boundary::after {
-        content: "Произошла ошибка."
-    }
-
-.darker-border-checkbox.form-check-input {
-    border-color: #929292;
-}
-
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-    color: var(--bs-secondary-color);
-    text-align: end;
-}
-
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-    text-align: start;
 }
 
 :root {
@@ -93,152 +44,41 @@ body {
 
 .create-asset-shell .glass-card,
 .trading-shell .glass-card,
-.news-shell .glass-card {
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--app-border);
-    background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 38%),
-        var(--app-surface);
-    box-shadow: var(--app-shadow);
-    backdrop-filter: blur(18px);
-}
 
 .create-asset-shell .glass-card::before,
 .trading-shell .glass-card::before,
-.news-shell .glass-card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-        linear-gradient(135deg, rgba(85, 199, 255, 0.1), transparent 28%),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 22%);
-    opacity: 0.95;
-}
 
 .create-asset-shell .glass-card > *,
 .trading-shell .glass-card > *,
-.news-shell .glass-card > * {
-    position: relative;
-    z-index: 1;
-}
 
 .trading-shell .page-heading,
-.news-shell .page-heading {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 14px;
-    min-height: auto;
-    padding-top: 6px;
-}
 
 .trading-shell .page-heading h1,
 .news-shell .page-heading h1,
-.create-asset-shell .page-header h1 {
-    margin: 0;
-    color: var(--app-text);
-    font-size: clamp(29px, 2.6vw, 36px);
-    line-height: 1.02;
-    font-weight: 760;
-    letter-spacing: -0.03em;
-}
 
 .trading-shell .page-heading p:last-child,
 .news-shell .page-heading p:last-child,
-.create-asset-shell .page-header p {
-    max-width: 720px;
-    margin: 8px 0 0;
-    color: var(--app-text-muted);
-    font-size: 14px;
-    line-height: 1.5;
-}
 
 .trading-shell .breadcrumbs,
-.news-shell .breadcrumbs {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 30px;
-    margin: 0 0 10px;
-    padding: 0 12px;
-    border: 1px solid var(--app-pill-border);
-    border-radius: 999px;
-    color: #bfd0e5;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(85, 199, 255, 0.05));
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-}
 
 .trading-shell .breadcrumbs a,
 .trading-shell .breadcrumbs span,
 .news-shell .breadcrumbs a,
-.news-shell .breadcrumbs span {
-    color: inherit;
-    text-decoration: none;
-}
 
 .trading-shell .breadcrumbs .bi,
-.news-shell .breadcrumbs .bi {
-    font-size: 10px;
-    opacity: 0.62;
-}
-
-.create-asset-shell .page-header {
-    display: grid;
-    gap: 8px;
-}
-
-.create-asset-shell .page-kicker {
-    display: inline-flex;
-    align-items: center;
-    width: fit-content;
-    min-height: 28px;
-    padding: 0 12px;
-    border: 1px solid var(--app-pill-border);
-    border-radius: 999px;
-    color: #c8d7ea;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(85, 199, 255, 0.06));
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-}
 
 .create-asset-shell .workflow-progress,
 .trading-shell .status-strip,
-.news-shell .panel-title > span {
-    border-color: var(--app-pill-border);
-}
 
 .trading-shell .panel-heading h2,
 .news-shell .panel-title h2,
 .trading-shell .asset-card h2,
-.news-shell .asset-card h2 {
-    color: var(--app-text);
-    font-size: 17px;
-    font-weight: 680;
-}
 
 .trading-shell .asset-meta span,
-.news-shell .asset-meta span {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.05);
-}
 
 .trading-shell .metric-card,
-.news-shell .metric-card {
-    border-color: var(--app-border);
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
-}
 
 .trading-shell .metric-card strong,
-.news-shell .metric-card strong {
-    color: var(--app-text);
-}
 
 .trading-shell .positive,
 .news-shell .positive {
@@ -251,20 +91,11 @@ body {
 }
 
 .trading-shell .warning,
-.news-shell .warning {
-    color: var(--app-warning) !important;
-}
 
 @media (max-width: 900px) {
     .trading-shell .page-heading h1,
     .news-shell .page-heading h1,
-    .create-asset-shell .page-header h1 {
-        font-size: clamp(26px, 7vw, 32px);
-    }
 
     .trading-shell .breadcrumbs,
-    .news-shell .breadcrumbs {
-        width: fit-content;
-        flex-wrap: wrap;
-    }
+
 }
