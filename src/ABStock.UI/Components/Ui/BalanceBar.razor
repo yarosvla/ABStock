@@ -7,14 +7,14 @@
 <div class="ui-balance @Class" role="img" aria-label="@AriaLabel">
     @if (Positive > 0)
     {
-        <div class="ui-balance__half ui-balance__half--positive" style="flex:@Flex(Positive)">
+        <div class="ui-balance__half ui-balance__half--positive @(HighlightPositive ? "is-touched" : null)" style="flex:@Flex(Positive)">
             <span class="ui-balance__count">@Positive</span>
             <span class="ui-balance__caption">@PositiveLabel</span>
         </div>
     }
     @if (Negative > 0)
     {
-        <div class="ui-balance__half ui-balance__half--negative" style="flex:@Flex(Negative)">
+        <div class="ui-balance__half ui-balance__half--negative @(HighlightNegative ? "is-touched" : null)" style="flex:@Flex(Negative)">
             <span class="ui-balance__count">@Negative</span>
             <span class="ui-balance__caption">@NegativeLabel</span>
         </div>
@@ -35,6 +35,15 @@
     [Parameter] public string NegativeLabel { get; set; } = "негативных";
 
     /// <summary>Что написать, когда считать нечего. Не «0» — раздел 10.</summary>
+
+    /// <summary>
+    /// Половина, которую задела новость, отмечается кромкой (артборды 02 и 03
+    /// «Новостей»). Отметка — кромка, а не заливка: заливка здесь несёт долю,
+    /// и менять её значило бы врать о соотношении.
+    /// </summary>
+    [Parameter] public bool HighlightPositive { get; set; }
+
+    [Parameter] public bool HighlightNegative { get; set; }
 
     [Parameter] public string? Class { get; set; }
 

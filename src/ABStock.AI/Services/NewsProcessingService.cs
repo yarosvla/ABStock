@@ -7,7 +7,7 @@ namespace ABStock.AI.Services;
 public sealed class NewsProcessingService : INewsProcessingService
 {
     private readonly IFinBertAnalyzer _finBert = new StubFinBertAnalyzer();
-    private readonly IAspectMatcher _matcher = new StubAspectMatcher();
+    private readonly IAspectMatcher _matcher = new ProfileAspectMatcher();
 
     internal NewsProcessingService(IFinBertAnalyzer finBert, IAspectMatcher matcher)
     {
@@ -35,7 +35,8 @@ public sealed class NewsProcessingService : INewsProcessingService
             PositiveMatches = matchResult.PositiveMatches,
             NegativeMatches = matchResult.NegativeMatches,
             RiskMatches = matchResult.RiskMatches,
-            MatchScore = matchResult.Score
+            MatchScore = matchResult.Score,
+            Factors = matchResult.Matches
         };
     }
 
