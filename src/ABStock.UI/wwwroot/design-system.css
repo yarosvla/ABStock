@@ -104,14 +104,31 @@
   --font-ui:  'Golos Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-num: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
 
-  --t-display: 600 30px/36px var(--font-ui);
-  --t-h1:      600 22px/28px var(--font-ui);
-  --t-h2:      600 16px/22px var(--font-ui);
-  --t-h3:      600 14px/20px var(--font-ui);
-  --t-body:    400 14px/20px var(--font-ui);
-  --t-body-sm: 400 13px/18px var(--font-ui);
-  --t-caption: 400 12px/16px var(--font-ui);
-  --t-micro:   500 11px/14px var(--font-ui);
+  /* Размеры отдельно от шорткатов. Шорткат --t-* задаёт сразу начертание,
+     размер и интерлиньяж — это удобно тексту и вредно контролу: кнопке из
+     него нужен ТОЛЬКО размер, а начертание у неё своё (500 у обычной, 600 у
+     первичной) и интерлиньяж свой (line-height: 1, иначе текст не встаёт по
+     центру фиксированной высоты). Раньше кнопка объявляла 13px, 12px и 14px
+     литералами, потому что взять их было неоткуда: пункт 3
+     docs/ui-backlog.md. Шкала — те же семь размеров, что задаёт таблица
+     раздела 4, и шорткаты ниже собраны из неё же, чтобы у размера был один
+     источник. */
+  --fs-display: 30px;
+  --fs-h1:      22px;
+  --fs-h2:      16px;
+  --fs-body:    14px;
+  --fs-dense:   13px;
+  --fs-caption: 12px;
+  --fs-micro:   11px;
+
+  --t-display: 600 var(--fs-display)/36px var(--font-ui);
+  --t-h1:      600 var(--fs-h1)/28px var(--font-ui);
+  --t-h2:      600 var(--fs-h2)/22px var(--font-ui);
+  --t-h3:      600 var(--fs-body)/20px var(--font-ui);
+  --t-body:    400 var(--fs-body)/20px var(--font-ui);
+  --t-body-sm: 400 var(--fs-dense)/18px var(--font-ui);
+  --t-caption: 400 var(--fs-caption)/16px var(--font-ui);
+  --t-micro:   500 var(--fs-micro)/14px var(--font-ui);
 
   --n-hero: 500 34px/38px var(--font-num);
   --n-lg:   500 20px/24px var(--font-num);
