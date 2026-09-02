@@ -4,6 +4,7 @@
 @using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
+@using Microsoft.AspNetCore.Components.Web
 @using static ABStock.UI.Services.NumberFormat
 @implements IDisposable
 @implements IAsyncDisposable
@@ -216,8 +217,15 @@
                             <div class="events">
                                 @foreach (var entry in NewsFeed.Entries)
                                 {
-                                    <NewsEventRow At="entry.At" Text="@entry.Text"
-                                                  Polarity="entry.Polarity" ImpactScore="entry.ImpactScore" />
+                                    var isCurrent = entry.At == SelectedNewsAt;
+                                    <div class="events__row" role="button" tabindex="0"
+                                         aria-pressed="@(isCurrent ? "true" : "false")"
+                                         @onclick="() => SelectNews(entry.At)"
+                                         @onkeydown="@(args => HandleNewsKey(args, entry.At))">
+                                        <NewsEventRow At="entry.At" Text="@entry.Text"
+                                                      Polarity="entry.Polarity" ImpactScore="entry.ImpactScore"
+                                                      Current="isCurrent" />
+                                    </div>
                                 }
                             </div>
                         }
@@ -242,6 +250,11 @@
                                             Title="Новостей не было"
                                             Description="Новость вводится во время сессии: сигналу нужен рынок, который на него отреагирует." />
                             }
+                        }
+
+                        @if (NewsFeed.Entries.Count > 0)
+                        {
+                            <p class="events__hint">Выбранная новость отмечена на графике и разобрана в полосе под ним</p>
                         }
                     </ChildContent>
                 </Panel>
@@ -340,6 +353,37 @@
                         </div>
                     </ChildContent>
                 </Panel>
+
+                @* Разбор выбранной новости — полоса связи (раздел 9.19, артборд 02).
+                   Раздел 9.19 называет «разбор новости на „Торгах“» первым местом
+                   применения полосы, и до сих пор её здесь не было вовсе. На экране
+                   она одна: больше полос связи на «Торгах» нет. *@
+                @if (SelectedNews is { } news)
+                {
+                    <CausalityStrip Class="rise rise-3" Label="Как новость сдвинула цену">
+                        <CausalityStep Label="Новость" Weight="1.2"
+                                       Value="@news.Text" Truncate="true"
+                                       Note="@($"{news.At.ToLocalTime():HH:mm} · введена пользователем")" />
+
+                        <CausalityStep Label="Тональность и уверенность" Weight="1.15">
+                            <span class="badge badge--@PolarityTone(news.Polarity)">@PolarityName(news.Polarity)</span>
+                            <span class="ui-causality__note">уверенность <span class="num-sm">@Fixed2(news.Confidence)</span></span>
+                        </CausalityStep>
+
+                        <CausalityStep Label="Сила влияния" Weight="2.1">
+                            <span class="num-lg">@Fixed2(news.ImpactScore)</span>
+                            <span class="ui-causality__note">уверенность × чувствительность актива × совпадение по теме</span>
+                        </CausalityStep>
+
+                        <CausalityStep Label="Новостной агент" Weight="1.3"
+                                       Value="@NewsAgentAction(news)" Truncate="true"
+                                       Note="@NewsAgentTradeNote(news)" />
+
+                        <CausalityStep Label="Сдвиг цены" Weight="1.05"
+                                       Value="@PriceShift(news)"
+                                       Note="@PriceShiftNote(news)" />
+                    </CausalityStrip>
+                }
 
                 @* Торги остановлены — состав задаётся до старта (артборд 03, раздел 16.1) *@
                 @if (!isRunning)
@@ -1553,6 +1597,131 @@
         agentName.Contains("News", StringComparison.Ordinal);
 
     private static string Fixed2(decimal value) => value.ToString("F2");
+
+    // ── Разбор выбранной новости (раздел 9.19) ──────────────────────────────
+
+    private DateTimeOffset? selectedNewsAt;
+
+    /// <summary>
+    /// Какая новость разобрана в полосе. По умолчанию — свежая: человек,
+    /// открывший «Торги» после новости, приходит смотреть именно её.
+    /// </summary>
+    private DateTimeOffset? SelectedNewsAt =>
+        selectedNewsAt is { } chosen && NewsFeed.Entries.Any(entry => entry.At == chosen)
+            ? chosen
+            : NewsFeed.Entries.FirstOrDefault()?.At;
+
+    private SessionNewsEntry? SelectedNews =>
+        SelectedNewsAt is { } at ? NewsFeed.Entries.FirstOrDefault(entry => entry.At == at) : null;
+
+    private void SelectNews(DateTimeOffset at) => selectedNewsAt = at;
+
+    private void HandleNewsKey(KeyboardEventArgs args, DateTimeOffset at)
+    {
+        if (args.Key is "Enter" or " ")
+        {
+            SelectNews(at);
+        }
+    }
+
+    private static string PolarityTone(SignalPolarity polarity) => polarity switch
+    {
+        SignalPolarity.Positive => "up",
+        SignalPolarity.Negative => "down",
+        _ => "warn"
+    };
+
+    private static string PolarityName(SignalPolarity polarity) => polarity switch
+    {
+        SignalPolarity.Positive => "Позитивная",
+        SignalPolarity.Negative => "Негативная",
+        _ => "Нейтральная"
+    };
+
+    /// <summary>Первая сделка новостного агента после новости — если она была.</summary>
+    private Trade? NewsAgentTrade(SessionNewsEntry news) =>
+        tradeHistory
+            .Where(trade => trade.ExecutedAt >= news.At
+                            && (IsNewsAgent(trade.BuyerAgentName) || IsNewsAgent(trade.SellerAgentName)))
+            .OrderBy(trade => trade.ExecutedAt)
+            .FirstOrDefault();
+
+    private string NewsAgentAction(SessionNewsEntry news)
+    {
+        var trade = NewsAgentTrade(news);
+        if (trade is null)
+        {
+            return "—";
+        }
+
+        var buys = IsNewsAgent(trade.BuyerAgentName);
+        return $"{(buys ? "покупает" : "продаёт")} {FormatQuantity(trade.Quantity)} по {FormatPrice(trade.Price)}";
+    }
+
+    private string NewsAgentTradeNote(SessionNewsEntry news)
+    {
+        var trade = NewsAgentTrade(news);
+        if (trade is null)
+        {
+            return "сделок после новости пока не было";
+        }
+
+        var counterparty = IsNewsAgent(trade.BuyerAgentName) ? trade.SellerAgentName : trade.BuyerAgentName;
+        return $"сделка {trade.ExecutedAt.ToLocalTime():HH:mm:ss} с {AgentTypeNames.InstrumentalForAgentName(counterparty)}";
+    }
+
+    /// <summary>Цена на момент новости — закрытие последней свечи до неё.</summary>
+    private decimal? PriceAtNews(SessionNewsEntry news)
+    {
+        var candles = GetSelectedTimeframeState().Candles;
+        var before = candles.LastOrDefault(candle => candle.Timestamp <= news.At);
+        return before?.Close;
+    }
+
+    private string PriceShift(SessionNewsEntry news)
+    {
+        var before = PriceAtNews(news);
+        var after = GetSelectedTimeframeState().Candles.LastOrDefault()?.Close;
+
+        if (before is not { } from || after is not { } to)
+        {
+            return "—";
+        }
+
+        // Раздел 10: «Текст никогда не показывает A → A». После округления до
+        // двух знаков начальное и конечное могут совпасть — тогда изменение
+        // называется словом, а не стрелкой из числа в то же число.
+        return FormatPrice(from) == FormatPrice(to)
+            ? "без изменения"
+            : $"{FormatPrice(from)} → {FormatPrice(to)}";
+    }
+
+    private string PriceShiftNote(SessionNewsEntry news)
+    {
+        var before = PriceAtNews(news);
+        var after = GetSelectedTimeframeState().Candles.LastOrDefault()?.Close;
+
+        if (before is not { } from || after is not { } to || from == 0m)
+        {
+            return "";
+        }
+
+        var elapsed = DateTimeOffset.Now - news.At;
+        var minutes = Math.Max(1, (int)Math.Round(elapsed.TotalMinutes, MidpointRounding.AwayFromZero));
+
+        // Цена не сдвинулась — значение выше уже сказало «без изменения», и
+        // приписывать к нему «↗ +0,00 %» значит спорить с самим собой в
+        // соседней строке (разделы 10 и 17).
+        if (FormatPrice(from) == FormatPrice(to))
+        {
+            return $"за {minutes} мин";
+        }
+
+        var percent = (to - from) / from * 100m;
+        var arrow = percent > 0m ? "↗" : "↘";
+
+        return $"за {minutes} мин {arrow} {Sign(percent)}{Math.Abs(percent):0.00} %";
+    }
 
     private ChartSyncPayload BuildIncrementalChartSyncPayload(AggregatedCandle candle, bool forceScrollToRealtime)
     {

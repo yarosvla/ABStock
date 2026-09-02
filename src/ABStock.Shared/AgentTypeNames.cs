@@ -26,6 +26,35 @@ public static class AgentTypeNames
     };
 
     /// <summary>
+    /// Название в творительном падеже — для оборотов «сделка с маркет-мейкером».
+    /// Падежи заданы таблицей, а не правилом: типов ровно четыре, это закрытый
+    /// набор, и склонять их алгоритмом значило бы решать задачу сложнее, чем она
+    /// есть. Обрубок вида «сделка с трендовый» раздел 17 не допускает.
+    /// </summary>
+    public static string Instrumental(AgentType type) => type switch
+    {
+        AgentType.TrendFollowing => "трендовым",
+        AgentType.CounterTrend => "контр-трендом",
+        AgentType.MarketMaker => "маркет-мейкером",
+        AgentType.NewsDriven => "новостным",
+        _ => Label(type)
+    };
+
+    /// <summary>Творительный падеж по внутреннему имени агента.</summary>
+    public static string InstrumentalForAgentName(string agentName)
+    {
+        var digits = agentName.Length;
+        while (digits > 0 && char.IsAsciiDigit(agentName[digits - 1]))
+        {
+            digits--;
+        }
+
+        return Enum.TryParse<AgentType>(agentName[..digits], ignoreCase: false, out var type)
+            ? Instrumental(type)
+            : agentName;
+    }
+
+    /// <summary>
     /// Название по внутреннему имени агента. Незнакомое имя отдаётся как есть:
     /// выдумывать русское название для того, чего мы не знаем, хуже, чем
     /// показать техническую строку.
