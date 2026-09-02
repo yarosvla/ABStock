@@ -54,10 +54,6 @@ main.news-page ::deep .ui-causality__note {
     color: var(--text-1);
 }
 
-.tone-up { color: var(--up-500); }
-.tone-down { color: var(--down-500); }
-.tone-flat { color: var(--text-3); }
-
 /* Бейдж-состояние — раздел 9.6. Окрашен только то, что предсказывает
    направление цены: тональность новости и сработавший фактор (раздел 3). */
 .badge {
@@ -350,7 +346,6 @@ main.news-page ::deep .ui-causality__note {
     justify-content: space-between;
     gap: var(--s-3);
 }
-
 
 /* Дорожка рисков: высота и радиус те же, что у половин полосы баланса
    (9.18), заливки нет — риск не участвует в балансе, он условие. */

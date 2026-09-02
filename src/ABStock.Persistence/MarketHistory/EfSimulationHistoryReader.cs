@@ -115,7 +115,7 @@ internal sealed class EfSimulationHistoryReader(IDbContextFactory<AbStockDbConte
             ABStock.Shared.AssetType.Stock => "Акция",
             ABStock.Shared.AssetType.Bond => "Облигация",
             ABStock.Shared.AssetType.Commodity => "Товар",
-            ABStock.Shared.AssetType.Crypto => "Криптоактив",
+            ABStock.Shared.AssetType.Crypto => "Криптовалюта",
             _ => assetType.ToString()
         };
 }

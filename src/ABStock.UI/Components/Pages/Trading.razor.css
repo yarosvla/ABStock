@@ -156,11 +156,6 @@
     .strip--optional { display: none; }
 }
 
-/* тон значения — рыночная семантика */
-.tone-up { color: var(--up-500); }
-.tone-down { color: var(--down-500); }
-.tone-flat { color: var(--text-3); }
-
 .chip {
     display: inline-flex;
     align-items: center;

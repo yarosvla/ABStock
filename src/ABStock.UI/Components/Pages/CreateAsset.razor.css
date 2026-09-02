@@ -157,7 +157,9 @@
     color: var(--down-500);
 }
 
-.field__error .ui-icon { flex: none; }
+/* ::deep обязателен: .ui-icon приходит из компонента Icon со своим scope,
+   и без него правило не достаёт до svg и не действует вовсе. */
+.field__error ::deep .ui-icon { flex: none; }
 
 /* ---------- поля ввода (9.3) ----------
    Однострочное поле уехало в кит (Components/Ui/TextField): такое же нужно
@@ -269,7 +271,7 @@
 
 .select__trigger:hover { border-color: var(--line-3); }
 .select__trigger.is-empty { color: var(--text-4); }
-.select__trigger .ui-icon { color: var(--text-3); flex: none; }
+.select__trigger ::deep .ui-icon { color: var(--text-3); flex: none; }
 
 .select__panel {
     position: absolute;

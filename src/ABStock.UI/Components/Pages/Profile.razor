@@ -50,7 +50,7 @@
 
             @* ── Левая колонка: настройки. Визуальный объект экрана — живой
                  предпросмотр, порождённый настройкой, а не данными (7.2). ── *@
-            <div class="col col--main">
+            <div class="profile-col profile-col--main">
 
                 <Panel Title="Оператор" Class="rise rise-1">
                     <ChildContent>
@@ -274,7 +274,7 @@
             </div>
 
             @* ── Правая колонка: состояние на сейчас и итоги (раздел 13). ── *@
-            <div class="col col--side">
+            <div class="profile-col profile-col--side">
 
                 <Panel Title="Текущий контекст" Class="rise rise-2">
                     <ChildContent>
@@ -382,7 +382,7 @@
                         {
                             <EmptyState IconName="clock"
                                         Title="События ещё не записаны"
-                                        Description="Создайте актив и запустите торги — здесь появится хронология.">
+                                        Description="Создайте актив и запустите торги — здесь появится хронология сессии.">
                                 <Action>
                                     <AppButton Variant="primary" Size="32" Href="/create-asset">Создать актив</AppButton>
                                 </Action>

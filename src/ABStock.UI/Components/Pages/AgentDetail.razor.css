@@ -251,7 +251,11 @@
 /* ============================================================================
    Правый рельс · состояние на сейчас
    ============================================================================ */
-.kv {
+/* Здесь «ключ · значение» — СТРОКА, а на «Торгах», «Новостях» и «Профиле»
+   класс .kv означает КОЛОНКУ. Одно имя на две раскладки: пункт 100
+   docs/ui-backlog.md. Переименовано здесь, потому что .kv-row описывает эту
+   форму точнее, а колоночный .kv остаётся за тремя остальными страницами. */
+.kv-row {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -260,8 +264,8 @@
 
 .kv__key { font: var(--t-body-sm); color: var(--text-3); }
 
-.kv--lead .kv__key { color: var(--text-2); }
-.kv--lead .num-lg { font: var(--n-lg); font-variant-numeric: tabular-nums; }
+.kv-row--lead .kv__key { color: var(--text-2); }
+.kv-row--lead .num-lg { font: var(--n-lg); font-variant-numeric: tabular-nums; }
 
 .kv-group {
     display: flex;
@@ -271,7 +275,7 @@
 
 .kv-group.hairline-top { margin-top: var(--s-3); padding-top: var(--s-3); }
 
-.kv .num-sm { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-1); }
+.kv-row .num-sm { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-1); }
 
 .split { display: flex; gap: var(--s-4); }
 
@@ -303,6 +307,3 @@
 .balance__buy { background: var(--line-3); }
 .balance__sell { flex: 1; background: var(--line-1); }
 
-.tone-up { color: var(--up-500); }
-.tone-down { color: var(--down-500); }
-.tone-flat { color: var(--text-2); }

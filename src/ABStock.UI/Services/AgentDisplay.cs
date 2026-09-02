@@ -85,7 +85,7 @@ public static class AgentDisplay
         AssetType.Stock => "Акция",
         AssetType.Bond => "Облигация",
         AssetType.Commodity => "Товар",
-        AssetType.Crypto => "Криптоактив",
+        AssetType.Crypto => "Криптовалюта",
         _ => assetType.ToString()
     };
 }
