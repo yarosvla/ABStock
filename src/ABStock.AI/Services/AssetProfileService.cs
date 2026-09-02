@@ -20,7 +20,7 @@ public sealed class AssetProfileService : IAssetProfileService
         var positiveFactors = new List<string>
         {
             $"Спрос в секторе «{normalizedIndustry}»",
-            $"Профиль {GetAssetTypeLabel(request.AssetType).ToLowerInvariant()} позволяет использовать сценарии роста через симуляцию"
+            $"Профиль {GetAssetTypeGenitive(request.AssetType)} позволяет использовать сценарии роста через симуляцию"
         };
         var negativeFactors = new List<string>
         {
@@ -155,11 +155,15 @@ public sealed class AssetProfileService : IAssetProfileService
         AssetType assetType,
         bool includeGovernmentSupport)
     {
+        // Тип актива в ключевые слова НЕ идёт. Он уже стоит чипом в шапке
+        // профиля и строкой в панели «Исходное описание», и третье появление —
+        // дубль по разделу 9.0 («метрика живёт ровно в одном месте экрана»).
+        // Сопоставлению новостей он тоже не помогает: «Акция» не встречается в
+        // тексте новостей про энергетику. Пункты 71 и 85 docs/ui-backlog.md.
         var keywords = new List<string>
         {
             name,
-            industry,
-            GetAssetTypeLabel(assetType)
+            industry
         };
 
         if (includeGovernmentSupport)
@@ -167,16 +171,20 @@ public sealed class AssetProfileService : IAssetProfileService
             keywords.Add("господдержка");
         }
 
-        // Грубый фильтр, пока описание разбирает не модель: слишком короткие
-        // и служебные слова («какой», «текст», «написан») попадали в чипы и
-        // читались как характеристика актива. Когда придёт модель, фильтр
-        // останется безвредным — она таких слов не вернёт.
+        // Грубый фильтр, пока описание разбирает не модель. Когда придёт
+        // модель, фильтр останется безвредным — она таких слов не вернёт.
+        //
+        // Регистр опускается: «Энергетическая» в начале описания начинается с
+        // прописной не потому, что это имя собственное, а потому что это
+        // начало предложения. В чипе рядом со строчными оно читалось как
+        // название.
         keywords.AddRange(description
             .Split([' ', ',', '.', ':', ';', '(', ')', '\n', '\r', '-', '—', '«', '»', '"'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(word => word.Trim())
+            .Select(word => word.Trim().ToLowerInvariant())
             .Where(word => word.Length >= MinKeywordLength)
             .Where(word => word.All(char.IsLetter))
             .Where(word => !StopWords.Contains(word))
+            .Where(word => !LooksLikeVerb(word))
             .Take(6));
 
         return keywords
@@ -186,8 +194,43 @@ public sealed class AssetProfileService : IAssetProfileService
             .ToArray();
     }
 
-    /// <summary>Короче — уже не характеристика актива, а связка.</summary>
-    private const int MinKeywordLength = 6;
+    /// <summary>
+    /// Короче — уже не характеристика актива, а связка.
+    ///
+    /// Порог опущен с шести до пяти: на шести не проходили «тариф» и «тепло»,
+    /// а в артборде «Создания актива» они стоят чипами. Ниже пяти не опускаю —
+    /// туда сразу попадают «года», «этом», «свои», и стоп-лист пришлось бы
+    /// растить быстрее, чем он ловит. Четырёхбуквенные слова вроде «сети»
+    /// в ключевые не попадут: это записанное ограничение, а не недосмотр.
+    /// </summary>
+    private const int MinKeywordLength = 5;
+
+    /// <summary>
+    /// Похоже ли слово на глагол в личной форме: «строит», «обслуживает»,
+    /// «растёт», «развивает». Такие слова описывают действие, а не признак
+    /// актива, и в чипе читались как характеристика.
+    ///
+    /// Фильтр по окончанию, а не по словарю, и он ошибается: «бюджет»,
+    /// «кредит», «дефицит» — существительные с теми же окончаниями. Поэтому
+    /// исключения перечислены явно. Это цена морфологии без модели, и она
+    /// меньше, чем «обслуживает» в списке характеристик актива.
+    /// </summary>
+    private static bool LooksLikeVerb(string word) =>
+        !VerbLikeNouns.Contains(word) &&
+        (word.EndsWith("ет", StringComparison.Ordinal)
+         || word.EndsWith("ёт", StringComparison.Ordinal)
+         || word.EndsWith("ит", StringComparison.Ordinal)
+         || word.EndsWith("ют", StringComparison.Ordinal)
+         || word.EndsWith("ят", StringComparison.Ordinal)
+         || word.EndsWith("ует", StringComparison.Ordinal)
+         || word.EndsWith("ают", StringComparison.Ordinal));
+
+    /// <summary>Существительные с глагольными окончаниями — исключения фильтра.</summary>
+    private static readonly HashSet<string> VerbLikeNouns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "бюджет", "кредит", "дефицит", "депозит", "пакет", "билет", "момент",
+        "процент", "лимит", "аудит", "актив", "проект", "объект", "субъект"
+    };
 
     /// <summary>
     /// Служебные и оценочные слова, которые в описании встречаются часто,
@@ -203,8 +246,30 @@ public sealed class AssetProfileService : IAssetProfileService
         "написан", "написано", "написать", "описание", "описания",
         "данный", "данные", "данных", "такой", "такая", "такие", "такое",
         "общий", "общая", "общее", "общей", "общего", "общих",
-        "часть", "части", "время", "период", "компания", "компании"
+        "часть", "части", "время", "период", "компания", "компании",
+        // Пятибуквенные, впущенные снижением порога: без них снижение
+        // обменяло бы «обслуживает» на «этом» и «свои».
+        "этом", "этой", "этих", "своих", "своей", "своим", "наших", "нашей",
+        "года", "году", "годах", "более", "менее", "около", "также",
+        "любой", "любые", "каждый", "каждая", "какой", "какая", "какие",
+        "новый", "новая", "новые", "новых", "текст", "здесь", "тогда"
     };
+
+    /// <summary>
+    /// Тип актива в родительном падеже — для оборота «Профиль акции».
+    /// Раньше сюда подставлялся именительный, и на экране стояло «Профиль
+    /// акция позволяет…». Падежи таблицей, а не правилом: типов четыре, это
+    /// закрытый набор.
+    /// </summary>
+    private static string GetAssetTypeGenitive(AssetType assetType) =>
+        assetType switch
+        {
+            AssetType.Stock => "акции",
+            AssetType.Bond => "облигации",
+            AssetType.Commodity => "товара",
+            AssetType.Crypto => "криптовалюты",
+            _ => GetAssetTypeLabel(assetType).ToLowerInvariant()
+        };
 
     private static string GetAssetTypeLabel(AssetType assetType) =>
         assetType switch

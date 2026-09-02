@@ -43,8 +43,8 @@ public class AssetProfileKeywordsTests
         var keywords = Keywords("Какой был текст, три ТЭЦ и сети, тариф на них уже есть.");
 
         Assert.All(
-            keywords.Skip(4), // первые четыре — название, отрасль, тип актива, господдержка
-            keyword => Assert.True(keyword.Length >= 6, $"«{keyword}» короче шести знаков"));
+            keywords.Skip(3), // первые три — название, отрасль, господдержка
+            keyword => Assert.True(keyword.Length >= 5, $"«{keyword}» короче пяти знаков"));
     }
 
     [Fact]
@@ -68,12 +68,58 @@ public class AssetProfileKeywordsTests
     }
 
     [Fact]
-    public void Название_отрасль_и_тип_актива_всегда_в_ключевых()
+    public void Название_и_отрасль_всегда_в_ключевых()
     {
         var keywords = Keywords("Региональный энергетический холдинг с тремя станциями и сетями.");
 
         Assert.Contains("Гелиос Энерго", keywords);
         Assert.Contains("Энергетика", keywords);
-        Assert.Contains("Акция", keywords);
+    }
+
+    [Fact]
+    public void Тип_актива_в_ключевые_не_идёт()
+    {
+        // Раньше «Акция» стояла в ключевых словах, и тест это закреплял.
+        // Поведение изменено намеренно: тип актива уже показан чипом в шапке
+        // профиля и строкой в панели «Исходное описание», третье появление —
+        // дубль по разделу 9.0. Сопоставлению новостей он тоже не помогает:
+        // слово «акция» в новостях про энергетику не встречается.
+        var keywords = Keywords("Региональный энергетический холдинг с тремя станциями и сетями.");
+
+        Assert.DoesNotContain("Акция", keywords);
+    }
+
+    [Fact]
+    public void Глаголы_не_попадают_в_ключевые()
+    {
+        // «строит», «обслуживает» описывают действие, а не признак актива, и
+        // в чипе читались как характеристика (пункты 71 и 85 бэклога).
+        var keywords = Keywords(
+            "Энергетическая компания строит и обслуживает солнечные электростанции в южных регионах.");
+
+        Assert.DoesNotContain("строит", keywords, StringComparer.OrdinalIgnoreCase);
+        Assert.DoesNotContain("обслуживает", keywords, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Существительные_с_глагольными_окончаниями_остаются()
+    {
+        // Фильтр глаголов работает по окончанию и потому ошибается: «бюджет»
+        // и «кредит» кончаются так же. Исключения перечислены явно, и тест
+        // держит именно их.
+        var keywords = Keywords("Компания увеличила бюджет и привлекла кредит на модернизацию.");
+
+        Assert.Contains("бюджет", keywords, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("кредит", keywords, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Слова_из_описания_идут_строчными()
+    {
+        // «Энергетическая» в начале описания с прописной не потому, что имя
+        // собственное, а потому что начало предложения.
+        var keywords = Keywords("Энергетическая компания развивает теплоснабжение города.");
+
+        Assert.DoesNotContain("Энергетическая", keywords);
     }
 }
