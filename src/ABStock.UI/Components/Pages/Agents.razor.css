@@ -321,7 +321,6 @@
 
 .roster__table tbody tr.is-group .roster__why { color: var(--text-3); }
 
-.nodata { color: var(--text-4); }
 
 /* ---------- подсветка типа ----------
    Наведение на строку группы выводит её линию вперёд на графике: гаснут там

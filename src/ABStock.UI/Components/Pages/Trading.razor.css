@@ -160,8 +160,6 @@
 .tone-up { color: var(--up-500); }
 .tone-down { color: var(--down-500); }
 .tone-flat { color: var(--text-3); }
-.nodata { color: var(--text-4); }
-.num-xs { font: var(--n-xs); font-variant-numeric: tabular-nums; }
 
 .chip {
     display: inline-flex;
