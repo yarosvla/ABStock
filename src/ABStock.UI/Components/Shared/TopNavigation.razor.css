@@ -39,7 +39,7 @@
    уравненный по прописным, читался бы мельче слова.
    ::deep — знак приходит своей разметкой из BrandMark, до неё скоуп шапки
    без этого не достаёт. */
-.topnav__brand ::deep .brand-mark {
+.topnav__brand ::deep .ui-brand-mark {
     width: 18px;
     height: 18px;
 }

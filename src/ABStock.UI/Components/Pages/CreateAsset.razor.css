@@ -44,12 +44,12 @@
    ::deep — потому что элементы принадлежат разметке компонентов кита,
    и скоуп страницы до них сам не достаёт. */
 
-.create-page ::deep .crumbs__current { color: var(--text-1); }
+.create-page ::deep .ui-crumbs__current { color: var(--text-1); }
 
-.create-page ::deep .page-head { gap: var(--s-6); }
-.create-page ::deep .page-head__title { gap: var(--s-2); min-width: 0; }
-.create-page ::deep .page-head__context { font: var(--t-body-sm); }
-.create-page ::deep .page-head__actions { flex: none; }
+.create-page ::deep .ui-page-head { gap: var(--s-6); }
+.create-page ::deep .ui-page-head__title { gap: var(--s-2); min-width: 0; }
+.create-page ::deep .ui-page-head__context { font: var(--t-body-sm); }
+.create-page ::deep .ui-page-head__actions { flex: none; }
 
 .page-foot {
     margin: 0;

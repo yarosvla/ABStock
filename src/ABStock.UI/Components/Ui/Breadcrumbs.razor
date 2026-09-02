@@ -7,8 +7,8 @@
    <Aside> — место справа от пути под чип состояния сессии. Он лежит вне
    <nav>, потому что состояние — не элемент пути (раздел 13). *@
 
-<div class="crumbs-line">
-    <nav class="crumbs" aria-label="Навигационная цепочка">
+<div class="ui-crumbs-line">
+    <nav class="ui-crumbs" aria-label="Навигационная цепочка">
         @for (var i = 0; i < Items.Count; i++)
         {
             var item = Items[i];
@@ -20,11 +20,11 @@
 
             @if (item.IsAsset)
             {
-                <span class="crumbs__asset">
-                    <span class="crumbs__name">@item.Title<Icon Name="chevron-down" Size="14" /></span>
+                <span class="ui-crumbs__asset">
+                    <span class="ui-crumbs__name">@item.Title<Icon Name="chevron-down" Size="14" /></span>
                     @if (item.ChipText is not null)
                     {
-                        <span class="crumbs__chip">@item.ChipText</span>
+                        <span class="ui-crumbs__chip">@item.ChipText</span>
                     }
                 </span>
             }
@@ -34,7 +34,7 @@
             }
             else
             {
-                <span class="crumbs__current">@item.Title</span>
+                <span class="ui-crumbs__current">@item.Title</span>
             }
         }
     </nav>

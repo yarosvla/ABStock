@@ -360,7 +360,7 @@ h3 { font: var(--t-h3); }
 .status-dot--live { animation: pulse-dot var(--d-pulse) ease-in-out infinite; }
 
 @keyframes shimmer { from { background-position: -180% 0; } to { background-position: 180% 0; } }
-.skeleton {
+.ui-skeleton {
   background: linear-gradient(90deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.075) 50%, rgba(255,255,255,0.035) 100%);
   background-size: 180% 100%;
   animation: shimmer var(--d-shimmer) linear infinite;
