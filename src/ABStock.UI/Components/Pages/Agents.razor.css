@@ -201,8 +201,6 @@
     padding: 0 0 0 var(--s-3);
     background: var(--gph-850);
     border-bottom: 1px solid var(--line-1);
-    /* Заголовок колонки выравнивается так же, как её значения (раздел 9.8). */
-    text-align: left;
     font-weight: inherit;
 }
 
@@ -216,7 +214,6 @@
     padding: 0 0 0 var(--s-3);
     border-bottom: 1px solid var(--line-1);
     font-weight: inherit;
-    text-align: left;
     vertical-align: middle;
 }
 
@@ -231,7 +228,22 @@
 .roster__c-pnl  { width: var(--w-col-pnl); }
 .roster__c-go   { width: var(--w-col-go); }
 
-/* Числа — по правому краю, шапки вместе с ними (раздел 9.8). */
+/* Выравнивание задаётся КОЛОНКОЙ, а не строкой, и потому одинаково у шапки и
+   у значений (раздел 9.8: «Заголовок колонки выравнивается так же, как её
+   значения. Разное выравнивание заголовка и значения визуально разваливает
+   таблицу»).
+
+   Раньше text-align: left стоял на .roster__table thead th и .roster__table
+   tbody td — это (0,2,1) против (0,1,1) у правила колонки, и правило колонки
+   не действовало НИКОГДА: числа выравнивались влево вопреки собственному
+   комментарию рядом. Пункт 73 docs/ui-backlog.md. Лечится не наращиванием
+   специфичности, а снятием лишнего правила: у td выравнивание по умолчанию
+   левое, у th — центральное, поэтому текстовые колонки объявляют left явно. */
+.roster__c-name,
+.roster__c-why {
+    text-align: left;
+}
+
 .roster__c-cash,
 .roster__c-pos,
 .roster__c-port,
@@ -253,6 +265,16 @@
 
 .roster__c-port.num-sm,
 .roster__c-cash.num-sm { color: var(--text-1); }
+
+/* Рыночный тон сильнее базового цвета числа. .roster__table .num-sm даёт
+   (0,2,1), а .tone-up — (0,1,1): без этих трёх правил позиция и P/L набраны
+   --text-1, то есть рыночного цвета в таблице нет вовсе. Замерено по пикселям
+   базовой линии: герой-число P/L над таблицей #3FA37A, P/L строки #F0F1F2.
+   Пункт 98 docs/ui-backlog.md. Тот же приём уже стоит на «Торгах»
+   (.agents__c-num.tone-up) и на детальной (.price__ohlc .num-sm.tone-up). */
+.roster__table .num-sm.tone-up { color: var(--up-500); }
+.roster__table .num-sm.tone-down { color: var(--down-500); }
+.roster__table .num-sm.tone-flat { color: var(--text-2); }
 
 /* ---------- строка группы ---------- */
 .roster__table tbody tr.is-group {
