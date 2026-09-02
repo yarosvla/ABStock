@@ -4,6 +4,7 @@
 @using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
+@using static ABStock.UI.Services.NumberFormat
 @implements IDisposable
 @implements IAsyncDisposable
 @inject ISimulationRunner SimulationRunner
@@ -63,61 +64,15 @@
         _ => "стратегия"
     };
 
-    // Счётная форма: 1 агент · 2 агента · 5 агентов.
-    static string Plural(int count, string one, string few, string many)
-    {
-        var mod100 = count % 100;
-        if (mod100 is >= 11 and <= 14)
-        {
-            return many;
-        }
-
-        return (count % 10) switch
-        {
-            1 => one,
-            2 or 3 or 4 => few,
-            _ => many
-        };
-    }
-
-    // Действие агента словами. Инфинитива нет — это констатация, не кнопка.
-    static string ActionLabel(TradeAction action) => action switch
-    {
-        TradeAction.Buy => "покупает",
-        TradeAction.Sell => "продаёт",
-        _ => "держит позицию"
-    };
-
-    static string ActionTone(TradeAction action) => action switch
-    {
-        TradeAction.Buy => "tone-up",
-        TradeAction.Sell => "tone-down",
-        _ => "tone-flat"
-    };
-
-    // ── Разрядность по таблице раздела 10. Формат «N» берёт групповой
-    //    разделитель из культуры — узкий неразрывный пробел (Program.cs).
-
-    /// <summary>Деньги агента, капитал: 0 знаков — 149 864.</summary>
-    static string Money0(decimal value) => Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("N0");
-
-    /// <summary>Объём сессии, сделки, тики: 0 знаков.</summary>
-    static string Count0(decimal value) => Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("N0");
-
-    // Знак обязателен у величин, которые могут быть отрицательными.
-    // Минус — U+2212, а не дефис. Ноль пишется без знака.
-    static string Sign(decimal value) => value > 0m ? "+" : value < 0m ? "\u2212" : "";
-
-    /// <summary>P/L: ровно 2 знака со знаком — +31,90.</summary>
-    static string Pnl2(decimal value) =>
-        Sign(value) + Math.Abs(value).ToString("N2");
-
-    /// <summary>Позиция: 0 знаков со знаком — +3 900 / −1 200.</summary>
-    static string Position0(decimal value) =>
-        Sign(value) + Math.Round(Math.Abs(value), 0, MidpointRounding.AwayFromZero).ToString("N0");
-
-    static string DeltaTone(decimal value) =>
-        value > 0m ? "tone-up" : value < 0m ? "tone-down" : "tone-flat";
+    // Разрядность, знак, тон и счётная форма — общие: Services/NumberFormat.
+    // Раньше страница объявляла свои копии Money0, Count0, Sign, Pnl2,
+    // Position0, DeltaTone и Plural, дословно совпадавшие с общими. Две копии
+    // одного правила расходятся при первой же правке — ровно так разошёлся
+    // .tone-flat (пункт 99 docs/ui-backlog.md).
+    //
+    // ActionLabel и ActionTone убраны вместе с ними: слово действия теперь даёт
+    // AgentRoster, и он различает «держит спред» и «ждёт», а ActionTone был
+    // мёртв — .agents__why-act перебивает тон специфичностью.
 }
 
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
@@ -402,14 +357,7 @@
                 {
                 <Panel Title="Агенты" Class="rise rise-3" Flush="true">
                     <MetaContent>
-                        @if (isRunning)
-                        {
-                            <text>@agents.Count в работе · @chart.UpdatedAt.ToLowerInvariant()</text>
-                        }
-                        else
-                        {
-                            <text>торги остановлены</text>
-                        }
+                        <text>@agents.Count в работе · @chart.UpdatedAt.ToLowerInvariant()</text>
                     </MetaContent>
                     <ChildContent>
                         @if (latestTick is null)
@@ -428,26 +376,21 @@
                         }
                         else
                         {
-                            // Решение на тип берём от первого агента типа: внутри типа
-                            // стратегия одна, а объяснение формулирует именно её.
-                            var decisionsByAgent = (latestTick.Decisions ?? [])
-                                .GroupBy(d => d.AgentName, StringComparer.Ordinal)
-                                .ToDictionary(g => g.Key, g => g.Last(), StringComparer.Ordinal);
+                            @* Таблица строится тем же построителем, что и на «Агентах»
+                               (Services/AgentRoster): раньше страница группировала
+                               агентов сама и рисовала строку группы всегда, включая
+                               «×1» — четыре строки «Маркет-мейкер ×1» подряд при
+                               четырёх агентах. Раздел 9.8: группа из одного экземпляра
+                               строки группы не получает, единственный экземпляр
+                               выводится обычной строкой. Пункт 10 docs/ui-backlog.md.
 
-                            var groups = agents
-                                .GroupBy(a => a.Type)
-                                .Select(g => new
-                                {
-                                    Type = g.Key,
-                                    Count = g.Count(),
-                                    Cash = Math.Round(g.Sum(a => a.Cash), 0, MidpointRounding.AwayFromZero),
-                                    Position = Math.Round(g.Sum(a => a.Position), 0, MidpointRounding.AwayFromZero),
-                                    Pnl = Math.Round(g.Sum(a => a.PortfolioValue - a.InitialPortfolioValue), 2, MidpointRounding.AwayFromZero),
-                                    Decision = g
-                                        .Select(a => decisionsByAgent.GetValueOrDefault(a.Name))
-                                        .FirstOrDefault(d => d is not null)
-                                })
-                                .OrderByDescending(g => g.Cash)
+                               «Торги» показывают только верхний уровень — строку типа:
+                               агрегат, когда экземпляров несколько, и сам экземпляр,
+                               когда он один. Разбор по экземплярам живёт на «Агентах»,
+                               и дублировать его здесь незачем (раздел 9.0). *@
+                            var roster = AgentRoster.Build(agents, latestTick.Decisions ?? []);
+                            var rows = roster.Rows
+                                .Where(row => row.Kind == AgentRowKind.Group || row.ShowTypeDot)
                                 .ToArray();
 
                             <div class="agents-wrap">
@@ -462,31 +405,37 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var g in groups)
+                                    @foreach (var row in rows)
                                     {
-                                        <tr>
+                                        <tr @key="row.Title">
                                             <th scope="row" class="agents__c-name">
                                                 <span class="agents__cell">
-                                                <StatusDot Tone="@AgentTone(g.Type)" />
+                                                <StatusDot Tone="@AgentTone(row.Type)" />
                                                 <span class="agents__name">
-                                                    <span class="agents__title">@AgentDisplay.GetTypeLabel(g.Type) ×@g.Count</span>
-                                                    <span class="agents__kind">@Kind(g.Type)</span>
+                                                    <span class="agents__title">@row.Title</span>
+                                                    <span class="agents__kind">@Kind(row.Type)</span>
                                                 </span>
                                                 </span>
                                             </th>
-                                            <td class="agents__c-num num-sm">@Money0(g.Cash)</td>
-                                            <td class="agents__c-num num-sm @DeltaTone(g.Position)">@Position0(g.Position)</td>
-                                            <td class="agents__c-num num-sm @DeltaTone(g.Pnl)">@Pnl2(g.Pnl)</td>
+                                            <td class="agents__c-num num-sm">@Money0(row.Cash)</td>
+                                            <td class="agents__c-num num-sm @DeltaTone(row.Position)">@Position0(row.Position)</td>
+                                            <td class="agents__c-num num-sm @DeltaTone(row.Pnl)">@Pnl2(row.Pnl)</td>
                                             <td class="agents__c-why">
-                                                @if (g.Decision is null)
+                                                @if (row.Action is null && row.Explanation is null)
                                                 {
                                                     <span class="nodata">—</span>
                                                 }
                                                 else
                                                 {
                                                     <span class="agents__why">
-                                                        <span class="agents__why-act @ActionTone(g.Decision.Action)">@ActionLabel(g.Decision.Action)</span>
-                                                        <span class="agents__why-reason" title="@g.Decision.Explanation">@g.Decision.Explanation</span>
+                                                        @if (row.Action is not null)
+                                                        {
+                                                            <span class="agents__why-act">@row.Action</span>
+                                                        }
+                                                        @if (row.Explanation is not null)
+                                                        {
+                                                            <span class="agents__why-reason" title="@row.Explanation">@row.Explanation</span>
+                                                        }
                                                     </span>
                                                 }
                                             </td>
@@ -495,11 +444,15 @@
                                 </tbody>
                                 <tfoot>
                                     <tr>
-                                        <th scope="row" class="agents__c-name">Итого · @agents.Count @Plural(agents.Count, "агент", "агента", "агентов")</th>
-                                        <td class="agents__c-num num-sm">@Money0(groups.Sum(g => g.Cash))</td>
-                                        <td class="agents__c-num num-sm @DeltaTone(groups.Sum(g => g.Position))">@Position0(groups.Sum(g => g.Position))</td>
-                                        <td class="agents__c-num num-sm @DeltaTone(groups.Sum(g => g.Pnl))">@Pnl2(groups.Sum(g => g.Pnl))</td>
-                                        <td class="agents__c-why">@string.Join(" + ", groups.Select(g => g.Count))</td>
+                                        <th scope="row" class="agents__c-name">Итого · @roster.AgentCount @Plural(roster.AgentCount, "агент", "агента", "агентов")</th>
+                                        <td class="agents__c-num num-sm">@Money0(roster.TotalCash)</td>
+                                        <td class="agents__c-num num-sm @DeltaTone(roster.TotalPosition)">@Position0(roster.TotalPosition)</td>
+                                        <td class="agents__c-num num-sm @DeltaTone(roster.TotalPnl)">@Pnl2(roster.TotalPnl)</td>
+                                        @* Текстовая колонка итоговой строки пуста: раздел 9.8
+                                           запрещает служебное перечисление в колонке
+                                           «объяснение», а число агентов уже стоит в
+                                           заголовке строки. Пункт 11 docs/ui-backlog.md. *@
+                                        <td class="agents__c-why"></td>
                                     </tr>
                                 </tfoot>
                             </table>
