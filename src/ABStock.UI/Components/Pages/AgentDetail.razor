@@ -38,8 +38,8 @@
             <Panel Class="rise rise-1">
                 <ChildContent>
                     <EmptyState IconName="users"
-                                Title="Торги не запущены"
-                                Description="Агенты появятся после старта симуляции.">
+                                Title="Агент ещё не торговал"
+                                Description="Сессия не запущена: у агента нет ни сделок, ни позиции, ни результата.">
                         <Action>
                             <AppButton Variant="primary" Href="/trading">Перейти к торгам</AppButton>
                         </Action>
@@ -279,16 +279,16 @@
                     <Panel Title="P/L" Class="rise rise-2">
                         <MetaContent>от стоимости портфеля на входе</MetaContent>
                         <ChildContent>
-                            <div class="kv kv--lead">
+                            <div class="kv-row kv-row--lead">
                                 <span class="kv__key">Общий</span>
                                 <span class="num-lg @DeltaTone(TotalPnl)">@Pnl2(TotalPnl)</span>
                             </div>
                             <div class="kv-group hairline-top">
-                                <div class="kv">
+                                <div class="kv-row">
                                     <span class="kv__key">Реализованный</span>
                                     <span class="num-sm @DeltaTone(Realized)">@Pnl2(Realized)</span>
                                 </div>
-                                <div class="kv">
+                                <div class="kv-row">
                                     <span class="kv__key">Нереализованный</span>
                                     <span class="num-sm @DeltaTone(Unrealized)">@Pnl2(Unrealized)</span>
                                 </div>
@@ -355,15 +355,15 @@
                         <MetaContent><span class="num-sm">@UpdatedAtLabel</span></MetaContent>
                         <ChildContent>
                             <div class="kv-group">
-                                <div class="kv">
+                                <div class="kv-row">
                                     <span class="kv__key">Деньги</span>
                                     <span class="num-sm">@Money0(CurrentCash)</span>
                                 </div>
-                                <div class="kv">
+                                <div class="kv-row">
                                     <span class="kv__key">Позиция</span>
                                     <span class="num-sm @DeltaTone(CurrentPosition)">@Position0(CurrentPosition)</span>
                                 </div>
-                                <div class="kv">
+                                <div class="kv-row">
                                     <span class="kv__key">Стоимость портфеля</span>
                                     <span class="num-sm">@Money0(CurrentPortfolio)</span>
                                 </div>

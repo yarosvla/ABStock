@@ -212,7 +212,7 @@ public sealed class AssetProfileService : IAssetProfileService
             AssetType.Stock => "Акция",
             AssetType.Bond => "Облигация",
             AssetType.Commodity => "Товар",
-            AssetType.Crypto => "Криптоактив",
+            AssetType.Crypto => "Криптовалюта",
             _ => assetType.ToString()
         };
 
