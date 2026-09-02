@@ -9,7 +9,9 @@
 @implements IAsyncDisposable
 @inject ISimulationRunner SimulationRunner
 @inject IAgentStatisticsReader AgentStatisticsReader
+@inject ISimulationHistoryReader SimulationHistoryReader
 @inject IActiveAssetContext ActiveAssetContext
+@inject IAgentEquityHistory EquityHistory
 @inject IJSRuntime JS
 
 <PageTitle>Агент · @InstanceName</PageTitle>
@@ -426,7 +428,19 @@
 
     private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
 
-    private IReadOnlyList<AgentSnapshot> SessionAgents => SimulationRunner.Current?.Agents ?? [];
+    /// <summary>
+    /// Состав сессии: из текущего тика, а когда тиков больше нет — из истории
+    /// прогона. Раннер в finally своего цикла обнуляет Current, и страница,
+    /// читающая только его, после остановки гасла целиком — ни P/L, ни сделок,
+    /// ни капитала, хотя разбирать решения агента приходят как раз после конца
+    /// сессии. «Агенты» это уже пережили (коммит 3fe4516), детальная — нет:
+    /// пункт 89 docs/ui-backlog.md.
+    /// </summary>
+    private IReadOnlyList<AgentSnapshot> SessionAgents =>
+        SimulationRunner.Current?.Agents is { Count: > 0 } agents ? agents : EquityHistory.LastAgents;
+
+    private IReadOnlyList<AgentDecision> SessionDecisions =>
+        SimulationRunner.Current?.Agents is { Count: > 0 } ? SimulationRunner.Current.Decisions : EquityHistory.LastDecisions;
 
     /// <summary>Прогон есть: идущий — или закончившийся, но со сделками агента.</summary>
     private bool HasSession => SessionAgents.Count > 0 || Trades.Count > 0;
@@ -507,7 +521,7 @@
 
     // ── Полоса связи ────────────────────────────────────────────────────────
 
-    private AgentDecision? LastDecision => SimulationRunner.Current?.Decisions
+    private AgentDecision? LastDecision => SessionDecisions
         .LastOrDefault(decision => string.Equals(decision.AgentName, Name, StringComparison.Ordinal));
 
     private string DecisionLabel
@@ -654,12 +668,30 @@
 
     private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
 
+    /// <summary>
+    /// Прогон, о котором страница рассказывает: идущий — или последний
+    /// закончившийся. Раннер обнуляет CurrentRunId в finally своего цикла, и
+    /// отчёт по агенту после остановки запрашивался у пустого идентификатора:
+    /// сделок не находилось, и страница объявляла агента несуществующим.
+    /// </summary>
+    private Guid SessionRunId =>
+        SimulationRunner.CurrentRunId != Guid.Empty ? SimulationRunner.CurrentRunId : EquityHistory.RunId;
+
     private void LoadData()
     {
         var current = SimulationRunner.Current;
-        liveAgent = current?.Agents.FirstOrDefault(a => string.Equals(a.Name, Name, StringComparison.Ordinal));
-        liveLastPrice = current?.Snapshot.LastPrice ?? 0m;
-        report = AgentStatisticsReader.GetReport(SimulationRunner.CurrentRunId, Name);
+        var runId = SessionRunId;
+
+        liveAgent = SessionAgents.FirstOrDefault(a => string.Equals(a.Name, Name, StringComparison.Ordinal));
+        report = AgentStatisticsReader.GetReport(runId, Name);
+
+        // Цена нужна, чтобы переоценить позицию. Пока прогон идёт — из тика;
+        // после остановки — цена закрытия из сводки прогона. Ноль здесь врал бы
+        // сильнее всего: он обнулял бы нереализованный P/L, а не помечал его
+        // неизвестным.
+        liveLastPrice = current?.Snapshot.LastPrice
+            ?? (runId == Guid.Empty ? 0m : SimulationHistoryReader.GetRun(runId)?.LastPrice ?? 0m);
+
         lastUpdate = DateTimeOffset.Now;
     }
 

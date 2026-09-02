@@ -4,6 +4,7 @@
 @inject ISimulationRunner SimulationRunner
 @inject IUserPreferences Preferences
 @inject INotificationFeed NotificationFeed
+@inject IAgentEquityHistory EquityHistory
 
 @* Оболочка приложения — раздел 13. Шапка 56px, стекло (под ней реально
    проезжает контент), нижняя кромка --line-1. Активный раздел — --text-1
@@ -137,7 +138,22 @@
 
     private bool IsNotificationsOpen { get; set; }
     private bool IsTradingActive => SimulationRunner.IsRunning;
-    private string MarketStatusLabel => IsTradingActive ? "Торги активны" : "Торги остановлены";
+
+    /// <summary>
+    /// Три состояния, а не два. До первого запуска торги не «остановлены» —
+    /// их не было, и утверждать обратное значит говорить о прошлом, которого
+    /// не случилось (пункт 95 docs/ui-backlog.md). Артборды «Создания актива»
+    /// показывают здесь «Торги не запущены», и подзаголовок «Агентов» уже
+    /// различает эти два случая — не различала только шапка.
+    ///
+    /// Признак «прогон был» — идентификатор в истории: она заполняется первым
+    /// же тиком и переживает остановку, в отличие от CurrentRunId раннера.
+    /// </summary>
+    private string MarketStatusLabel => IsTradingActive
+        ? "Торги активны"
+        : EquityHistory.RunId == Guid.Empty
+            ? "Торги не запущены"
+            : "Торги остановлены";
     private string Clock => DateTimeOffset.Now.ToString("HH:mm:ss");
 
     /// <summary>

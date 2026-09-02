@@ -14,6 +14,7 @@
 @inject IActiveAssetContext ActiveAssetContext
 @inject ISessionNewsFeed NewsFeed
 @inject ISimulationHistoryReader SimulationHistoryReader
+@inject IAgentEquityHistory EquityHistory
 
 <PageTitle>Торги</PageTitle>
 
@@ -27,7 +28,7 @@
     var spread = Spread;
     var status = Status;
     var trades = RecentTrades;
-    var agents = latestTick?.Agents ?? [];
+    var agents = SessionAgents;
     var isStale = latestTick is not null && (DateTimeOffset.Now - lastChartUpdate).TotalSeconds > 5;
     var startBlocked = !IsCompositionValid;
 
@@ -128,11 +129,11 @@
                         <dl class="kv">
                             <div class="kv__row">
                                 <dt>Сделок</dt>
-                                <dd class="num-sm">@Count0(seenTradeIds.Count)</dd>
+                                <dd class="num-sm">@Count0(SessionTradeCount)</dd>
                             </div>
                             <div class="kv__row">
                                 <dt>Шаг симуляции</dt>
-                                <dd class="num-sm">@(latestTick is null ? "—" : Count0(latestTick.Tick))</dd>
+                                <dd class="num-sm">@(SessionTick is { } tick ? Count0(tick) : "—")</dd>
                             </div>
                             <div class="kv__row">
                                 <dt>Новостей</dt>
@@ -156,13 +157,25 @@
                         }
                         else
                         {
-                            <EmptyState IconName="news"
-                                        Title="Новостей ещё не было"
-                                        Description="Рынок идёт на решениях трендового, контр-трендового агентов и маркет-мейкера. Новостной агент ждёт сигнала.">
-                                <Action>
-                                    <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
-                                </Action>
-                            </EmptyState>
+                            @* Два текста, а не один: при остановленных торгах рынок
+                               никуда не идёт, агентов в работе ноль и ждать сигнала
+                               некому. Пункт 19 docs/ui-backlog.md, раздел 14. *@
+                            @if (isRunning)
+                            {
+                                <EmptyState IconName="news"
+                                            Title="Новостей ещё не было"
+                                            Description="Рынок идёт на решениях трендового, контр-трендового агентов и маркет-мейкера. Новостной агент ждёт сигнала.">
+                                    <Action>
+                                        <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
+                                    </Action>
+                                </EmptyState>
+                            }
+                            else
+                            {
+                                <EmptyState IconName="news"
+                                            Title="Новостей не было"
+                                            Description="Новость вводится во время сессии: сигналу нужен рынок, который на него отреагирует." />
+                            }
                         }
                     </ChildContent>
                 </Panel>
@@ -193,7 +206,10 @@
                         <span class="strip__sep strip--optional" aria-hidden="true"></span>
                         <div class="strip__item strip--optional"><span class="strip__label">мин</span><span class="num-sm">@chart.Low</span></div>
                         <span class="strip__sep" aria-hidden="true"></span>
-                        <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@Count0(snapshot?.Volume ?? 0m)</span></div>
+                        @* Объём известен только из снимка рынка. После остановки снимка нет, а
+                               в сводке прогона объём не хранится — значит «—», а не ноль:
+                               раздел 10, «Нет данных — —. Не „0“, не „N/A“». *@
+                        <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@(snapshot is { } s ? Count0(s.Volume) : "—")</span></div>
                     </div>
                 </section>
 
@@ -352,15 +368,29 @@
                     </Panel>
                 }
 
-                @* Агенты: действие и объяснение — то, ради чего выбрана эта компоновка *@
-                @if (isRunning)
+                @* Агенты: действие и объяснение — то, ради чего выбрана эта компоновка.
+
+                   Только пока торги идут. После остановки центр занимает таблица
+                   состава, готовящая следующий запуск, и вместе они не помещаются
+                   в 1080 — а раздел 9.8 требует, чтобы экран помещался. Артборд 03
+                   показывает после остановки состав, график сессии и счётчики, но не
+                   разбор по агентам: он живёт на «Агентах», которые остановку
+                   переживают (коммит 3fe4516). *@
+                @if (isRunning && agents.Count > 0)
                 {
                 <Panel Title="Агенты" Class="rise rise-3" Flush="true">
                     <MetaContent>
-                        <text>@agents.Count в работе · @chart.UpdatedAt.ToLowerInvariant()</text>
+                        @if (isRunning)
+                        {
+                            <text>@agents.Count в работе · @chart.UpdatedAt.ToLowerInvariant()</text>
+                        }
+                        else
+                        {
+                            <text>@agents.Count @Plural(agents.Count, "агент", "агента", "агентов") · сессия завершена</text>
+                        }
                     </MetaContent>
                     <ChildContent>
-                        @if (latestTick is null)
+                        @if (agents.Count == 0)
                         {
                             <div class="agents__skeleton">
                                 @for (var i = 0; i < 4; i++)
@@ -388,7 +418,7 @@
                                агрегат, когда экземпляров несколько, и сам экземпляр,
                                когда он один. Разбор по экземплярам живёт на «Агентах»,
                                и дублировать его здесь незачем (раздел 9.0). *@
-                            var roster = AgentRoster.Build(agents, latestTick.Decisions ?? []);
+                            var roster = AgentRoster.Build(agents, SessionDecisions);
                             var rows = roster.Rows
                                 .Where(row => row.Kind == AgentRowKind.Group || row.ShowTypeDot)
                                 .ToArray();
@@ -527,16 +557,38 @@
 
                 <Panel Title="Лента сделок" Class="tape-panel rise rise-3" Flush="true">
                     <MetaContent>
-                        @if (trades.Length == 0)
-                        {
-                            <text>нет сделок</text>
-                        }
-                        else
+                        @if (trades.Length > 0)
                         {
                             <text>последние <span class="num-sm">@trades.Length</span></text>
                         }
+                        else if (!isRunning && SessionTick is not null)
+                        {
+                            <text>сессия завершена</text>
+                        }
                     </MetaContent>
                     <ChildContent>
+                        @if (trades.Length == 0)
+                        {
+                            @* Пустое состояние у ленты было единственным, которого не
+                               существовало: при пустом списке оставались заголовок,
+                               мета «нет сделок» и легенда четырёх типов агентов над
+                               пустым прямоугольником в четыреста пикселей высотой.
+                               Пункт 22 docs/ui-backlog.md, раздел 14. *@
+                            @if (isRunning)
+                            {
+                                <EmptyState IconName="activity"
+                                            Title="Сделок пока нет"
+                                            Description="Агенты выставили заявки — сделка появится, как только цены сойдутся." />
+                            }
+                            else
+                            {
+                                <EmptyState IconName="activity"
+                                            Title="Лента пуста"
+                                            Description="Здесь идут сделки текущей сессии. Сделки закончившейся сохранены и видны на странице агента." />
+                            }
+                        }
+                        else
+                        {
                         <div class="tape">
                             <div class="tape__list">
                                 @foreach (var trade in trades)
@@ -563,6 +615,7 @@
                                 <StatusDot Tone="agent-news">Новостной</StatusDot>
                             </div>
                         </div>
+                        }
                     </ChildContent>
                 </Panel>
             </div>
@@ -610,6 +663,33 @@
     private readonly HashSet<string> loadedHistoryTimeframes = [];
     private SimulationRunSummary? currentRunSummary;
     private Guid observedRunId = Guid.Empty;
+    private DateTimeOffset lastSummaryRead = DateTimeOffset.MinValue;
+
+    /// <summary>Как часто перечитывается сводка прогона — как на «Агентах».</summary>
+    private static readonly TimeSpan SummaryRefreshInterval = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Состав сессии: из текущего тика, а когда тиков больше нет — из истории
+    /// прогона. Пункт 13 docs/ui-backlog.md: после остановки страница
+    /// показывала «Сделок 0», «Шаг симуляции —» и пустую таблицу, хотя сессия
+    /// только что шла и в ней были сделки.
+    /// </summary>
+    private IReadOnlyList<AgentSnapshot> SessionAgents =>
+        latestTick?.Agents is { Count: > 0 } agents ? agents : EquityHistory.LastAgents;
+
+    private IReadOnlyList<AgentDecision> SessionDecisions =>
+        latestTick?.Agents is { Count: > 0 } ? latestTick.Decisions ?? [] : EquityHistory.LastDecisions;
+
+    /// <summary>
+    /// Сделок за сессию — из сводки прогона, а не из локального счётчика
+    /// страницы: seenTradeIds считает только то, что увидел ЭТОТ экземпляр
+    /// компонента, и обнуляется при каждом заходе на страницу. Тот же источник,
+    /// что у «Агентов», — иначе две страницы называли бы разные числа.
+    /// </summary>
+    private int SessionTradeCount => currentRunSummary?.TradeCount ?? seenTradeIds.Count;
+
+    /// <summary>Шаг симуляции: из тика, после остановки — из сводки прогона.</summary>
+    private int? SessionTick => latestTick?.Tick ?? currentRunSummary?.TickCount;
 
     private TimeframeSeriesState GetSelectedTimeframeState() => timeframeSeriesStates[selectedTimeframe];
 
@@ -628,8 +708,11 @@
         if (latestTick is not null)
         {
             PrimeFromSnapshot(latestTick, DateTimeOffset.Now);
-            LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
         }
+
+        // Свечи грузятся и когда тика нет: заход на страницу после остановки —
+        // это разбор закончившейся сессии, и график в нём главная панель.
+        LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
 
         // Заход на страницу торги НЕ запускает. Раньше отсюда вызывался
         // EnsureSimulationAsync, и переход по ссылке сам стартовал сессию: из-за
@@ -917,7 +1000,16 @@
 
     private void UpdateRunSummary()
     {
+        // Прогон закончился — раннер обнулил CurrentRunId, и спрашивать сводку
+        // стало не у кого. Идентификатор берётся из истории прогона: она знает,
+        // какому прогону принадлежит её состав, и переживает остановку. Тем же
+        // приёмом это решено на «Агентах» (коммит 3fe4516).
         var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty)
+        {
+            runId = EquityHistory.RunId;
+        }
+
         if (runId == Guid.Empty)
         {
             currentRunSummary = null;
@@ -925,7 +1017,14 @@
             return;
         }
 
-        if (observedRunId == runId && currentRunSummary is not null)
+        // Время старта в сводке неизменно, а число сделок и тиков растёт:
+        // кешировать её на весь прогон нельзя, счётчики замрут на значении
+        // первого тика.
+        var now = DateTimeOffset.Now;
+
+        if (observedRunId == runId
+            && currentRunSummary is not null
+            && now - lastSummaryRead < SummaryRefreshInterval)
         {
             runStartedAt = currentRunSummary.StartedAt.ToLocalTime();
             return;
@@ -933,6 +1032,7 @@
 
         currentRunSummary = SimulationHistoryReader.GetRun(runId);
         observedRunId = runId;
+        lastSummaryRead = now;
 
         if (currentRunSummary is not null)
         {
@@ -1312,7 +1412,15 @@
             return;
         }
 
+        // После остановки CurrentRunId обнулён, но свечи закончившегося прогона
+        // никуда не делись — график обязан показывать разбор сессии, а не
+        // «Нет данных» (пункт 13 docs/ui-backlog.md).
         var runId = SimulationRunner.CurrentRunId;
+        if (runId == Guid.Empty)
+        {
+            runId = EquityHistory.RunId;
+        }
+
         if (runId == Guid.Empty)
         {
             return;
