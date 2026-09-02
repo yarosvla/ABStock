@@ -66,10 +66,18 @@ internal sealed class ProfileAspectMatcher : IAspectMatcher
         var negative = matches.Count(match => match.Kind == NewsFactorKind.Negative);
         var risk = matches.Count(match => match.Kind == NewsFactorKind.Risk);
 
-        // Ключевые слова в счётчики сторон не идут: они говорят «новость про
-        // этот актив», а не «новость его хвалит». В вес — идут: попадание по
-        // теме и есть третий множитель.
-        var score = Math.Min(ScoreBase + ScorePerMatch * matches.Count, ScoreCeiling);
+        // Ключевые слова не идут ни в счётчики сторон, ни в вес. Артборд
+        // «Результат анализа» говорит однозначно: «вес трёх совпавших пунктов
+        // профиля из одиннадцати», и рядом «затронуто 3» — одно и то же число,
+        // а одиннадцать это 4 позитивных + 4 негативных + 3 риска, без
+        // ключевых слов. Считать их в вес значило бы показать «затронуто 1»
+        // рядом с весом, выведенным из трёх.
+        //
+        // Роль ключевых слов другая: они ловят тему, когда ни один пункт
+        // профиля дословно не задет, и тогда вес остаётся базовым — «новость
+        // про этот актив, но ни за, ни против».
+        var touchedProfileItems = positive + negative + risk;
+        var score = Math.Min(ScoreBase + ScorePerMatch * touchedProfileItems, ScoreCeiling);
 
         return new AspectMatchResult(positive, negative, risk, score, matches);
 

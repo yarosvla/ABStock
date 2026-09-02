@@ -81,7 +81,11 @@ public class ProfileAspectMatcherTests
         // шаг 0,2 на пункт — тест держит именно это соотношение.
         var signal = Analyze("Ввод новых генерирующих мощностей, контракты на поставку тепла, энергетика.");
 
-        var expected = 1.5m + 0.2m * signal.Factors.Count;
+        // Ключевые слова в вес не идут: артборд считает «совпавшие пункты
+        // профиля», а это факторы и риски. Иначе на экране «затронуто 1»
+        // стояло бы рядом с весом, выведенным из трёх.
+        var touched = signal.PositiveMatches + signal.NegativeMatches + signal.RiskMatches;
+        var expected = 1.5m + 0.2m * touched;
 
         Assert.Equal(expected, signal.MatchScore);
         Assert.InRange(signal.MatchScore, 1.5m, 2.5m);
