@@ -48,7 +48,7 @@
 .ui-event__badge {
     display: inline-flex;
     align-items: center;
-    height: var(--s-5);
+    height: var(--h-badge);
     padding: 0 var(--s-2);
     border-radius: var(--r-pill);
     font: var(--t-caption);

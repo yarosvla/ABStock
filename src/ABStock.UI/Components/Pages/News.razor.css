@@ -143,6 +143,14 @@ main.news-page ::deep .ui-causality__note {
     font: var(--t-body-sm);
     resize: none;
     overflow-y: auto;
+
+    /* Поле растёт по мере ввода до предела, дальше скроллится внутри себя —
+       раздел 7.1 и артборд 05 «Поле растёт по мере ввода». rows=6 остаётся
+       начальной высотой и запасом: браузер без field-sizing покажет шесть
+       строк и внутренний скролл, то есть прежнее поведение, а не сломанное. */
+    field-sizing: content;
+    min-height: calc(6 * 20px + 2 * var(--s-3));
+    max-height: calc(14 * 20px + 2 * var(--s-3));
 }
 
 .composer__field::placeholder { color: var(--text-4); }

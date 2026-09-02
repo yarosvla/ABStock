@@ -4,6 +4,17 @@
    всё оформление — через var(--...) из design-system.css (DESIGN.md 18.3).
    ============================================================================ */
 
+/* Опорные высоты страницы. Именованными переменными, а не литералами по
+   месту: у каждой есть причина, и она должна лежать рядом с числом
+   (пункт 39 docs/ui-backlog.md). Артборды их не задают — это полы раскладки,
+   ниже которых панели перестают быть читаемыми. */
+.trading-shell,
+.trading-page {
+    --h-workspace-min: 620px;  /* рабочая область не схлопывается на низком окне */
+    --h-chart-min: 360px;      /* график — главная панель экрана (раздел 7) */
+    --h-tape-min: 220px;       /* лента: восемь строк по --h-row-dense плюс шапка */
+}
+
 .trading-shell {
     position: relative;
     z-index: var(--z-content);
@@ -30,7 +41,7 @@
    ============================================================================ */
 .workspace {
     flex: 1;
-    min-height: 620px;
+    min-height: var(--h-workspace-min);
     display: grid;
     grid-template-columns: var(--rail-left) minmax(var(--center-min), 1fr) var(--rail-right);
     gap: var(--gutter);
@@ -151,6 +162,10 @@
 
 .quote__stale { font: var(--t-caption); color: var(--text-3); }
 
+/* Процент — вторая строка дельты (артборды 01, 02, 05). Тон наследуется от
+   .quote__delta: знак у обеих частей один. */
+.quote__percent { color: inherit; }
+
 /* 9.0: строка показателей НИКОГДА не переносится на второй ряд.
    nowrap делает это структурной гарантией, а не пожеланием: если места мало,
    уходят наименее важные метрики (.strip--optional), а не появляется второй ряд. */
@@ -187,7 +202,7 @@
 .chip {
     display: inline-flex;
     align-items: center;
-    height: 22px;
+    height: var(--h-chip);
     padding: 0 var(--s-2);
     border-radius: var(--r-pill);
     background: var(--fill-soft);
@@ -198,7 +213,7 @@
 /* ============================================================================
    График — главная панель экрана
    ============================================================================ */
-.center ::deep .chart-panel { flex: 1; min-height: 360px; }
+.center ::deep .chart-panel { flex: 1; min-height: var(--h-chart-min); }
 .chart-panel__id { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
 
 .chart-body {
@@ -411,7 +426,7 @@
 
 .book__head .label:first-child { flex: 1; }
 .book__c-vol { width: 88px; text-align: right; }
-.book__c-orders { width: 66px; text-align: right; }
+.book__c-orders { width: 64px; text-align: right; }
 
 .book__row {
     position: relative;
@@ -466,7 +481,7 @@
 /* ============================================================================
    Лента сделок — строка 26px, новая строка входит сверху
    ============================================================================ */
-.rail--right ::deep .tape-panel { flex: 1; min-height: 220px; }
+.rail--right ::deep .tape-panel { flex: 1; min-height: var(--h-tape-min); }
 
 .tape {
     height: 100%;
