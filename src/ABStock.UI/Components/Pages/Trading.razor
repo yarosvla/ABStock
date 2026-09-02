@@ -95,13 +95,20 @@
         @* ── PageHeader: H1 + одна строка контекста · до двух действий ───────── *@
         <PageHead Title="Торги">
             <Context>
+                @* Формулировки из артбордов 01–03. Длительность идущей сессии здесь
+                   не повторяется: её показывает чип сессии в шапке, и второе такое же
+                   число рядом — дубль по разделу 9.0 (пункт 31). *@
                 @if (isRunning)
                 {
-                    <text>Сессия идёт <span class="num-sm">@status.Elapsed</span> · агентов в работе <span class="num-sm">@agents.Count</span></text>
+                    <text>Сессия открыта <span class="num-sm">@SessionOpenedAt</span> · агентов в работе <span class="num-sm">@agents.Count</span></text>
+                }
+                else if (SessionTick is not null)
+                {
+                    <text>Сессия закрыта · агентов в работе <span class="num-sm">0</span> · состав задаётся до запуска</text>
                 }
                 else
                 {
-                    <text>Сессия остановлена · состав агентов задаётся до запуска</text>
+                    <text>Торги не запущены · состав агентов задаётся до запуска</text>
                 }
             </Context>
             <Actions>
@@ -268,9 +275,15 @@
                     <div class="quote__price">
                         <div class="num-hero @(isStale ? "is-stale" : null)">@chart.Close <span class="unit">₽</span></div>
                         <div class="quote__delta tone-@Tone(chart.ChangeClass)">
-                            <span class="num-sm">
-                                @(chart.ChangeClass == "positive" ? "↗" : chart.ChangeClass == "negative" ? "↘" : "·") @chart.Change
-                            </span>
+                            @* Пока данных нет, дельты нет тоже: стрелка рядом с прочерком
+                               ничего не значит, а прочерк уже сказал «неизвестно». *@
+                            @if (chart.ChangeAbsolute != "—")
+                            {
+                                <span class="num-sm">
+                                    @(chart.ChangeClass == "positive" ? "↗" : chart.ChangeClass == "negative" ? "↘" : "·") @chart.ChangeAbsolute
+                                </span>
+                                <span class="num-sm quote__percent">@chart.ChangePercent</span>
+                            }
                             @if (isStale)
                             {
                                 <span class="quote__stale">нет обновлений</span>
@@ -340,6 +353,9 @@
                                     <span>К текущей цене</span>
                                 </button>
 
+                                @* Одна формулировка на одно состояние (раздел 17). Раньше здесь стояло
+                                   «Нет данных», а в подвале панели — «Ожидание данных»: одно
+                                   и то же, названное дважды и по-разному (пункт 21). *@
                                 <div class="chart-empty-state">Нет данных</div>
                             </div>
 
@@ -389,7 +405,7 @@
                 @if (!isRunning)
                 {
                     <Panel Title="Состав агентов перед запуском" Class="rise rise-3" Flush="true">
-                        <MetaContent>четыре типа стратегий</MetaContent>
+                        <MetaContent><span class="num-sm">@agentComposition.Length</span> типа стратегий</MetaContent>
                         <ChildContent>
                             <div class="compose-wrap">
                                 <table class="compose">
@@ -851,6 +867,11 @@
             return steps.Length == 0 ? null : steps.Min();
         }
     }
+
+    /// <summary>Время открытия сессии — из сводки прогона.</summary>
+    private string SessionOpenedAt => currentRunSummary is { } summary
+        ? summary.StartedAt.ToLocalTime().ToString("HH:mm")
+        : "—";
 
     /// <summary>Шаг симуляции: из тика, после остановки — из сводки прогона.</summary>
     private int? SessionTick => latestTick?.Tick ?? currentRunSummary?.TickCount;
@@ -1738,19 +1759,12 @@
         SimulationTickResult? tickResult,
         DateTimeOffset updatedAt)
     {
-        var fallbackPrice = tickResult?.Snapshot.LastPrice ?? DemoStartPrice;
+        // Пока свечей нет, показывать нечего: цена, дельта и границы сессии —
+        // прочерки. Раньше здесь стояла демо-цена и литерал «+0.00 (0.00%)» с
+        // точками вместо запятых и плюсом у нуля (пункты 14, 15 и 36).
         if (state.Candles.Count == 0)
         {
-            var fallbackText = FormatPrice(fallbackPrice);
-            return new ChartSummaryData(
-                fallbackText,
-                fallbackText,
-                fallbackText,
-                fallbackText,
-                "+0.00 (0.00%)",
-                "neutral",
-                tickResult is null ? "Торги не запущены" : "Торги запущены",
-                "Ожидание данных");
+            return new ChartSummaryData("—", "—", "—", "—", "—", "—", "neutral", "—");
         }
 
         var sessionOpen = state.Candles[0].Open;
@@ -1759,17 +1773,19 @@
         var sessionLow = state.Candles.Min(candle => candle.Low);
         var change = sessionClose - sessionOpen;
         var percent = sessionOpen == 0m ? 0m : change / sessionOpen * 100m;
-        var sign = change > 0m ? "+" : change < 0m ? "" : "";
         var changeClass = change > 0m ? "positive" : change < 0m ? "negative" : "neutral";
 
+        // Знак ставит Sign(): минус там U+2212, а не дефис из культуры, и ноль
+        // остаётся без знака (раздел 10). Абсолютная часть и процент — двумя
+        // строками, как в артбордах 01, 02 и 05, а не одной строкой в скобках.
         return new ChartSummaryData(
             FormatPrice(sessionOpen),
             FormatPrice(sessionHigh),
             FormatPrice(sessionLow),
             FormatPrice(sessionClose),
-            $"{sign}{FormatPrice(change)} ({sign}{percent:0.00}%)",
+            $"{Sign(change)}{FormatPrice(Math.Abs(change))} ₽",
+            $"{Sign(percent)}{Math.Abs(percent):0.00} %",
             changeClass,
-            tickResult is null ? "Торги не запущены" : "Торги запущены",
             $"Обновлено {updatedAt.ToLocalTime():HH:mm:ss}");
     }
 
@@ -2182,14 +2198,19 @@
         string LiquidityClass,
         string LiquidityDetail);
     private sealed record TradeRow(string Time, string Price, string Volume, string Buyer, string Seller, string SideClass);
+    /// <summary>
+    /// Поля MarketState здесь больше нет: оно не читалось нигде и было третьим
+    /// написанием статуса торгов, который на экране уже назван дважды —
+    /// StatusDot в шапке графика и статус в шапке приложения (пункт 38).
+    /// </summary>
     private sealed record ChartSummaryData(
         string Open,
         string High,
         string Low,
         string Close,
-        string Change,
+        string ChangeAbsolute,
+        string ChangePercent,
         string ChangeClass,
-        string MarketState,
         string UpdatedAt);
     private sealed record ChartSyncPayload(
         string Action,

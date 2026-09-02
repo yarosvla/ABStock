@@ -222,23 +222,6 @@
                    состояниях: шаг полосы несёт короткое действие, развёрнутое
                    объяснение — здесь. До появления новости агент неактивен, и
                    это состояние показывается, а не прячется (раздел 16.4). *@
-                @if (isRunning)
-                {
-                    <Panel Quiet="true" Class="rise rise-2">
-                        <div class="agent-line">
-                            <span class="label agent-line__label">Новостной агент</span>
-                            <StatusDot Tone="agent-news" />
-                            <span class="agent-line__name">@NewsAgentName</span>
-                            <span class="agent-line__state">@AgentStateText</span>
-                            @if (NewsAgent is not null)
-                            {
-                                <span class="agent-line__metric">деньги <span class="num-sm">@Count0(NewsAgent.Cash)</span></span>
-                                <span class="agent-line__metric">позиция <span class="num-sm">@Position0(NewsAgent.Position)</span></span>
-                            }
-                        </div>
-                    </Panel>
-                }
-
                 @if (!isRunning)
                 {
                     @* Состояние: торги не запущены. Новость появляется только
@@ -418,12 +401,31 @@
                         <p class="explanation">@signal.Explanation</p>
                     </Panel>
                 }
+
+                @if (isRunning)
+                {
+                    <Panel Quiet="true" Class="rise rise-2">
+                        <div class="agent-line">
+                            <span class="label agent-line__label">Новостной агент</span>
+                            <StatusDot Tone="agent-news" />
+                            <span class="agent-line__name">@NewsAgentName</span>
+                            <span class="agent-line__state">@AgentStateText</span>
+                            @if (NewsAgent is not null)
+                            {
+                                <span class="agent-line__metric">деньги <span class="num-sm">@Count0(NewsAgent.Cash)</span></span>
+                                <span class="agent-line__metric">позиция <span class="num-sm">@Position0(NewsAgent.Position)</span></span>
+                            }
+                        </div>
+                    </Panel>
+                }
             </div>
 
             @* ─────────── ПРАВЫЙ РЕЛЬС · состояние на сейчас ─────────── *@
             <div class="rail rail--right">
                 <Panel Title="Профиль актива" Class="rise rise-3">
-                    <MetaContent><text>по нему сопоставляется новость</text></MetaContent>
+                    @* Короткая мета: длинная разгоняла шапку панели и ломала заголовок
+                       на две строки — «Профиль / актива» (пункт 72, раздел 9.7). *@
+                    <MetaContent><text>@(signal is null ? "состояние на сейчас" : "на момент сигнала")</text></MetaContent>
                     <ChildContent>
                         <div class="profile">
                             <ZoneScale Value="profile.NewsSensitivity"
