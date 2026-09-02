@@ -1054,7 +1054,7 @@
         var liveEvents = snapshot.RecentTrades
             .Where(trade => processedTradeIds.Add(trade.Id))
             .OrderBy(trade => trade.ExecutedAt)
-            .Select(trade => new LivePriceEvent(trade.ExecutedAt, trade.Price))
+            .Select(trade => new LivePriceEvent(trade.ExecutedAt, trade.Price, trade.Quantity))
             .ToArray();
 
         if (liveEvents.Length == 0)
@@ -1319,7 +1319,7 @@
     {
         var trades = snapshot.RecentTrades
             .OrderBy(trade => trade.ExecutedAt)
-            .Select(trade => new LivePriceEvent(trade.ExecutedAt, trade.Price))
+            .Select(trade => new LivePriceEvent(trade.ExecutedAt, trade.Price, trade.Quantity))
             .ToList();
 
         if (trades.Count > 0)
@@ -1370,7 +1370,7 @@
 
         if (candles.Count == 0)
         {
-            candles.Add(new AggregatedCandle(timestamp, price, price, price, price));
+            candles.Add(new AggregatedCandle(timestamp, price, price, price, price, liveEvent.Quantity));
             return new TimeframeAppendResult(true, true);
         }
 
@@ -1378,6 +1378,12 @@
         if (lastCandle.Timestamp == timestamp)
         {
             var updated = false;
+
+            if (liveEvent.Quantity > 0m)
+            {
+                lastCandle.Volume += liveEvent.Quantity;
+                updated = true;
+            }
 
             if (price != lastCandle.Close)
             {
@@ -1402,7 +1408,7 @@
 
         if (timestamp > lastCandle.Timestamp)
         {
-            candles.Add(new AggregatedCandle(timestamp, price, price, price, price));
+            candles.Add(new AggregatedCandle(timestamp, price, price, price, price, liveEvent.Quantity));
             return new TimeframeAppendResult(true, true);
         }
 
@@ -1410,6 +1416,12 @@
         if (existingCandle is not null)
         {
             var updated = false;
+
+            if (liveEvent.Quantity > 0m)
+            {
+                existingCandle.Volume += liveEvent.Quantity;
+                updated = true;
+            }
 
             if (price != existingCandle.Close)
             {
@@ -1433,13 +1445,14 @@
         }
 
         var insertIndex = candles.FindIndex(candle => candle.Timestamp > timestamp);
+        var created = new AggregatedCandle(timestamp, price, price, price, price, liveEvent.Quantity);
         if (insertIndex < 0)
         {
-            candles.Add(new AggregatedCandle(timestamp, price, price, price, price));
+            candles.Add(created);
         }
         else
         {
-            candles.Insert(insertIndex, new AggregatedCandle(timestamp, price, price, price, price));
+            candles.Insert(insertIndex, created);
         }
 
         return new TimeframeAppendResult(true, false);
@@ -1466,8 +1479,80 @@
             state.Definition.Key,
             forceScrollToRealtime,
             state.Candles.Select(ToChartCandlePoint).ToArray(),
-            null);
+            null,
+            BuildChartMarkers(state));
     }
+
+    /// <summary>
+    /// Отметки на графике: момент каждой новости сессии и сделки новостного
+    /// агента (артборд 02, раздел 11 — «маркеры сделок агента цветом агента»).
+    ///
+    /// Сделки прорежены: не больше одной отметки на свечу. Без прореживания
+    /// сотни сделок складываются в решётку точек, под которой свечей не видно
+    /// вовсе — ровно это видно на детальной агента (пункт 77).
+    ///
+    /// Число маркеров новостей равно числу событий в списке — раздел 10.1
+    /// требует этого прямо.
+    /// </summary>
+    private IReadOnlyList<ChartMarker> BuildChartMarkers(TimeframeSeriesState state)
+    {
+        if (state.Candles.Count == 0)
+        {
+            return [];
+        }
+
+        var interval = state.Definition.Duration;
+        var first = state.Candles[0].Timestamp;
+        var last = state.Candles[^1].Timestamp;
+
+        var markers = new List<ChartMarker>();
+
+        foreach (var entry in NewsFeed.Entries)
+        {
+            var slot = AlignToTimeframe(entry.At, interval);
+            if (slot < first || slot > last)
+            {
+                continue;
+            }
+
+            markers.Add(new ChartMarker(
+                slot.ToUnixTimeSeconds(),
+                "aboveBar",
+                "arrowDown",
+                "rgba(240, 241, 243, 0.42)",
+                Fixed2(entry.ImpactScore)));
+        }
+
+        var seenSlots = new HashSet<long>();
+
+        foreach (var trade in tradeHistory)
+        {
+            if (!IsNewsAgent(trade.BuyerAgentName) && !IsNewsAgent(trade.SellerAgentName))
+            {
+                continue;
+            }
+
+            var slot = AlignToTimeframe(trade.ExecutedAt, interval);
+            if (slot < first || slot > last || !seenSlots.Add(slot.ToUnixTimeSeconds()))
+            {
+                continue;
+            }
+
+            markers.Add(new ChartMarker(
+                slot.ToUnixTimeSeconds(),
+                "belowBar",
+                "circle",
+                "#C08E63",
+                string.Empty));
+        }
+
+        return markers.OrderBy(marker => marker.Time).ToArray();
+    }
+
+    private static bool IsNewsAgent(string agentName) =>
+        agentName.Contains("News", StringComparison.Ordinal);
+
+    private static string Fixed2(decimal value) => value.ToString("F2");
 
     private ChartSyncPayload BuildIncrementalChartSyncPayload(AggregatedCandle candle, bool forceScrollToRealtime)
     {
@@ -1519,21 +1604,20 @@
             $"Обновлено {updatedAt.ToLocalTime():HH:mm:ss}");
     }
 
-    private static ChartCandlePoint ToChartCandlePoint(AggregatedCandle candle)
-    {
-        var isUp = candle.Close > candle.Open;
-        var isDown = candle.Close < candle.Open;
-
-        return new ChartCandlePoint(
+    /// <summary>
+    /// Точка ряда для графика. Цвета здесь больше нет: она задаётся темой
+    /// серии в Trading.razor.js по разделу 11, а страница возила семь
+    /// литеральных hex, которые normalizePoint всё равно выбрасывал. Три из
+    /// них были неоновыми и пришли из доредизайнового app.css (пункт 37).
+    /// </summary>
+    private static ChartCandlePoint ToChartCandlePoint(AggregatedCandle candle) =>
+        new(
             candle.Timestamp.ToUnixTimeSeconds(),
             candle.Open,
             candle.High,
             candle.Low,
             candle.Close,
-            isUp ? "#36D98A" : isDown ? "#FF6B5F" : "#B7C2D5",
-            isUp ? "#36D98A" : isDown ? "#FF6B5F" : "#A1B2CC",
-            isUp ? "#65F1AB" : isDown ? "#FF8A80" : "#D0D9E6");
-    }
+            candle.Volume);
 
     private void LoadPersistedCandles(string timeframeKey, bool forceScrollToRealtime = false)
     {
@@ -1568,7 +1652,8 @@
                 candle.Open,
                 candle.High,
                 candle.Low,
-                candle.Close))
+                candle.Close,
+                candle.Volume))
             .ToArray();
 
         if (persistedCandles.Length == 0)
@@ -1630,11 +1715,15 @@
             existing.High = candle.High;
             existing.Low = candle.Low;
             existing.Close = candle.Close;
+            // Объём из хранилища авторитетнее живого накопления: биржа считает
+            // его по всем сделкам свечи, а страница — только по тем, что успела
+            // увидеть с момента открытия.
+            existing.Volume = candle.Volume;
             return changed;
         }
 
         var insertIndex = state.Candles.FindIndex(item => item.Timestamp > timestamp);
-        var normalized = new AggregatedCandle(timestamp, candle.Open, candle.High, candle.Low, candle.Close);
+        var normalized = new AggregatedCandle(timestamp, candle.Open, candle.High, candle.Low, candle.Close, candle.Volume);
         if (insertIndex < 0)
         {
             state.Candles.Add(normalized);
@@ -1938,27 +2027,48 @@
         string Timeframe,
         bool ForceScrollToRealtime,
         IReadOnlyList<ChartCandlePoint>? Data,
-        ChartCandlePoint? Candle);
+        ChartCandlePoint? Candle,
+        IReadOnlyList<ChartMarker>? Markers = null);
+
+    /// <param name="Position">`aboveBar` или `belowBar` — сторона свечи.</param>
+    /// <param name="Shape">Форма значка библиотеки: `circle`, `arrowDown`.</param>
+    private sealed record ChartMarker(
+        long Time,
+        string Position,
+        string Shape,
+        string Color,
+        string Text);
     private sealed record ChartCandlePoint(
         long Time,
         decimal Open,
         decimal High,
         decimal Low,
         decimal Close,
-        string Color,
-        string BorderColor,
-        string WickColor);
-    private sealed record LivePriceEvent(DateTimeOffset Timestamp, decimal Price);
+        decimal Volume);
+    /// <param name="Quantity">
+    /// Количество сделки. У синтетических событий — бутстрап ряда и «цена
+    /// сдвинулась, а сделки не было» — оно честно нулевое: объём в такой
+    /// свече не появился, и подставлять туда правдоподобное число значило бы
+    /// нарисовать оборот, которого не случилось (раздел 10.1).
+    /// </param>
+    private sealed record LivePriceEvent(DateTimeOffset Timestamp, decimal Price, decimal Quantity = 0m);
     private sealed record TimeframeAppendResult(bool Changed, bool CreatedNewBar);
     private sealed class AggregatedCandle
     {
-        public AggregatedCandle(DateTimeOffset timestamp, decimal open, decimal high, decimal low, decimal close)
+        public AggregatedCandle(
+            DateTimeOffset timestamp,
+            decimal open,
+            decimal high,
+            decimal low,
+            decimal close,
+            decimal volume = 0m)
         {
             Timestamp = timestamp;
             Open = open;
             High = high;
             Low = low;
             Close = close;
+            Volume = volume;
         }
 
         public DateTimeOffset Timestamp { get; set; }
@@ -1966,6 +2076,9 @@
         public decimal High { get; set; }
         public decimal Low { get; set; }
         public decimal Close { get; set; }
+
+        /// <summary>Оборот свечи — сумма количеств сделок, попавших в её интервал.</summary>
+        public decimal Volume { get; set; }
     }
 
     private sealed class TimeframeSeriesState

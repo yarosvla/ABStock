@@ -83,6 +83,7 @@ function normalizePayload(payload) {
         timeframe: payload.timeframe ?? payload.Timeframe ?? "30s",
         forceScrollToRealtime: payload.forceScrollToRealtime ?? payload.ForceScrollToRealtime ?? false,
         data: payload.data ?? payload.Data ?? null,
+        markers: payload.markers ?? payload.Markers ?? null,
         candle: payload.candle ?? payload.Candle ?? null
     };
 }
@@ -92,14 +93,28 @@ function normalizePoint(point) {
         return null;
     }
 
-    // Цвет свечи задаётся темой серии (раздел 11), а не полями точки:
-    // payload несёт наследные значения, которые палитре не соответствуют.
+    // Цвет свечи задаётся темой серии (раздел 11), а не полями точки.
     return {
         time: toLocalChartTime(point.time ?? point.Time),
         open: point.open ?? point.Open,
         high: point.high ?? point.High,
         low: point.low ?? point.Low,
-        close: point.close ?? point.Close
+        close: point.close ?? point.Close,
+        volume: point.volume ?? point.Volume ?? 0
+    };
+}
+
+// Объём — гистограмма внизу холста, те же цвета свечи с alpha 0.30
+// (DESIGN.md 11). Цвет столбика задаётся точкой, а не темой серии: он зависит
+// от направления свечи, а у гистограммы нет понятия up/down.
+const VOLUME_UP = "rgba(63, 163, 122, 0.30)";
+const VOLUME_DOWN = "rgba(210, 85, 95, 0.30)";
+
+function toVolumePoint(point) {
+    return {
+        time: point.time,
+        value: point.volume,
+        color: point.close >= point.open ? VOLUME_UP : VOLUME_DOWN
     };
 }
 
@@ -329,6 +344,7 @@ function ensureViewport(controller, { forceScrollToRealtime = false, fitContent 
 function replaceData(controller, data, forceScrollToRealtime, fitContent) {
     controller.data = data;
     controller.series.setData(data);
+    controller.volumeSeries.setData(data.map(toVolumePoint));
     updateEmptyState(controller);
     refreshLegend(controller);
 
@@ -340,6 +356,8 @@ function replaceData(controller, data, forceScrollToRealtime, fitContent) {
 
 function upsertPoint(controller, point) {
     const lastPoint = controller.data.length > 0 ? controller.data[controller.data.length - 1] : null;
+
+    controller.volumeSeries.update(toVolumePoint(point));
 
     if (lastPoint && lastPoint.time === point.time) {
         controller.data[controller.data.length - 1] = point;
@@ -484,10 +502,25 @@ export function register(root) {
         lastValueVisible: true
     });
 
+    // Гистограмма объёма занимает нижние ~16 % холста и живёт на своей ценовой
+    // шкале: общая с ценой шкала сплющила бы свечи (DESIGN.md 11).
+    const volumeSeries = chart.addHistogramSeries({
+        priceScaleId: "volume",
+        priceLineVisible: false,
+        lastValueVisible: false,
+        priceFormat: { type: "volume" }
+    });
+
+    chart.priceScale("volume").applyOptions({
+        scaleMargins: { top: 0.84, bottom: 0 },
+        borderVisible: false
+    });
+
     const controller = {
         root,
         chart,
         series,
+        volumeSeries,
         surface,
         legend: root.querySelector(".chart-hover-legend"),
         emptyState: root.querySelector(".chart-empty-state"),
@@ -550,6 +583,21 @@ export function sync(root, payload) {
 
     const timeframeChanged = controller.currentTimeframe !== normalized.timeframe;
     applyTimeframeOptions(controller, normalized.timeframe);
+
+    // Момент новости и сделки новостного агента. Библиотека умеет ставить
+    // значок у свечи, но не вертикальную линию через холст: артборд 02 рисует
+    // пунктир, и это расхождение записано в бэклог осознанно — рисовать
+    // собственный слой поверх боевого графика значит завести второй график,
+    // который разъедется с первым при первом же зуме.
+    if (Array.isArray(normalized.markers)) {
+        controller.series.setMarkers(normalized.markers.map(marker => ({
+            time: toLocalChartTime(marker.time ?? marker.Time),
+            position: marker.position ?? marker.Position,
+            shape: marker.shape ?? marker.Shape,
+            color: marker.color ?? marker.Color,
+            text: marker.text ?? marker.Text ?? ""
+        })));
+    }
 
     if (normalized.action === "update" && normalized.candle) {
         const point = normalizePoint(normalized.candle);
