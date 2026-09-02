@@ -232,8 +232,16 @@ h3 { font: var(--t-h3); }
 .num-hero { font: var(--n-hero); font-variant-numeric: tabular-nums; color: var(--text-1); letter-spacing: -0.02em; }
 .num-lg   { font: var(--n-lg); font-variant-numeric: tabular-nums; color: var(--text-1); letter-spacing: -0.01em; }
 .num-sm   { font: var(--n-sm); font-variant-numeric: tabular-nums; }
+/* .num-xs объявлялся тремя страницами по отдельности, и кто забывал — получал
+   тикающее число шрифтом интерфейса вместо моноширинного: разряды дёргались
+   каждую секунду. Пункты 4 и 5 docs/ui-backlog.md. */
+.num-xs   { font: var(--n-xs); font-variant-numeric: tabular-nums; }
 .label    { font: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
 .up { color: var(--up-500); } .down { color: var(--down-500); }
+
+/* Прочерк на месте отсутствующего значения — раздел 10: «Нет данных — —
+   (--text-4). Не „0“, не „N/A“». Объявлялся тремя страницами дословно. */
+.nodata { color: var(--text-4); }
 
 /* ============================================================================
    СЛУЖЕБНЫЕ СТРАНИЦЫ — «не найдена» и «ошибка».

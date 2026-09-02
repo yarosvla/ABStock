@@ -204,4 +204,3 @@
 .notif__body strong { font: var(--t-body-sm); font-weight: 500; color: var(--text-1); }
 .notif__body p { margin: 0; font: var(--t-caption); color: var(--text-3); }
 .notif__time { color: var(--text-4); }
-.num-xs { font: var(--n-xs); font-variant-numeric: tabular-nums; }
