@@ -891,7 +891,16 @@
         }
 
         var grid = candles.Select(candle => candle.Time).ToArray();
-        var markers = new List<TradeMarker>(Trades.Count);
+
+        // Не больше одной отметки на свечу и сторону. Без прореживания сотни
+        // сделок складываются в решётку точек, под которой свечей не видно
+        // вовсе: у трендового агента их бывает за две минуты больше двухсот
+        // (пункт 77 docs/ui-backlog.md). График — главная панель экрана
+        // (раздел 9.11), и отметки не должны его закрывать.
+        //
+        // Выбранная сделка своей отметки не теряет никогда: она вытесняет
+        // соседку по слоту, иначе клик по строке ленты подсвечивал бы пустоту.
+        var chosen = new Dictionary<(long Slot, bool IsBuy), TradeMarker>();
 
         for (var index = 0; index < Trades.Count; index++)
         {
@@ -906,15 +915,21 @@
 
             slot = Math.Clamp(slot, 0, grid.Length - 1);
 
-            markers.Add(new TradeMarker(
-                grid[slot],
-                index,
-                trade.Side == OrderSide.Buy,
-                trade.Price,
-                trade.Quantity));
+            var isBuy = trade.Side == OrderSide.Buy;
+            var key = (grid[slot], isBuy);
+            var marker = new TradeMarker(grid[slot], index, isBuy, trade.Price, trade.Quantity);
+
+            if (!chosen.TryGetValue(key, out var existing) || index == ActiveTrade)
+            {
+                chosen[key] = marker;
+            }
+            else if (existing.Index == ActiveTrade)
+            {
+                // Слот уже занят выбранной — она сильнее любой соседки.
+            }
         }
 
-        return markers;
+        return chosen.Values.OrderBy(marker => marker.Time).ThenBy(marker => marker.Index).ToList();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
