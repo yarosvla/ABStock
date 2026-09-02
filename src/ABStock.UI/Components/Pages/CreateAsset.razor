@@ -447,16 +447,14 @@
     private const int MinDescriptionLength = 120;
     private const int MaxDescriptionLength = 1200;
 
-    // Диапазон подписан на экране и размечен зонами: 0,45 · 0,60 · 0,75 · 0,95.
-    private const decimal SensitivityMin = 0.45m;
-    private const decimal SensitivityMax = 0.95m;
+    // Диапазон и зоны — общие: Services/SensitivityScale. Ту же шкалу
+    // размечают «Новости» и «Торги», и разъехавшаяся разметка означала бы,
+    // что на одном экране 0,70 «средняя», а на другом «высокая».
+    private const decimal SensitivityMin = SensitivityScale.Min;
+    private const decimal SensitivityMax = SensitivityScale.Max;
 
     private static readonly ZoneScale.Zone[] SensitivityZones =
-    [
-        new("низкая", 0.60m),
-        new("средняя", 0.75m),
-        new("высокая", SensitivityMax)
-    ];
+        SensitivityScale.Zones.Select(zone => new ZoneScale.Zone(zone.Name, zone.To)).ToArray();
 
     private static readonly AssetTypeOption[] AssetTypes =
     [
@@ -640,17 +638,7 @@
     {
         get
         {
-            var value = profile?.NewsSensitivity ?? SensitivityMin;
-
-            foreach (var zone in SensitivityZones)
-            {
-                if (value < zone.To)
-                {
-                    return zone.Name;
-                }
-            }
-
-            return SensitivityZones[^1].Name;
+            return SensitivityScale.Word(profile?.NewsSensitivity ?? SensitivityMin);
         }
     }
 

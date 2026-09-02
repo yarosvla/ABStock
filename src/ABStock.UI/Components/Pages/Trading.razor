@@ -104,9 +104,12 @@
                 }
             </Context>
             <Actions>
-                <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
+                @* «Добавить новость» — только при идущей сессии: новость вводится
+                   «в любой момент ПОСЛЕ старта» (раздел 16.3), а при остановленных
+                   торгах вводить её некуда. Артборд 03 показывает одно действие. *@
                 @if (isRunning)
                 {
+                    <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
                     <AppButton Variant="primary" OnClick="SimulationRunner.StopAsync">Остановить торги</AppButton>
                 }
                 else
@@ -123,27 +126,90 @@
 
             @* ─────────── ЛЕВЫЙ РЕЛЬС ─────────── *@
             <div class="rail rail--left">
-                <Panel Title="Сессия" Class="rise rise-1">
-                    <MetaContent><span class="num-sm">@CurrentAsset.Symbol</span></MetaContent>
-                    <ChildContent>
-                        <dl class="kv">
-                            <div class="kv__row">
-                                <dt>Сделок</dt>
-                                <dd class="num-sm">@Count0(SessionTradeCount)</dd>
-                            </div>
-                            <div class="kv__row">
-                                <dt>Шаг симуляции</dt>
-                                <dd class="num-sm">@(SessionTick is { } tick ? Count0(tick) : "—")</dd>
-                            </div>
-                            <div class="kv__row">
-                                <dt>Новостей</dt>
-                                <dd class="num-sm">@Count0(NewsFeed.Entries.Count)</dd>
-                            </div>
-                        </dl>
-                    </ChildContent>
-                </Panel>
+                @* После остановки левый рельс меняется по артборду 03: профиль актива
+                   и итоги закончившейся сессии вместо счётчиков идущей. Раздел 13
+                   закрепил за левым рельсом хронологию, и она остаётся ниже — панель
+                   «События сессии» никуда не уходит. *@
+                @if (isRunning)
+                {
+                    <Panel Title="Сессия" Class="rise rise-1">
+                        <MetaContent><span class="num-sm">@CurrentAsset.Symbol</span></MetaContent>
+                        <ChildContent>
+                            <dl class="kv">
+                                <div class="kv__row">
+                                    <dt>Сделок</dt>
+                                    <dd class="num-sm">@Count0(SessionTradeCount)</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Шаг симуляции</dt>
+                                    <dd class="num-sm">@(SessionTick is { } tick ? Count0(tick) : "—")</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Новостей</dt>
+                                    <dd class="num-sm">@Count0(NewsFeed.Entries.Count)</dd>
+                                </div>
+                            </dl>
+                        </ChildContent>
+                    </Panel>
+                }
+                else
+                {
+                    <Panel Title="Актив" Class="rise rise-1">
+                        <MetaContent>один в сессии</MetaContent>
+                        <ChildContent>
+                            <dl class="kv">
+                                <div class="kv__row">
+                                    <dt>Название</dt>
+                                    <dd>@CurrentAsset.Draft.Name</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Тикер</dt>
+                                    <dd class="num-sm">@CurrentAsset.Symbol</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Сектор</dt>
+                                    <dd>@(string.IsNullOrWhiteSpace(CurrentAsset.Draft.Industry) ? "—" : CurrentAsset.Draft.Industry)</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Чувствительность к новостям</dt>
+                                    <dd>@SensitivityScale.Word(CurrentAsset.Profile.NewsSensitivity)</dd>
+                                </div>
+                            </dl>
+                            @* «Стартовая цена» из артборда 03 здесь НЕ показана: на этом же
+                               экране она стоит в строке показателей как «откр», и раздел 9.0
+                               называет такой дубль поимённо — «цена открытия — строке
+                               показателей, а не панели сессии». *@
+                            <p class="rail__note">Профиль задан при создании актива и в сессии не меняется</p>
+                        </ChildContent>
+                    </Panel>
+
+                    <Panel Title="Завершённая сессия" Class="rise rise-1">
+                        <MetaContent>итоги</MetaContent>
+                        <ChildContent>
+                            <dl class="kv">
+                                <div class="kv__row">
+                                    <dt>Длительность</dt>
+                                    <dd class="num-sm">@SessionDuration</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Сделок</dt>
+                                    <dd class="num-sm">@Count0(SessionTradeCount)</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Шаг симуляции</dt>
+                                    <dd class="num-sm">@(SessionTick is { } tick ? Count0(tick) : "—")</dd>
+                                </div>
+                                <div class="kv__row">
+                                    <dt>Новостей</dt>
+                                    <dd class="num-sm">@Count0(NewsFeed.Entries.Count)</dd>
+                                </div>
+                            </dl>
+                        </ChildContent>
+                    </Panel>
+                }
 
                 <Panel Title="События сессии" Class="rise rise-2" Flush="true">
+                    <MetaContent><span class="num-sm">@Count0(NewsFeed.Entries.Count)</span></MetaContent>
                     <ChildContent>
                         @if (NewsFeed.Entries.Count > 0)
                         {
@@ -196,6 +262,13 @@
                             {
                                 <span class="quote__stale">нет обновлений</span>
                             }
+                            else if (!isRunning && SessionTick is not null)
+                            {
+                                @* Артборд 03 подписывает герой-число словами. «закр» отдельной
+                                   метрикой в строку не добавлен: он равен герою, а раздел 9.0
+                                   запрещает показывать одну метрику дважды на экране. *@
+                                <span class="quote__stale">цена закрытия</span>
+                            }
                         </div>
                     </div>
 
@@ -210,6 +283,11 @@
                                в сводке прогона объём не хранится — значит «—», а не ноль:
                                раздел 10, «Нет данных — —. Не „0“, не „N/A“». *@
                         <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@(snapshot is { } s ? Count0(s.Volume) : "—")</span></div>
+                        @if (TradesPerMinute is { } rate)
+                        {
+                            <span class="strip__sep" aria-hidden="true"></span>
+                            <div class="strip__item"><span class="strip__label">сделок в минуту</span><span class="num-sm">@Count0(rate)</span></div>
+                        }
                     </div>
                 </section>
 
@@ -277,6 +355,7 @@
                                             <th scope="col" class="label compose__c-count">Количество</th>
                                             <th scope="col" class="label compose__c-cap">Капитал агента, ₽</th>
                                             <th scope="col" class="label compose__c-total">Всего капитала</th>
+                                            <th scope="col" class="label compose__c-why">Поведение</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -295,10 +374,7 @@
                                                 <th scope="row" class="compose__c-type">
                                                     <span class="compose__cell">
                                                         <StatusDot Tone="@AgentTone(row.Type)" />
-                                                        <span class="compose__type">
-                                                            <span class="compose__type-name">@typeLabel</span>
-                                                            <span class="compose__type-why" title="@row.Behaviour">@row.Behaviour</span>
-                                                        </span>
+                                                        <span class="compose__type-name">@typeLabel</span>
                                                     </span>
                                                 </th>
                                                 <td class="compose__c-count">
@@ -328,6 +404,7 @@
                                                     }
                                                 </td>
                                                 <td class="compose__c-total num-sm">@Money0(row.TotalCapital)</td>
+                                                <td class="compose__c-why" title="@row.Behaviour">@row.Behaviour</td>
                                             </tr>
                                         }
                                     </tbody>
@@ -337,32 +414,34 @@
                                             <td class="compose__c-count num-sm">@TotalAgentCount</td>
                                             <td class="compose__c-cap"></td>
                                             <td class="compose__c-total num-sm">@Money0(TotalCompositionCapital)</td>
+                                            @* Примечание стоит в колонке «Поведение» итоговой строки — так в
+                                               артборде 03. Предупреждения валидации туда не уезжают: они не
+                                               про колонку, а про весь состав, и остаются строкой под таблицей. *@
+                                            <td class="compose__c-why">
+                                                @if (TotalAgentCount >= MinTotalAgents && TotalAgentCount <= MaxTotalAgents)
+                                                {
+                                                    <text>Новостной агент активируется после первой новости в сессии</text>
+                                                }
+                                            </td>
                                         </tr>
                                     </tfoot>
                                 </table>
 
                                 @* Строка относится ко всему составу, а не к колонке,
                                    поэтому стоит под таблицей, а не в ячейке подвала. *@
-                                <p class="compose__note">
-                                    @if (TotalAgentCount < MinTotalAgents)
-                                    {
+                                @if (TotalAgentCount < MinTotalAgents || TotalAgentCount > MaxTotalAgents)
+                                {
+                                    <p class="compose__note">
                                         <span class="compose__warn">
                                             <Icon Name="alert" Size="14" />
-                                            <span>Нужен хотя бы один агент</span>
+                                            <span>
+                                                @(TotalAgentCount < MinTotalAgents
+                                                    ? "Нужен хотя бы один агент"
+                                                    : $"Не больше {MaxTotalAgents} агентов в сессии")
+                                            </span>
                                         </span>
-                                    }
-                                    else if (TotalAgentCount > MaxTotalAgents)
-                                    {
-                                        <span class="compose__warn">
-                                            <Icon Name="alert" Size="14" />
-                                            <span>Не больше @MaxTotalAgents агентов в сессии</span>
-                                        </span>
-                                    }
-                                    else
-                                    {
-                                        <text>Новостной агент активируется после первой новости в сессии</text>
-                                    }
-                                </p>
+                                    </p>
+                                }
                             </div>
                         </ChildContent>
                     </Panel>
@@ -498,18 +577,23 @@
             <div class="rail rail--right">
 
                 <Panel Title="Стакан заявок" Class="rise rise-2" Flush="true">
+                    <MetaContent>
+                        @* Шаг агрегации уровней: цены в стакане округляются именно по нему
+                           (раздел 11), и до сих пор он на экране не назывался нигде. *@
+                        @if (BookStep is { } step)
+                        {
+                            <text>шаг <span class="num-sm">@FormatPrice(step)</span></text>
+                        }
+                    </MetaContent>
                     <ChildContent>
                         @if (!isRunning && latestTick is null)
                         {
+                            @* Кнопки запуска здесь нет: она стоит в шапке страницы, экран
+                               помещается целиком, и раздел 17 запрещает дублировать
+                               основное действие сверху и снизу. Пункт 18. *@
                             <EmptyState IconName="book"
                                         Title="Заявок нет"
-                                        Description="Торги остановлены — агенты сняли открытые заявки. Стакан наполнится после запуска сессии.">
-                                <Action>
-                                    <AppButton Variant="primary" Icon="play"
-                               Disabled="startBlocked"
-                               OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
-                                </Action>
-                            </EmptyState>
+                                        Description="Торги остановлены — агенты сняли открытые заявки. Стакан наполнится после запуска сессии." />
                         }
                         else
                         {
@@ -549,6 +633,13 @@
                                             <span class="num-sm book__c-orders">@row.Orders</span>
                                         </div>
                                     }
+                                </div>
+
+                                @* Лучшие цены обеих сторон — подвал стакана (артборды 01–03).
+                                   Раздел 9.0: bid и ask принадлежат стакану, и это их место. *@
+                                <div class="book__best hairline-top">
+                                    <span>лучший bid <span class="num-sm tone-up">@(book.BestBid is { } bb2 ? FormatPrice(bb2) : "—")</span></span>
+                                    <span>ask <span class="num-sm tone-down">@(book.BestAsk is { } ba2 ? FormatPrice(ba2) : "—")</span></span>
                                 </div>
                             </div>
                         }
@@ -688,8 +779,47 @@
     /// </summary>
     private int SessionTradeCount => currentRunSummary?.TradeCount ?? seenTradeIds.Count;
 
+    /// <summary>
+    /// Сделок в минуту за сессию. Шаг симуляции — секунда, значит число тиков
+    /// это секунды прогона. Пока тиков меньше минуты, показывать нечего:
+    /// «120 сделок в минуту» на десяти секундах — экстраполяция, а не измерение.
+    /// </summary>
+    private decimal? TradesPerMinute => currentRunSummary is { TickCount: >= 60 } summary
+        ? Math.Round(summary.TradeCount * 60m / summary.TickCount, 0, MidpointRounding.AwayFromZero)
+        : null;
+
+    /// <summary>Шаг агрегации уровней стакана — разница соседних отображаемых цен.</summary>
+    private decimal? BookStep
+    {
+        get
+        {
+            var prices = latestTick?.OrderBook.Asks
+                .Select(level => level.Price)
+                .OrderBy(price => price)
+                .ToArray() ?? [];
+
+            if (prices.Length < 2)
+            {
+                return null;
+            }
+
+            var steps = prices.Zip(prices.Skip(1), (a, b) => b - a).Where(step => step > 0m).ToArray();
+            return steps.Length == 0 ? null : steps.Min();
+        }
+    }
+
     /// <summary>Шаг симуляции: из тика, после остановки — из сводки прогона.</summary>
     private int? SessionTick => latestTick?.Tick ?? currentRunSummary?.TickCount;
+
+    /// <summary>
+    /// Длительность закончившейся сессии. Времени окончания в сводке прогона
+    /// нет, но шаг симуляции — ровно секунда (CreateSessionConfig), поэтому
+    /// число тиков и есть длительность в секундах. Выдумывать её из разницы
+    /// «сейчас минус старт» нельзя: страницу могли открыть через час.
+    /// </summary>
+    private string SessionDuration => currentRunSummary is { TickCount: > 0 } summary
+        ? TimeSpan.FromSeconds(summary.TickCount).ToString(@"hh\:mm\:ss")
+        : "—";
 
     private TimeframeSeriesState GetSelectedTimeframeState() => timeframeSeriesStates[selectedTimeframe];
 

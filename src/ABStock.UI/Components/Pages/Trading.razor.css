@@ -98,6 +98,14 @@
 }
 
 .kv__row:last-child { border-bottom: 0; }
+
+/* Примечание под списком «ключ · значение» — относится ко всей панели, а не к
+   строке, поэтому стоит под списком, а не в ячейке (артборд 03). */
+.rail__note {
+    margin: var(--s-3) 0 0;
+    font: var(--t-caption);
+    color: var(--text-3);
+}
 .kv dt { font: var(--t-caption); color: var(--text-3); }
 .kv dd { margin: 0; color: var(--text-1); }
 .unit { color: var(--text-3); }
@@ -151,8 +159,13 @@
 .strip__item { flex: none; }
 
 /* макс и мин читаются с графика; откр держит дельту, объём обязателен
-   по разделу 16.2 — поэтому в тесноте уходят первые два. */
-@media (max-width: 1599px) {
+   по разделу 16.2 — поэтому в тесноте уходят первые два.
+
+   Порог — --bp-md (1440), а не выдуманные 1600: раздел 8 требует, чтобы
+   брейкпоинты были токенами, а 1599 не выводился ни из --bp-md, ни из
+   --bp-sm, ни из макета. На 1440 центру хватает места на все метрики.
+   Пункт 30 docs/ui-backlog.md. */
+@media (max-width: 1439px) {
     .strip--optional { display: none; }
 }
 
@@ -295,17 +308,23 @@
 .agents tbody tr:hover { background: var(--gph-750); }
 .agents td, .agents tbody th { height: var(--h-row-tall); padding: 0; vertical-align: middle; }
 
-.agents__c-name { width: 200px; }
-.agents__c-num { width: 130px; text-align: right; }
+/* Колонка объяснения не должна схлопываться: она — причина этой компоновки.
+   Ужимаются имя и числа, а не объяснение.
+
+   Порог — --bp-sm (1280), а не 1440. Прежние 200/130 не помещались уже на
+   1440: заголовку «Действие и объяснение» оставалось 134px, и он переносился
+   на три строки, разгоняя шапку с 28 до 42,5 (раздел 9.8 требует --h-thead).
+   Прежний литерал 1599 это скрывал — он и включал узкий набор на 1440. Теперь
+   узкий набор базовый, а ниже --bp-sm колонки ужимаются ещё раз. */
+.agents__c-name { width: 164px; }
+.agents__c-num { width: 92px; text-align: right; }
 .agents td.agents__c-why,
 .agents th.agents__c-why,
 .agents tfoot .agents__c-why { padding-left: var(--s-6); min-width: 0; }
 
-/* Колонка объяснения не должна схлопываться: она — причина этой компоновки.
-   На узких экранах ужимаются имя и числа, а не объяснение. */
-@media (max-width: 1599px) {
-    .agents__c-name { width: 164px; }
-    .agents__c-num { width: 92px; }
+@media (max-width: 1279px) {
+    .agents__c-name { width: 140px; }
+    .agents__c-num { width: 84px; }
     .agents td.agents__c-why,
     .agents th.agents__c-why,
     .agents tfoot .agents__c-why { padding-left: var(--s-4); }
@@ -417,6 +436,18 @@
 
 .book__spread .num-sm { color: var(--text-2); }
 
+/* Подвал стакана — лучшие цены обеих сторон (артборды 01–03). */
+.book__best {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--h-thead);
+    margin-top: var(--s-2);
+    padding-top: var(--s-2);
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
 /* ============================================================================
    Лента сделок — строка 26px, новая строка входит сверху
    ============================================================================ */
@@ -484,6 +515,9 @@
 .compose thead th.compose__c-cap,
 .compose thead th.compose__c-total { text-align: right; }
 
+/* Текстовая колонка — по левому краю, и заголовок вместе с ней (раздел 9.8). */
+.compose thead th.compose__c-why { text-align: left; }
+
 .compose tbody tr { border-bottom: 1px solid var(--line-1); }
 .compose td, .compose tbody th { height: var(--h-row-tall); padding: 0; vertical-align: middle; }
 .compose tbody th { text-align: left; font-weight: inherit; color: var(--text-1); }
@@ -493,30 +527,46 @@
 .compose tbody tr.is-off th { color: var(--text-4); }
 .compose tbody tr.is-off .compose__c-total { color: var(--text-4); }
 
-/* Тип забирает остаток ширины: у трёх числовых колонок он фиксированный,
-   и на 1440 «Поведение» отдельной колонкой схлопывалось в ноль, а строка
-   вырастала до 97px. Объяснение переехало второй строкой под тип — тот же
-   приём, что в таблице агентов ниже, и ровно тот случай, под который в
-   разделе 8 заведён --h-row-tall. */
-.compose__c-type { width: auto; }
+/* Пять колонок по артборду 03. Раньше «Поведение» стояло второй строкой под
+   именем типа: колонка схлопывалась в ноль, потому что остаток ширины забирал
+   себе тип (width: auto), а не она. Теперь наоборот — фиксированы ТИП и три
+   числовые, остаток достаётся «Поведению». Пункт 35 docs/ui-backlog.md.
+
+   «Всего капитала» расширено со 108 до 120: на 11px в верхнем регистре с
+   трекингом +0.06em заголовок в 108 не помещался и переносился на вторую
+   строку, разгоняя шапку выше --h-thead (пункт 34). */
+.compose__c-type { width: 132px; }
 .compose__c-count { width: 88px; text-align: right; }
 .compose__c-cap { width: 152px; text-align: right; }
-.compose__c-total { width: 108px; text-align: right; }
+.compose__c-total { width: 120px; text-align: right; }
 
-.compose__cell { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
-.compose__c-total { color: var(--text-1); }
-
-.compose__type { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.compose__type-name { color: var(--text-1); white-space: nowrap; }
-
-/* Объяснение — ровно одна строка, полный текст по наведению. */
-.compose__type-why {
+/* Остаток ширины и обрезка с многоточием: полный текст — по наведению.
+   Между последней числовой колонкой и текстовой — зазор не меньше --s-4
+   (раздел 9.8), иначе число упирается в текст. */
+/* width: auto в таблице с table-layout: fixed отдаёт колонке ОСТАТОК ширины —
+   этого достаточно. max-width: 0 здесь стоять не должен: в фиксированной
+   таблице он схлопывает колонку в ноль, и текст вываливается поверх соседней
+   вместо того, чтобы обрезаться. */
+.compose__c-why {
+    width: auto;
     font: var(--t-caption);
     color: var(--text-3);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* Зазор до текстовой колонки задаётся селектором с ЯЧЕЙКОЙ, иначе не
+   применяется: базовое `.compose td { padding: 0 }` даёт (0,2,1), а правило
+   колонки — (0,1,1), и колонка проигрывает. Ровно так же не работали
+   выравнивание и рыночный цвет на «Агентах» (пункты 73 и 98). */
+.compose td.compose__c-why,
+.compose th.compose__c-why { padding-left: var(--s-4); }
+
+.compose__cell { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.compose__c-total { color: var(--text-1); }
+
+.compose__type-name { color: var(--text-1); white-space: nowrap; }
 
 .compose__note {
     margin: 0;
