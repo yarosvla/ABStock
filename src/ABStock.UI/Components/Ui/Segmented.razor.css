@@ -1,8 +1,16 @@
+/* Высота — --h-ctl-sm, как подписано в артборде «Профиль · Подробности».
+   Прежние 28px не попадали ни в один размер шкалы контролов (26/32/40) и
+   численно совпадали с --h-thead, высотой шапки таблицы, к которой контрол
+   отношения не имеет: пункт 3 docs/ui-backlog.md.
+
+   gap и padding по 2px остаются литералами намеренно: это не шаг раскладки,
+   а внутренний зазор, которым активная плашка вписана в дорожку. Шкала --s-*
+   начинается с 4px, и 4px здесь съели бы половину высоты сегмента. */
 .ui-seg {
     display: flex;
     align-items: center;
     gap: 2px;
-    height: 28px;
+    height: var(--h-ctl-sm);
     padding: 2px;
     border: 1px solid var(--line-1);
     border-radius: var(--r-md);
@@ -10,15 +18,15 @@
 }
 
 .ui-seg__item {
-    height: 22px;
-    padding: 0 9px;
+    height: 20px;
+    padding: 0 var(--s-2);
     border: 0;
     border-radius: var(--r-xs);
     background: transparent;
     color: var(--text-3);
     font: var(--n-sm);
     font-variant-numeric: tabular-nums;
-    line-height: 22px;
+    line-height: 20px;
     cursor: pointer;
     transition: background var(--d-base) var(--e-out), color var(--d-base) var(--e-out);
 }

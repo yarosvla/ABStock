@@ -8,7 +8,7 @@
     background: transparent;
     font-family: var(--font-ui);
     font-weight: 500;
-    font-size: 13px;
+    font-size: var(--fs-dense);
     line-height: 1;
     white-space: nowrap;
     text-decoration: none;
@@ -19,9 +19,9 @@
 }
 
 /* ---------- размеры 26 / 32 / 40 ---------- */
-.ui-btn--26 { height: var(--h-ctl-sm); padding: 0 var(--s-3); border-radius: var(--r-sm); font-size: 12px; }
+.ui-btn--26 { height: var(--h-ctl-sm); padding: 0 var(--s-3); border-radius: var(--r-sm); font-size: var(--fs-caption); }
 .ui-btn--32 { height: var(--h-ctl-md); padding: 0 14px; }
-.ui-btn--40 { height: var(--h-ctl-lg); padding: 0 var(--s-4); font-size: 14px; }
+.ui-btn--40 { height: var(--h-ctl-lg); padding: 0 var(--s-4); font-size: var(--fs-body); }
 
 /* ---------- варианты ---------- */
 .ui-btn--primary {
