@@ -1,9 +1,9 @@
 @* Чип состояния сессии — раздел 13: статус стоит рядом с путём, а не внутри
    него. Точка дышит, только пока сессия действительно идёт (раздел 9.6). *@
 
-<span class="session-chip">
+<span class="ui-session-chip">
     <StatusDot Tone="@(Running ? "up" : "muted")" Live="Running" />
-    <span class="session-chip__text">
+    <span class="ui-session-chip__text">
         @if (Running)
         {
             <text>сессия идёт <span class="num-xs">@Elapsed</span></text>

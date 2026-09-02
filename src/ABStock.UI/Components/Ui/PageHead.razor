@@ -5,8 +5,8 @@
    слотом <TitleContent> — когда рядом с именем стоят тикер, чипы и бейдж
    источника, как на «Создании актива». *@
 
-<header class="page-head">
-    <div class="page-head__title">
+<header class="ui-page-head">
+    <div class="ui-page-head__title">
         @if (TitleContent is not null)
         {
             @TitleContent
@@ -18,13 +18,13 @@
 
         @if (Context is not null)
         {
-            <p class="page-head__context @ContextClass">@Context</p>
+            <p class="ui-page-head__context @ContextClass">@Context</p>
         }
     </div>
 
     @if (Actions is not null)
     {
-        <div class="page-head__actions">@Actions</div>
+        <div class="ui-page-head__actions">@Actions</div>
     }
 </header>
 

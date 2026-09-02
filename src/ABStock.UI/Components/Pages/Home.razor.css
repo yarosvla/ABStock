@@ -43,7 +43,7 @@
    1080 по артборду 04; на низком окне сжимается, чтобы группа помещалась
    без скролла, и не мельчает ниже размера, в котором форма ещё держится.
    ::deep — знак приходит своей разметкой из BrandMark. */
-.welcome__mark ::deep .brand-mark {
+.welcome__mark ::deep .ui-brand-mark {
     width: clamp(128px, 18.5vh, 200px);
     height: clamp(128px, 18.5vh, 200px);
 }
