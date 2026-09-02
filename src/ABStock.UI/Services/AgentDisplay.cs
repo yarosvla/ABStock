@@ -72,13 +72,47 @@ public static class AgentDisplay
     }
 
     /// <summary>
-    /// Имя экземпляра по внутреннему имени агента. Если состава сессии нет —
-    /// на детальную зашли по прямой ссылке при остановленных торгах — показываем
-    /// внутреннее имя как есть: пустая строка на месте заголовка страницы хуже
-    /// технического имени, а выдумывать номер не из чего.
+    /// Имя экземпляра по внутреннему имени агента. Когда состава сессии нет —
+    /// на детальную зашли при остановленных торгах — имя выводится из самого
+    /// внутреннего имени, а не показывается технической строкой.
+    ///
+    /// Раньше здесь стоял возврат внутреннего имени как есть, и заголовок
+    /// страницы, крошки и вкладка браузера показывали «TrendFollowing»
+    /// латиницей (пункт 88 docs/ui-backlog.md). Довод «выдумывать номер не из
+    /// чего» оказался неверен: номер выводится. Раннер даёт экземплярам одного
+    /// типа имена «TrendFollowing», «TrendFollowing2», «TrendFollowing3»
+    /// (SimulationRunner.GetUniqueAgentName), а BuildInstanceNames нумерует их
+    /// в том же порядке начиная с единицы — суффикс и номер совпадают.
     /// </summary>
     public static string GetInstanceName(IReadOnlyList<AgentSnapshot> agents, string agentName) =>
-        BuildInstanceNames(agents).GetValueOrDefault(agentName, agentName);
+        BuildInstanceNames(agents).GetValueOrDefault(agentName)
+        ?? DeriveInstanceName(agentName);
+
+    /// <summary>
+    /// «TrendFollowing3» → «Трендовый 3», «TrendFollowing» → «Трендовый 1».
+    /// Имя, из которого тип не выводится, отдаётся как есть: выдумывать
+    /// русское название для того, чего мы не знаем, хуже технической строки.
+    /// </summary>
+    private static string DeriveInstanceName(string agentName)
+    {
+        var digits = agentName.Length;
+        while (digits > 0 && char.IsAsciiDigit(agentName[digits - 1]))
+        {
+            digits--;
+        }
+
+        var baseName = agentName[..digits];
+
+        if (!Enum.TryParse<AgentType>(baseName, ignoreCase: false, out var type))
+        {
+            return agentName;
+        }
+
+        var suffix = agentName[digits..];
+        var number = suffix.Length == 0 ? 1 : int.Parse(suffix);
+
+        return $"{GetTypeLabel(type)} {number}";
+    }
 
     public static string GetAssetTypeLabel(AssetType assetType) => assetType switch
     {
