@@ -438,11 +438,20 @@
                             <section class="profile__block hairline-top">
                                 <div class="profile__head">
                                     <span class="label">Факторы профиля</span>
+                                    @* Сколько пунктов профиля новость задела. До разбора мета
+                                       пуста: числа ещё нет, и ноль был бы утверждением о том,
+                                       чего не считали (пункт 69, раздел 10). *@
+                                    @if (signal is not null)
+                                    {
+                                        <span class="profile__meta">затронуто <span class="num-sm">@TouchedFactorCount</span></span>
+                                    }
                                 </div>
                                 <BalanceBar Positive="profile.PositiveFactors.Count"
                                             Negative="profile.NegativeFactors.Count"
                                             PositiveLabel="позитивных"
-                                            NegativeLabel="негативных" />
+                                            NegativeLabel="негативных"
+                                            HighlightPositive="@(TouchedKind == NewsFactorKind.Positive)"
+                                            HighlightNegative="@(TouchedKind == NewsFactorKind.Negative)" />
 
                                 @* Риск — не встречная величина, в полосу баланса он не входит.
                                    Своя дорожка того же веса под полосой: геометрия общая,
@@ -689,11 +698,65 @@
         signal is not null && analyzedAt is not null && entry.At == analyzedAt.Value;
 
     /// <summary>
-    /// Сработавшие факторы профиля. Список пуст, пока IAspectMatcher не начнёт
-    /// возвращать формулировки и фрагменты совпадения: сегодня из анализатора
-    /// приходят только количества, и придумывать строки здесь нельзя.
+    /// Сработавшие факторы профиля — из сигнала. Раньше список был захардкожен
+    /// пустым, потому что сопоставитель возвращал одни количества, и панель во
+    /// всех состояниях показывала пустое состояние (пункт 67 бэклога).
+    ///
+    /// Ключевые слова в этот список не идут: они говорят «новость про этот
+    /// актив», а не «новость его хвалит», и стоят отдельными чипами в правом
+    /// рельсе. Смешать их с факторами значило бы покрасить в тон то, что тона
+    /// не имеет (раздел 3).
     /// </summary>
-    private IReadOnlyList<MatchedFactor> MatchedFactors => [];
+    private IReadOnlyList<MatchedFactor> MatchedFactors =>
+        signal?.Factors
+            .Where(factor => factor.Kind != NewsFactorKind.Keyword)
+            .Select(factor => new MatchedFactor(
+                factor.Text,
+                factor.Kind switch
+                {
+                    NewsFactorKind.Positive => "up",
+                    NewsFactorKind.Negative => "down",
+                    _ => "warn"
+                },
+                factor.Kind switch
+                {
+                    NewsFactorKind.Positive => "позитивный",
+                    NewsFactorKind.Negative => "негативный",
+                    _ => "риск"
+                },
+                factor.Excerpt))
+            .ToArray()
+        ?? [];
+
+    /// <summary>Сколько пунктов профиля затронула новость — для меты (пункт 69).</summary>
+    private int TouchedFactorCount => MatchedFactors.Count;
+
+    /// <summary>
+    /// Какую сторону профиля новость задела сильнее — её половина полосы
+    /// баланса подсвечивается (артборды 02 и 03). Ничью не разрешаем в пользу
+    /// какой-либо стороны: если позитивных и негативных поровну, не подсвечено
+    /// ничего — подсветка тогда врала бы о перевесе, которого нет.
+    /// </summary>
+    private NewsFactorKind? TouchedKind
+    {
+        get
+        {
+            if (signal is null)
+            {
+                return null;
+            }
+
+            var positive = signal.Factors.Count(factor => factor.Kind == NewsFactorKind.Positive);
+            var negative = signal.Factors.Count(factor => factor.Kind == NewsFactorKind.Negative);
+
+            if (positive == negative)
+            {
+                return null;
+            }
+
+            return positive > negative ? NewsFactorKind.Positive : NewsFactorKind.Negative;
+        }
+    }
 
     protected override void OnInitialized()
     {

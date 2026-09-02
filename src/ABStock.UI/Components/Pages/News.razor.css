@@ -355,6 +355,8 @@ main.news-page ::deep .ui-causality__note {
     gap: var(--s-3);
 }
 
+.profile__meta { font: var(--t-caption); color: var(--text-3); }
+
 /* Дорожка рисков: высота и радиус те же, что у половин полосы баланса
    (9.18), заливки нет — риск не участвует в балансе, он условие. */
 .risks {

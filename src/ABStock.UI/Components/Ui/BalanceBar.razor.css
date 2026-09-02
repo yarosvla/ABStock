@@ -43,6 +43,10 @@
     color: var(--text-4);
 }
 
+/* Затронутая новостью половина. Кромкой --text-1, а не заливкой: заливка
+   несёт долю, и подсветка ею соврала бы о соотношении. */
+.ui-balance__half.is-touched { border-color: var(--text-1); }
+
 .ui-balance__count {
     font: var(--n-sm);
     font-weight: 500;
