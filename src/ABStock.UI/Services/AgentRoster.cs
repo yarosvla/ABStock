@@ -50,6 +50,7 @@ public sealed record AgentRow(
 public sealed record AgentRosterView(
     IReadOnlyList<AgentRow> Rows,
     decimal TotalCash,
+    decimal TotalPosition,
     decimal TotalPortfolio,
     decimal TotalPnl,
     int AgentCount,
@@ -70,7 +71,7 @@ public static class AgentRoster
     {
         if (agents.Count == 0)
         {
-            return new AgentRosterView([], 0m, 0m, 0m, 0, 0, 0);
+            return new AgentRosterView([], 0m, 0m, 0m, 0m, 0, 0, 0);
         }
 
         // Решение на агента: за тик оно одно, но подстрахуемся от повтора имени.
@@ -79,7 +80,7 @@ public static class AgentRoster
             .ToDictionary(group => group.Key, group => group.Last(), StringComparer.Ordinal);
 
         var rows = new List<AgentRow>();
-        decimal totalCash = 0m, totalPortfolio = 0m, totalPnl = 0m;
+        decimal totalCash = 0m, totalPosition = 0m, totalPortfolio = 0m, totalPnl = 0m;
 
         // Типы — в порядке объявления AgentType, внутри типа — порядок снимка.
         var groups = agents
@@ -105,6 +106,7 @@ public static class AgentRoster
                 .ToArray();
 
             totalCash += cells.Sum(cell => cell.Cash);
+            totalPosition += cells.Sum(cell => cell.Position);
             totalPortfolio += cells.Sum(cell => cell.Portfolio);
             totalPnl += cells.Sum(cell => cell.Pnl);
 
@@ -155,6 +157,7 @@ public static class AgentRoster
         return new AgentRosterView(
             rows,
             totalCash,
+            totalPosition,
             totalPortfolio,
             totalPnl,
             agents.Count,
