@@ -4,6 +4,7 @@ import {
     LineStyle,
     createChart
 } from "/lib/lightweight-charts/lightweight-charts.standalone.production.mjs";
+import { addVolumeSeries, toVolumePoint } from "/js/chart-volume.js";
 
 const charts = new WeakMap();
 
@@ -154,7 +155,8 @@ function normalizeCandles(candles) {
             open: Number(c.open ?? c.Open),
             high: Number(c.high ?? c.High),
             low: Number(c.low ?? c.Low),
-            close: Number(c.close ?? c.Close)
+            close: Number(c.close ?? c.Close),
+            volume: Number(c.volume ?? c.Volume ?? 0)
         }))
         .filter(c => Number.isFinite(c.time) && Number.isFinite(c.close))
         .sort((a, b) => a.time - b.time);
@@ -243,9 +245,12 @@ export function renderPrice(element, payload, dotNetRef) {
             lastValueVisible: true
         });
 
+        const volumeSeries = addVolumeSeries(chart);
+
         bundle = {
             chart,
             series,
+            volumeSeries,
             tokens,
             trades: [],
             activeIndex: -1,
@@ -280,6 +285,7 @@ export function renderPrice(element, payload, dotNetRef) {
 
     const candles = normalizeCandles(payload?.candles ?? payload?.Candles);
     bundle.series.setData(candles);
+    bundle.volumeSeries.setData(candles.map(toVolumePoint));
     bundle.series.setMarkers(buildMarkers(bundle));
 
     if (candles.length > 0) {

@@ -583,7 +583,7 @@
 .overlay { display: flex; align-items: center; justify-content: center; }
 
 .confirm {
-    width: 520px;
+    width: var(--w-modal);
     max-width: calc(100vw - var(--s-10));
     padding: var(--s-6);
     display: flex;

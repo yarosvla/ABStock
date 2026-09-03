@@ -18,6 +18,13 @@ public sealed record AgentTradeRecord(
     decimal Price,
     decimal Quantity);
 
+/// <param name="TotalVolume">
+/// Объём НАРАСТАЮЩИМ ИТОГОМ на момент тика — так его хранит рынок
+/// (<c>MarketSnapshot.Volume</c>). Объём одной свечи получается разностью
+/// соседних значений; хранить здесь уже разность нельзя, иначе прореживание
+/// ряда молча теряло бы часть объёма.
+/// </param>
 public sealed record AgentPricePoint(
     DateTimeOffset Time,
-    decimal Price);
+    decimal Price,
+    decimal TotalVolume);

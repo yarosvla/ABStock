@@ -391,7 +391,6 @@ main.news-page ::deep .ui-causality__note {
 /* ---------- рынок ---------- */
 .market { display: flex; flex-direction: column; gap: var(--s-3); }
 
-.kv { margin: 0; display: flex; flex-direction: column; }
 
 .kv__row {
     display: flex;

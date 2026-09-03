@@ -87,16 +87,23 @@
                     @CurrentAsset.Draft.Name · <span class="num-sm">@CurrentAsset.Symbol</span>
                     @if (StartedAtLabel is not null)
                     {
-                        <text> · в сессии с <span class="num-sm">@StartedAtLabel</span></text>
+                        <text> · в работе с <span class="num-sm">@StartedAtLabel</span></text>
                     }
                     <text> · </text>
-                    @if (TradeCount > 0)
+                    @if (TradeCount == 0)
+                    {
+                        <text>заявок не выставлял</text>
+                    }
+                    else if (SimulationRunner.IsRunning)
                     {
                         <span class="tone-up">торгует</span>
                     }
                     else
                     {
-                        <text>заявок не выставлял</text>
+                        @* Сессия остановлена: агент сделки совершил, но сейчас
+                           не торгует. Настоящее время здесь означало бы, что
+                           за остановленным экраном что-то происходит. *@
+                        <text>торговал в сессии</text>
                     }
                 </Context>
                 <Actions>
@@ -166,7 +173,7 @@
                                         <span class="label tape__c-price">Цена</span>
                                         <span class="label tape__c-qty">Кол-во</span>
                                     </div>
-                                    <div class="tape__list">
+                                    <div class="tape__list @(TradeCount > TapeRowsVisible ? "is-scrollable" : null)">
                                         @foreach (var trade in TradeViews)
                                         {
                                             <button type="button"
@@ -210,6 +217,7 @@
                                 <span><small>макс</small><span class="num-sm">@Price2(HighPrice)</span></span>
                                 <span><small>мин</small><span class="num-sm">@Price2(LowPrice)</span></span>
                                 <span><small>посл</small><span class="num-sm">@Price2(EffectiveLastPrice)</span></span>
+                                <span><small>объём</small><span class="num-sm">@Count0(SessionVolume)</span></span>
                                 <span class="num-sm @DeltaTone(PriceChange)">
                                     @(PriceChange > 0m ? "↗" : PriceChange < 0m ? "↘" : "·") @Pnl2(PriceChange) ₽ ·
                                     @Sign(PriceChangePercent)@Percent2(Math.Abs(PriceChangePercent)) %
@@ -498,6 +506,14 @@
 
     private int TradeCount => report?.Trades.Count ?? 0;
 
+    /// <summary>
+    /// Сколько строк ленты видно без прокрутки. Тринадцать — по артборду 02,
+    /// где панель «Сделки агента» нарисована фиксированной высоты. Список во
+    /// всю страницу растягивал бы экран под число сделок, и правый рельс
+    /// уезжал бы от графика, к которому он относится (раздел 9.8).
+    /// </summary>
+    private const int TapeRowsVisible = 13;
+
     /// <summary>Агент в сессии есть, но ещё ничего не сделал.</summary>
     private bool IsIdle => TradeCount == 0;
 
@@ -728,6 +744,15 @@
     private decimal OpenPrice => report?.PriceSeries.Count > 0 ? report.PriceSeries[0].Price : EffectiveLastPrice;
     private decimal HighPrice => report?.PriceSeries.Count > 0 ? report.PriceSeries.Max(p => p.Price) : EffectiveLastPrice;
     private decimal LowPrice => report?.PriceSeries.Count > 0 ? report.PriceSeries.Min(p => p.Price) : EffectiveLastPrice;
+    /// <summary>
+    /// Объём за сессию — то же число и в том же смысле, что «объём» в строке
+    /// показателей «Торгов»: накопленный итог с начала прогона. Соседи по
+    /// строке (откр, макс, мин) тоже считаются по всей сессии, а не по
+    /// последней свече, — период у всей строки один (раздел 10).
+    /// </summary>
+    private decimal SessionVolume =>
+        report?.PriceSeries.Count > 0 ? report.PriceSeries[^1].TotalVolume : 0m;
+
     private decimal PriceChange => EffectiveLastPrice - OpenPrice;
     private decimal PriceChangePercent => OpenPrice != 0m ? PriceChange / OpenPrice * 100m : 0m;
 
@@ -851,6 +876,12 @@
     /// Свечи собираются из ряда цен группировкой по интервалу таймфрейма:
     /// открытие — первая цена корзины, закрытие — последняя. Это оформление
     /// уже имеющегося ряда, а не новый расчёт.
+    ///
+    /// Объём свечи — разность накопленного объёма на концах корзины: рынок
+    /// хранит его нарастающим итогом, и «объём за свечу» получается только
+    /// вычитанием. У первой свечи предыдущей корзины нет, и точкой отсчёта
+    /// берётся её собственный первый тик — то есть первая свеча показывает
+    /// объём, набранный после открытия, а не весь объём от начала времён.
     /// </summary>
     private List<Candle> BuildCandles()
     {
@@ -862,20 +893,29 @@
 
         var interval = Math.Max(1, IntervalSeconds);
         var candles = new List<Candle>();
+        decimal? previousTotalVolume = null;
 
-        foreach (var bucket in series.GroupBy(point => point.Time.ToUnixTimeSeconds() / interval))
+        foreach (var bucket in series
+            .GroupBy(point => point.Time.ToUnixTimeSeconds() / interval)
+            .OrderBy(bucket => bucket.Key))
         {
-            var prices = bucket.OrderBy(point => point.Time).Select(point => point.Price).ToArray();
+            var points = bucket.OrderBy(point => point.Time).ToArray();
+            var prices = points.Select(point => point.Price).ToArray();
+
+            var openTotalVolume = previousTotalVolume ?? points[0].TotalVolume;
+            var closeTotalVolume = points[^1].TotalVolume;
+            previousTotalVolume = closeTotalVolume;
 
             candles.Add(new Candle(
                 bucket.Key * interval,
                 prices[0],
                 prices.Max(),
                 prices.Min(),
-                prices[^1]));
+                prices[^1],
+                Math.Max(0m, closeTotalVolume - openTotalVolume)));
         }
 
-        return candles.OrderBy(candle => candle.Time).ToList();
+        return candles;
     }
 
     /// <summary>
@@ -1030,6 +1070,12 @@
     }
 
     private sealed record TradeView(int Index, string Time, bool IsBuy, decimal Price, decimal Quantity);
-    private sealed record Candle(long Time, decimal Open, decimal High, decimal Low, decimal Close);
+    private sealed record Candle(
+        long Time,
+        decimal Open,
+        decimal High,
+        decimal Low,
+        decimal Close,
+        decimal Volume);
     private sealed record TradeMarker(long Time, int Index, bool IsBuy, decimal Price, decimal Quantity);
 }

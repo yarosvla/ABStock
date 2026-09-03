@@ -98,13 +98,14 @@
                     сделок за сессию <span class="num-md">@Count0(SessionTradeCount)</span>
                 </span>
 
-                @* Признак — деньги, отличные от стартовых: они меняются от любой
-                   исполненной сделки. Это «торговал за сессию», а не «торгует
-                   прямо сейчас», и подпись говорит именно это (раздел 10.1). *@
+                @* Признак — открытая позиция: агент в рынке тогда, когда у него
+                   на руках есть бумага. Соседи по строке — «капитал под
+                   управлением» и «сделок за сессию»; метрика за период между
+                   ними читалась бы третьим периодом (раздел 10). *@
                 <span class="metrics__sep" aria-hidden="true"></span>
                 <span class="metrics__item">
-                    торговали за сессию
-                    <span class="num-md">@roster.TradingCount</span> из
+                    торгуют сейчас
+                    <span class="num-md">@roster.TradingNowCount</span> из
                     <span class="num-md metrics__of">@roster.AgentCount</span>
                 </span>
             </section>

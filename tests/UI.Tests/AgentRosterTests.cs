@@ -247,18 +247,21 @@ public class AgentRosterTests
     }
 
     [Fact]
-    public void Торговали_за_сессию_считаются_по_отличию_денег_от_стартовых()
+    public void Торгуют_сейчас_считаются_по_открытой_позиции()
     {
+        // «Сейчас» обязано считаться на сейчас. Агент B за сессию торговал —
+        // деньги ушли от стартовых, — но позицию закрыл и сейчас вне рынка;
+        // прежний счётчик «торговали за сессию» считал бы его.
         AgentSnapshot[] agents =
         [
-            Agent("A", AgentType.TrendFollowing, cash: 98_000m, initialCash: 100_000m),
-            Agent("B", AgentType.TrendFollowing, cash: 100_000m, initialCash: 100_000m),
-            Agent("C", AgentType.NewsDriven, cash: 100_000m, initialCash: 100_000m)
+            Agent("A", AgentType.TrendFollowing, cash: 98_000m, position: 20m),
+            Agent("B", AgentType.TrendFollowing, cash: 101_000m, position: 0m),
+            Agent("C", AgentType.NewsDriven, cash: 100_000m, position: 0m)
         ];
 
         var view = AgentRoster.Build(agents, []);
 
-        Assert.Equal(1, view.TradingCount);
+        Assert.Equal(1, view.TradingNowCount);
         Assert.Equal(3, view.AgentCount);
         Assert.Equal(2, view.TypeCount);
     }

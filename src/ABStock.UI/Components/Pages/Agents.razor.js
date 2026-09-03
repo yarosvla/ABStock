@@ -189,7 +189,27 @@ export function render(element, payload) {
     // превращается в ряд одинаковых чисел. Секунды показываем ровно до тех
     // пор, пока минут не хватает, чтобы отличить метки друг от друга.
     const spanSec = Number.isFinite(first) ? last - first : 0;
-    bundle.chart.timeScale().applyOptions({ secondsVisible: spanSec < 600 });
+    const withSeconds = spanSec < 600;
+
+    // Ширина, которую ось резервирует под подпись, задаётся в ЗНАКАХ, и по
+    // умолчанию их восемь — ровно длина «20:30:22». Этого не хватало, и
+    // крайняя слева подпись наезжала на соседнюю: `20:30:2220:30:35`.
+    //
+    // Причина не в числе точек. Когда прокрутка и масштабирование выключены
+    // разом — а у нас выключены оба, — библиотека считает края
+    // зафиксированными независимо от `fixLeftEdge`/`fixRightEdge` и сдвигает
+    // крайние подписи внутрь поля, чтобы они не обрезались. Сдвиг — до
+    // половины подписи, и он съедает зазор, отмеренный по её полной длине.
+    //
+    // Поэтому резервируем полторы длины: собственная ширина подписи плюс
+    // половина на сдвиг края. Это и есть «прореживать по доступной ширине»,
+    // а не по числу точек.
+    const labelChars = withSeconds ? 8 : 5;
+
+    bundle.chart.timeScale().applyOptions({
+        secondsVisible: withSeconds,
+        tickMarkMaxCharacterLength: Math.ceil(labelChars * 1.5)
+    });
 
     bundle.chart.timeScale().fitContent();
     applyHighlight(bundle, bundle.highlight);

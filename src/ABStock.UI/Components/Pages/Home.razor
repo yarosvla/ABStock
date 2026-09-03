@@ -2,6 +2,7 @@
 @using ABStock.Application.Simulation
 @using ABStock.UI.Services
 @inject ISimulationRunner SimulationRunner
+@inject IActiveAssetContext ActiveAsset
 
 @* Приветственная страница — титульный экран, не лендинг. Три вещи: знак,
    одно предложение, одно действие.
@@ -24,42 +25,58 @@
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
 @{
-    // Оба значения снимаются ОДИН раз. IsRunning и CurrentAssetName —
-    // два чтения синглтона, который живёт своим циклом тиков, и сессия
-    // может остановиться между ними. Состояние страницы определяет
-    // isRunning; имя — только суффикс на кнопке, и его отсутствие при
-    // isRunning = true нормально.
+    // Все значения снимаются ОДИН раз. IsRunning и CurrentAssetName — два
+    // чтения синглтона, который живёт своим циклом тиков, и сессия может
+    // остановиться между ними. Состояние страницы определяет isRunning;
+    // имя — только суффикс на кнопке, и его отсутствие при isRunning = true
+    // нормально.
     var isRunning = SimulationRunner.IsRunning;
-    var assetName = SessionAssetName(SimulationRunner.CurrentAssetName);
+
+    // Актив есть — значит человек уже прошёл создание, и следующий его шаг
+    // по разделу 16 — «Торги», а не создание заново. Без этой ветки экраны
+    // «актива нет», «актив создан» и «торги остановлены» были попиксельно
+    // одинаковыми, и тому, у кого сессия только что закончилась, предлагалось
+    // единственное действие — создать актив ещё раз (раздел 14).
+    var createdAssetName = ActiveAsset.Draft?.Name;
+
+    var assetName = isRunning
+        ? SessionAssetName(SimulationRunner.CurrentAssetName)
+        : createdAssetName;
+
+    var hasAsset = isRunning || createdAssetName is not null;
 }
 
 <main class="welcome">
     <div class="welcome__group">
-        <span class="welcome__mark"><BrandMark /></span>
+        <span class="welcome__mark rise"><BrandMark /></span>
 
         @* Слово «ABStock» на странице ровно один раз. *@
-        <h1 class="welcome__name">ABStock</h1>
+        <h1 class="welcome__name rise rise-1">ABStock</h1>
 
-        <p class="welcome__lead">Вы создаёте актив, торговые агенты торгуют им каждый по своей стратегии, а вы вводите новости и видите, как решения агентов складываются в цену.</p>
+        <p class="welcome__lead rise rise-2">Вы создаёте актив, агенты торгуют им каждый по своей стратегии, а вы вводите новости и видите, как их решения складываются в цену.</p>
 
-        <div class="welcome__actions">
-            @if (isRunning)
+        <div class="welcome__actions rise rise-3">
+            @if (hasAsset)
             {
-                @* Сессия идёт — человек с большей вероятностью вернулся
-                   продолжить, а не начать заново, поэтому возврат первичный,
-                   а создание уходит вниз текстовой ссылкой. *@
+                @* Актив уже есть — первично «Торги», а создание уходит вниз
+                   текстовой ссылкой. Слово меняется по состоянию: «вернуться»
+                   к идущей сессии и «перейти» к ещё не начатой — это разные
+                   действия, и называть их одинаково значило бы соврать про
+                   то, что происходит за экраном. *@
                 @* @if стоит с новой строки не для красоты: приписанный
                    вплотную к слову, «торгам@if» попадает под правило Razor
                    про адреса почты и выводится текстом как есть. *@
                 <AppButton Variant="primary" Size="40" Href="/trading">
-                    Вернуться к торгам
+                    @(isRunning ? "Вернуться к торгам" : "Перейти к торгам")
                     @if (assetName is not null)
                     {
                         <span class="welcome__asset">·&#160;@assetName</span>
                     }
                 </AppButton>
 
-                <AppButton Variant="ghost" Size="32" Href="/create-asset" Class="welcome__secondary">Создать актив</AppButton>
+                @* «Другой»: актив в сессии один, и новый заменит текущий —
+                   так это и подписано на «Создании актива». *@
+                <AppButton Variant="ghost" Size="32" Href="/create-asset">Создать другой актив</AppButton>
             }
             else
             {

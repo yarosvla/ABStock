@@ -4,6 +4,7 @@ import {
     LineStyle,
     createChart
 } from "/lib/lightweight-charts/lightweight-charts.standalone.production.mjs";
+import { addVolumeSeries, toVolumePoint } from "/js/chart-volume.js";
 
 const FOLLOW_THRESHOLD_PX = 24;
 
@@ -101,20 +102,6 @@ function normalizePoint(point) {
         low: point.low ?? point.Low,
         close: point.close ?? point.Close,
         volume: point.volume ?? point.Volume ?? 0
-    };
-}
-
-// Объём — гистограмма внизу холста, те же цвета свечи с alpha 0.30
-// (DESIGN.md 11). Цвет столбика задаётся точкой, а не темой серии: он зависит
-// от направления свечи, а у гистограммы нет понятия up/down.
-const VOLUME_UP = "rgba(63, 163, 122, 0.30)";
-const VOLUME_DOWN = "rgba(210, 85, 95, 0.30)";
-
-function toVolumePoint(point) {
-    return {
-        time: point.time,
-        value: point.volume,
-        color: point.close >= point.open ? VOLUME_UP : VOLUME_DOWN
     };
 }
 
@@ -502,19 +489,7 @@ export function register(root) {
         lastValueVisible: true
     });
 
-    // Гистограмма объёма занимает нижние ~16 % холста и живёт на своей ценовой
-    // шкале: общая с ценой шкала сплющила бы свечи (DESIGN.md 11).
-    const volumeSeries = chart.addHistogramSeries({
-        priceScaleId: "volume",
-        priceLineVisible: false,
-        lastValueVisible: false,
-        priceFormat: { type: "volume" }
-    });
-
-    chart.priceScale("volume").applyOptions({
-        scaleMargins: { top: 0.84, bottom: 0 },
-        borderVisible: false
-    });
+    const volumeSeries = addVolumeSeries(chart);
 
     const controller = {
         root,
