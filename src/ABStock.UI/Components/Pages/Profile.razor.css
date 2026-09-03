@@ -10,7 +10,10 @@
 .profile-shell {
     position: relative;
     z-index: var(--z-content);
-    min-height: 100vh;
+    /* Оболочка — ровно один экран, длинное прокручивается внутри неё
+       (раздел 13, «Модель оболочки»). */
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .profile-page {
