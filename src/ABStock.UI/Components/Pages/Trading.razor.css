@@ -20,6 +20,8 @@
     z-index: var(--z-content);
     display: flex;
     flex-direction: column;
+    /* Оболочка — ровно один экран, длинное прокручивается внутри неё
+       (раздел 13, «Модель оболочки»). */
     height: 100vh;
     overflow-y: auto;
 }

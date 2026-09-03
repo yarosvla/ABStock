@@ -9,7 +9,10 @@
     z-index: var(--z-content);
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
+    /* Оболочка — ровно один экран, длинное прокручивается внутри неё
+       (раздел 13, «Модель оболочки»). */
+    height: 100vh;
+    overflow-y: auto;
 }
 
 .news-page {
