@@ -250,6 +250,44 @@
     color: var(--text-4);
 }
 
+/* Дорожка потенциала роста — показывает положение, не принимает ввод
+   (артборд 05, раздел 9.2.1). */
+.param__track {
+    position: relative;
+    height: var(--s-6);
+    margin-top: var(--s-1);
+}
+
+.param__track-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: var(--s-1);
+    height: 2px;
+    border-radius: var(--r-pill);
+    background: var(--gph-600);
+}
+
+.param__track-mark {
+    position: absolute;
+    top: 0;
+    width: 2px;
+    height: var(--s-3);
+    margin-left: -1px;
+    border-radius: var(--r-pill);
+    background: var(--acc-500);
+}
+
+.param__track-min,
+.param__track-max {
+    position: absolute;
+    top: var(--s-3);
+    color: var(--text-4);
+}
+
+.param__track-min { left: 0; }
+.param__track-max { right: 0; }
+
 /* ---------- селект (9.4) ---------- */
 .select { position: relative; }
 
@@ -395,10 +433,15 @@
     flex-direction: column;
 }
 
+/* Маркер прижат к ПЕРВОЙ строке, а не к центру блока: у фактора в две строки
+   он уезжал на середину и переставал читаться как начало пункта. Отступ сверху
+   доводит его до базовой линии первой строки — align-items: baseline тут не
+   годится, у точки нет своей базовой линии. Пункт 84 docs/ui-backlog.md. */
 .factor {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--s-2);
+    padding: var(--s-3) 0;
     min-height: var(--h-row-tall);
     border-bottom: 1px solid var(--line-1);
 }
@@ -407,6 +450,7 @@
 
 .factor__dot {
     flex: none;
+    margin-top: calc((20px - 4px) / 2);  /* половина интерлиньяжа --t-body минус радиус */
     width: 4px;
     height: 4px;
     border-radius: var(--r-pill);
