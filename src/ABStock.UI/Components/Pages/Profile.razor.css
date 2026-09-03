@@ -19,6 +19,12 @@
     padding: var(--s-5) var(--page-pad) var(--s-10);
 }
 
+/* Опорные ширины страницы — именованными переменными, а не литералами по
+   месту (пункт 66 docs/ui-backlog.md). */
+.profile-page {
+    --w-name-field: 260px;  /* поле имени оператора, артборд «Состояния» */
+}
+
 .profile-grid {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -98,7 +104,7 @@
     min-width: 0;
 }
 
-.operator__edit ::deep .ui-field { width: 260px; }
+.operator__edit ::deep .ui-field { width: var(--w-name-field); }
 .operator__hint { font: var(--t-caption); color: var(--text-4); }
 
 /* Валидация — охра. Красный означает падение цены и ничего больше (раздел 3).
@@ -110,7 +116,7 @@
     width: 100%;
     margin: 0;
     font: var(--t-caption);
-    color: var(--warn-500);
+    color: var(--down-500);
 }
 
 .operator__error ::deep .ui-icon { flex: none; }
@@ -127,68 +133,93 @@
     align-items: start;
 }
 
+/* Пять колонок на всех трёх ширинах: десять пресетов ложатся ровно в две
+   строки, как в артборде. На четырёх колонках последняя строка оставалась
+   наполовину пустой (пункт 53), а образец узкий — места хватает. */
 .swatches {
+    --h-swatch: 74px;  /* артборд «Профиль · Подробности»: образец 116 × 74 */
+
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: var(--s-2);
 }
 
+/* Кнопка сама коробкой не является: коробка — образец под ней, а подпись
+   стоит НИЖЕ рамки (артборд «Акцент · палитра и предпросмотр»). Раньше рамка
+   охватывала и подпись, и образец получался вдвое ниже макетных 74px. */
 .swatch {
     display: flex;
     flex-direction: column;
     gap: var(--s-2);
-    padding: var(--s-2);
-    background: var(--gph-800);
-    border: 1px solid var(--line-1);
-    border-radius: var(--r-md);
+    padding: 0;
+    background: transparent;
+    border: 0;
     cursor: pointer;
-    transition: background var(--d-fast) var(--e-out), border-color var(--d-fast) var(--e-out);
-}
-
-.swatch:hover { background: var(--gph-750); border-color: var(--line-3); }
-
-/* Выбранный помечается обводкой --acc-line, а не галочкой поверх цвета:
-   галочка закрывает собой то, что человек и пришёл разглядывать. */
-.swatch.is-chosen {
-    background: var(--acc-soft);
-    border-color: var(--acc-line);
 }
 
 /* Образец — портрет пресета из тех же трёх токенов, которыми акцент живёт
    в системе: заливка кнопки, тонкая линия, подложка выбранного. Один только
    квадрат заливки не показал бы, что линия и подложка тоже сменят тон. */
+/* Образец — портрет пресета из тех же трёх токенов, которыми акцент живёт в
+   системе: заливка кнопки, тонкая линия, подложка выбранного. Размер и радиус
+   из артборда «Профиль · Подробности»: 116 × 74, радиус --r-md.
+
+   Прежние 32px высоты (--s-8) делали образец вдвое ниже макетного, а раздел
+   3.1 требует, чтобы десять пресетов различались между собой ИМЕННО в размере
+   образца: чем он мельче, тем хуже читается тон в --acc-line и --acc-soft.
+   Пункт 52 docs/ui-backlog.md.
+
+   Ширина не фиксируется: колонки сетки её задают, а 116 — это ширина при
+   пяти колонках на 1920. Высота фиксирована, потому что от неё зависит
+   читаемость. */
 .swatch__stage {
     position: relative;
+    /* Заливка и линия — в один ряд, подложка под ними во всю ширину, как в
+       артборде «Профиль · Подробности». Колонкой из трёх полосок образец
+       читался как список, а не как портрет пресета. */
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    align-content: center;
     gap: var(--s-2);
-    height: var(--s-8);
-    padding: 0 var(--s-2);
-    border-radius: var(--r-sm);
-    background: var(--gph-850);
+    height: var(--h-swatch);
+    padding: var(--s-3);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-md);
+    background: var(--gph-800);
     overflow: hidden;
+    transition: background var(--d-fast) var(--e-out), border-color var(--d-fast) var(--e-out);
 }
 
+.swatch:hover .swatch__stage { background: var(--gph-750); border-color: var(--line-3); }
+
+/* Выбранный помечается обводкой --acc-line, а не галочкой поверх цвета:
+   галочка закрывает собой то, что человек и пришёл разглядывать. */
+.swatch.is-chosen .swatch__stage {
+    background: var(--acc-soft);
+    border-color: var(--acc-line);
+}
+
+.swatch:focus-visible { outline: none; }
+.swatch:focus-visible .swatch__stage { outline: 2px solid var(--acc-400); outline-offset: 2px; }
+
 .swatch__fill {
-    width: var(--s-6);
+    width: var(--s-10);
     height: var(--s-3);
     border-radius: var(--r-xs);
     background: var(--acc-500);
 }
 
 .swatch__line {
-    width: var(--s-5);
+    width: var(--s-6);
     height: 2px;
     border-radius: var(--r-pill);
     background: var(--acc-line);
 }
 
 .swatch__soft {
-    position: absolute;
-    left: var(--s-2);
-    right: var(--s-2);
-    bottom: var(--s-1);
-    height: var(--s-2);
+    width: 100%;
+    height: var(--s-4);
     border-radius: var(--r-xs);
     background: var(--acc-soft);
 }
@@ -406,9 +437,14 @@
    экран целиком обязан помещаться в 1080 по высоте. Без этого десять
    событий уводили страницу на 1276 и обрезались нижней границей экрана. */
 .events {
+    --h-event: 60px;  /* две строки события плюс отступы */
+
     display: flex;
     flex-direction: column;
-    max-height: 296px;
+    /* Кратно высоте строки, чтобы список обрывался МЕЖДУ строками, а не
+       посередине: раньше нижняя граница резала строку пополам, и виден был
+       заголовок без описания (пункт 61 docs/ui-backlog.md). */
+    max-height: calc(var(--h-event) * 5);
     overflow-y: auto;
 }
 
@@ -451,17 +487,18 @@
    предпросмотра под палитру уводил страницу с 1080 на 1258, а раздел 9.8
    требует, чтобы экран целиком помещался в 1080. Уже палитра, а не выше
    раскладка. */
-@media (max-width: 1440px) {
+/* Порог — --bp-md (1440), записанный как «меньше 1440», а не «1440 и меньше»:
+   на «Торгах» тот же брейкпоинт записан как 1439, и на ширине ровно 1440 две
+   страницы расходились (пункт 54 docs/ui-backlog.md). */
+@media (max-width: 1439px) {
     .profile-page { padding-left: var(--s-5); padding-right: var(--s-5); }
     .accent { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-4); }
     .preview { padding-left: var(--s-4); gap: var(--s-4); }
-    .swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 /* На 1280 остаются те же четыре образца в ряд: три давали лишнюю строку
    палитры и уводили страницу за 1080, а места под четыре хватает — образец
    узкий, в нём только полоска и одно слово. Сжимается подпись, не сетка. */
-@media (max-width: 1280px) {
-    .swatch { padding: var(--s-1) var(--s-2) var(--s-2); }
-    .events { max-height: 240px; }
+@media (max-width: 1279px) {
+    .events { max-height: calc(var(--h-event) * 4); }
 }

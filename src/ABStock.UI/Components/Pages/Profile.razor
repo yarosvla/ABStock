@@ -66,15 +66,19 @@
                                                MaxLength="60"
                                                Label="Имя оператора"
                                                Invalid="nameError"
+                                               InvalidTone="down"
                                                OnKeyDown="HandleNameKey" />
                                     <span class="operator__hint">Enter — сохранить, Esc — отменить</span>
                                 </div>
 
                                 @if (nameError)
                                 {
-                                    @* Охра, а не рыночный красный: раздел 3 —
-                                       --up-* и --down-* не используются для
-                                       валидации, красный означает падение цены. *@
+                                    @* Красная, а не охра. Раздел 3 запрещал --down-* в
+                                       валидации, раздел 9.3 требовал его там же — спор
+                                       разрешён в пользу 9.3 (DESIGN.md v2.21): красная
+                                       кромка поля читается как ошибка ввода, а не как
+                                       падение цены. Охра осталась за предупреждением,
+                                       которое не про конкретное поле. *@
                                     <p class="operator__error">
                                         <Icon Name="alert" Size="14" />
                                         Имя не может быть пустым
@@ -87,7 +91,11 @@
                                     <h3>@Preferences.OperatorName</h3>
                                     <p>Оператор симуляции</p>
                                 </div>
-                                <AppButton Variant="ghost" Size="26" OnClick="StartEditingName">Изменить</AppButton>
+                                @* Знак вместо подписи (артборд 01): подпись «Изменить» рядом с именем
+                                   читалась как второе имя. IconButton — раздел 9.2. *@
+                                <AppButton Variant="ghost" Size="26" Icon="pencil"
+                                           OnClick="StartEditingName"
+                                           aria-label="Изменить имя оператора" />
                             }
                         </div>
                     </ChildContent>
@@ -172,53 +180,63 @@
                                             Label="Пример тумблера" />
                                 </div>
 
-                                <div class="preview__col preview__col--fixed">
-                                    <span class="label">Не меняется никогда</span>
+                                @* Зеркало: те же шесть контролов под пресетом по умолчанию.
+                                   data-accent="graphite" — не имитация, а настоящие токены:
+                                   пресеты в design-system.css объявлены атрибутом, и вложенный
+                                   элемент отдаёт детям графитовые значения. Человек видит один
+                                   и тот же контрол с акцентом и без (артборд 02).
+
+                                   Раньше здесь стояли рыночные данные и подпись «Не меняется
+                                   никогда». Доказывать неизменность рынка эта панель не обязана:
+                                   раздел 3.1 говорит, что «пресет проверяется не на „Профиле“,
+                                   а на „Торгах“», и для этого есть артборды 03 и 04 с тремя
+                                   полноразмерными экранами рядом. Пункт 55 docs/ui-backlog.md. *@
+                                <div class="preview__col preview__col--fixed" data-accent="graphite">
+                                    <span class="label">Нейтрально</span>
+
+                                    <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
+
+                                    <TextField Value="@CurrentAsset.Draft.Name"
+                                               Label="Пример поля без акцента"
+                                               Class="preview__field" />
 
                                     <div class="preview__rows">
                                         <div class="preview__row">
                                             <span>Трендовый</span>
                                             <span class="num-sm up">@Pnl2(18_240m)</span>
                                         </div>
-                                        <div class="preview__row">
+                                        @* Выбранная строка помечена и здесь: её левая полоса —
+                                           одно из шести мест, куда идёт акцент (раздел 3.1), и
+                                           без неё зеркало не показало бы, что именно меняется. *@
+                                        <div class="preview__row is-selected">
                                             <span>Контр-тренд</span>
                                             <span class="num-sm down">@Pnl2(-6_110m)</span>
                                         </div>
                                     </div>
 
-                                    <div class="preview__badges">
-                                        <span class="badge badge--up">Позитивная</span>
-                                        <span class="badge badge--down">Негативная</span>
-                                    </div>
+                                    <Segmented TValue="string"
+                                               Items="@PreviewTimeframes"
+                                               Value="@previewTimeframe"
+                                               ValueChanged="@(value => previewTimeframe = value)"
+                                               Label="Пример переключателя без акцента" />
 
-                                    @* Депт-бар — рыночная форма. Он и числа рядом
-                                       обязаны не отреагировать на смену акцента:
-                                       это и есть доказательство обещания ниже. *@
-                                    <div class="preview__depth">
-                                        <div class="preview__level">
-                                            <span class="preview__bar preview__bar--down" style="width:72%"></span>
-                                            <span class="num-sm down">124,24</span>
-                                            <span class="num-sm preview__qty">1 460</span>
-                                        </div>
-                                        <div class="preview__level">
-                                            <span class="preview__bar preview__bar--up" style="width:54%"></span>
-                                            <span class="num-sm up">124,12</span>
-                                            <span class="num-sm preview__qty">1 320</span>
-                                        </div>
-                                    </div>
+                                    <Toggle Value="previewToggle"
+                                            ValueChanged="@(value => previewToggle = value)"
+                                            Text="@(previewToggle ? "Включено" : "Выключено")"
+                                            Label="Пример тумблера без акцента" />
                                 </div>
                             </div>
 
                             <p class="accent__promise hairline-top">
-                                Акцент меняет только элементы управления — цвета рынка, агентов и
-                                графиков не меняются никогда. Значения в предпросмотре условные.
+                                Акцент меняет только элементы управления. Цвета рынка, агентов и
+                                графиков не меняются никогда.
                             </p>
                         </div>
                     </ChildContent>
                 </Panel>
 
                 <Panel Title="Настройки интерфейса" Class="rise rise-3">
-                    <MetaContent>применяются сразу</MetaContent>
+                    <MetaContent>Применяются сразу</MetaContent>
                     <ChildContent>
                         <div class="settings">
 
@@ -242,7 +260,7 @@
                             <div class="setting">
                                 <div class="setting__text">
                                     <span class="setting__name" id="n-trades">Сделки</span>
-                                    <span class="setting__note">Когда агент открывает или закрывает позицию.</span>
+                                    <span class="setting__note">Каждая сделка агента в сессии.</span>
                                 </div>
                                 <Toggle Value="Preferences.NotifyTrades"
                                         ValueChanged="SetNotifyTrades"
@@ -262,7 +280,7 @@
                             <div class="setting">
                                 <div class="setting__text">
                                     <span class="setting__name" id="n-system">Системные события</span>
-                                    <span class="setting__note">Запуск и остановка торгов, создание актива.</span>
+                                    <span class="setting__note">Запуск и остановка торгов, потеря связи.</span>
                                 </div>
                                 <Toggle Value="Preferences.NotifySystem"
                                         ValueChanged="SetNotifySystem"
