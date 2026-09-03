@@ -153,6 +153,13 @@
   --center-min: 600px;     /* ориентир минимума центра */
   --bp-md: 1440px;
   --bp-sm: 1280px;
+  /* Ширина модалки названа в разделе 9.12 — значит величина системная, и
+     литералу по месту там не место (18.3). Широкая объявлена вместе с узкой:
+     раздел описывает обе, и оставить половину правила без токена значит
+     завести ловушку на первое же широкое окно. */
+  --w-modal: 520px;
+  --w-modal-wide: 840px;
+
   --page-max: 1680px;
   --page-pad: 28px;
   --gutter: 16px;
@@ -257,6 +264,17 @@ h3 { font: var(--t-h3); }
 .num-xs   { font: var(--n-xs); font-variant-numeric: tabular-nums; }
 .label    { font: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
 .up { color: var(--up-500); } .down { color: var(--down-500); }
+
+/* Пара «ключ — значение» колонкой. Объявлялась дословно «Торгами»,
+   «Новостями» и «Профилем» (пункт 4 docs/ui-backlog.md). Выносить её было
+   нельзя, пока то же имя на детальной агента означало СТРОКУ: глобальное
+   flex-direction: column сложило бы её в колонку, потому что scoped-правило
+   детальной этого свойства не задавало и потому не перекрыло бы. Имя там
+   разведено (.kv-row, пункт 100), и теперь вынос безопасен.
+
+   Оформление dt/dd остаётся за страницами: у «Профиля» подпись набрана
+   --t-body-sm, у остальных --t-caption. Общее здесь только раскладка. */
+.kv { margin: 0; display: flex; flex-direction: column; }
 
 /* Прочерк на месте отсутствующего значения — раздел 10: «Нет данных — —
    (--text-4). Не „0“, не „N/A“». Объявлялся тремя страницами дословно. */
@@ -396,6 +414,10 @@ h3 { font: var(--t-h3); }
 *::-webkit-scrollbar-thumb { background: var(--gph-500); border-radius: var(--r-pill); }
 *::-webkit-scrollbar-track { background: transparent; }
 
+/* animation-delay гасится вместе с длительностью, и это не мелочь: .rise-N
+   стоит с fill: both, и элемент с задержкой 180ms оставался бы невидимым эти
+   180ms, а потом возникал скачком — то есть при выключенном движении экран
+   собирался бы рывками заметнее, чем при включённом. */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
