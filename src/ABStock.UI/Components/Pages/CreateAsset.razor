@@ -203,6 +203,23 @@
                                                            IncrementLabel="Увеличить потенциал роста" />
                                             <span class="param__range">0 – 100</span>
                                         </div>
+
+                                        @* Дорожка с маркером — раздел 9.2.1: «диапазон — своя
+                                           дорожка с маркером», и артборд 05 показывает её под
+                                           полем. Дорожка ПОКАЗЫВАЕТ положение, а вводит по-прежнему
+                                           поле со степпером: нативный range запрещён тем же
+                                           разделом, а свой перетаскиваемый ползунок — это контрол,
+                                           которого нет ни в ките, ни в разделе 9.
+                                           Пункт 81 docs/ui-backlog.md. *@
+                                        <div class="param__track" aria-hidden="true">
+                                            <span class="param__track-line"></span>
+                                            @if (growthPotential is { } value)
+                                            {
+                                                <span class="param__track-mark" style="left:@(value)%"></span>
+                                            }
+                                            <span class="param__track-min num-xs">0</span>
+                                            <span class="param__track-max num-xs">100</span>
+                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -258,7 +275,18 @@
                         {
                             <span class="chip">господдержка учтена</span>
                         }
-                        <span class="badge badge--@(IsFallbackProfile ? "warn" : "acc")">@SourceBadge</span>
+                        @if (growthPotential is { } potential)
+                        {
+                            <span class="chip">потенциал роста <span class="num-sm">@potential</span></span>
+                        }
+                        @* Бейдж источника — только у запасного профиля. В обычном
+                           состоянии артборд 03 его не показывает: «Профиль построен AI»
+                           это спецификация из артборда 05, а не отметка на экране.
+                           Пункт 83 docs/ui-backlog.md. *@
+                        @if (IsFallbackProfile)
+                        {
+                            <span class="badge badge--warn">@SourceBadge</span>
+                        }
                     </div>
                 </TitleContent>
                 <Context>@SourceNote</Context>

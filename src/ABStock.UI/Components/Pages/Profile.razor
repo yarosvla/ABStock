@@ -246,7 +246,7 @@
                                     <span class="setting__note">С него открывается график на «Торгах».</span>
                                 </div>
                                 <Segmented TValue="string"
-                                           Items="@PreviewTimeframes"
+                                           Items="@SettingTimeframes"
                                            Value="@Preferences.DefaultTimeframe"
                                            ValueChanged="SetTimeframe"
                                            Label="Таймфрейм по умолчанию" />
@@ -463,8 +463,24 @@
     private string Initials => UserPreferences.GetInitials(Preferences.OperatorName);
     private bool HasRuns => historyOverview.RunCount > 0;
 
-    private static readonly SegmentedItem<string>[] PreviewTimeframes =
+    /// <summary>
+    /// Таймфреймы настройки — все шесть: это рабочий контрол, и человек
+    /// выбирает из полного списка.
+    /// </summary>
+    private static readonly SegmentedItem<string>[] SettingTimeframes =
         Timeframes.All.Select(option => new SegmentedItem<string>(option.Key, option.Label)).ToArray();
+
+    /// <summary>
+    /// Таймфреймы предпросмотра — три, как в артборде 02. Предпросмотру надо
+    /// показать, КАК выглядит сегментированный контрол, а не весь список: с
+    /// зеркальной парой колонок шесть сегментов на 1280 не помещались, и «1h»
+    /// вылезал за край панели.
+    /// </summary>
+    private static readonly SegmentedItem<string>[] PreviewTimeframes =
+        Timeframes.All
+            .Where(option => option.Key is "1m" or "15m" or "1h")
+            .Select(option => new SegmentedItem<string>(option.Key, option.Label))
+            .ToArray();
 
     /// <summary>
     /// Время начала сессии — из той же сводки прогона, что у чипа сессии на
