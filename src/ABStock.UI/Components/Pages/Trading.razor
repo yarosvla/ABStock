@@ -803,16 +803,13 @@
     private string selectedTimeframe = Timeframes.DefaultKey;
     private SimulationTickResult? latestTick;
     private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
-    private DateTimeOffset runStartedAt = DateTimeOffset.Now;
-
     /// <summary>
-    /// Длительность идущей сессии для чипа. Считается от того же начала, что и
-    /// на «Агентах», — из сводки прогона, а не от захода на страницу: иначе
-    /// переход между экранами обнулял бы счётчик и сессия «начиналась заново»
-    /// на каждой навигации.
+    /// Длительность сессии для чипа — тем же расчётом, что на «Агентах»
+    /// (<see cref="SessionClock"/>). Из сводки прогона, а не от захода на
+    /// страницу: иначе переход между экранами обнулял бы счётчик и сессия
+    /// «начиналась заново» на каждой навигации.
     /// </summary>
-    private string Elapsed =>
-        (DateTimeOffset.Now - runStartedAt).ToString(@"hh\:mm\:ss");
+    private string? Elapsed => SessionClock.Format(SimulationRunner.IsRunning, currentRunSummary);
     private ElementReference chartViewport;
     private IJSObjectReference? tradingChartModule;
     private bool isChartRegistered;
@@ -889,13 +886,13 @@
     private int? SessionTick => latestTick?.Tick ?? currentRunSummary?.TickCount;
 
     /// <summary>
-    /// Длительность закончившейся сессии. Времени окончания в сводке прогона
-    /// нет, но шаг симуляции — ровно секунда (CreateSessionConfig), поэтому
-    /// число тиков и есть длительность в секундах. Выдумывать её из разницы
-    /// «сейчас минус старт» нельзя: страницу могли открыть через час.
+    /// Длительность закончившейся сессии для панели итогов. Тот же расчёт, что
+    /// у чипа (<see cref="SessionClock"/>), но прочерк вместо нулей: в панели
+    /// итогов «00:00:00» означало бы сессию нулевой длины, а не её отсутствие
+    /// (раздел 10).
     /// </summary>
-    private string SessionDuration => currentRunSummary is { TickCount: > 0 } summary
-        ? TimeSpan.FromSeconds(summary.TickCount).ToString(@"hh\:mm\:ss")
+    private string SessionDuration => currentRunSummary is { TickCount: > 0 }
+        ? SessionClock.Format(running: false, currentRunSummary) ?? "—"
         : "—";
 
     private TimeframeSeriesState GetSelectedTimeframeState() => timeframeSeriesStates[selectedTimeframe];
@@ -1189,7 +1186,6 @@
         latestTick = null;
         currentRunSummary = null;
         observedRunId = Guid.Empty;
-        runStartedAt = DateTimeOffset.Now;
         lastChartUpdate = DateTimeOffset.Now;
         chartStatePrimed = false;
         tradeHistoryPrimed = false;
@@ -1233,7 +1229,6 @@
             && currentRunSummary is not null
             && now - lastSummaryRead < SummaryRefreshInterval)
         {
-            runStartedAt = currentRunSummary.StartedAt.ToLocalTime();
             return;
         }
 
@@ -1241,10 +1236,6 @@
         observedRunId = runId;
         lastSummaryRead = now;
 
-        if (currentRunSummary is not null)
-        {
-            runStartedAt = currentRunSummary.StartedAt.ToLocalTime();
-        }
     }
 
     private bool SimulationMatchesCurrentAsset()
