@@ -297,9 +297,13 @@
     /// </summary>
     private int SessionTradeCount => runSummary?.TradeCount ?? 0;
 
-    private string Elapsed => runSummary is null
-        ? "00:00:00"
-        : (DateTimeOffset.Now - runSummary.StartedAt.ToLocalTime()).ToString(@"hh\:mm\:ss");
+    /// <summary>
+    /// Длительность сессии для чипа. Расчёт — в <see cref="SessionClock"/>:
+    /// здесь он был верен только для идущей сессии, а после остановки давал
+    /// «сейчас минус старт», то есть рос и после остановки. Не было видно
+    /// потому, что остановленный чип показывал слова вместо числа.
+    /// </summary>
+    private string? Elapsed => SessionClock.Format(SimulationRunner.IsRunning, runSummary);
 
     private IReadOnlyDictionary<AgentType, IReadOnlyList<ChartPoint>> EquitySeries => EquityHistory.Series;
 
