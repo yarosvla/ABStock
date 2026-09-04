@@ -4,8 +4,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--s-2);
-    /* Высота чипа зафиксирована разделом 9.6 в 22px, токена под неё нет. */
-    height: 22px;
+    /* Высота чипа — раздел 9.6, токен --h-chip. */
+    height: var(--h-chip);
     padding: 0 var(--s-3);
     border-radius: var(--r-pill);
     background: var(--fill-soft);
