@@ -26,8 +26,6 @@
     var snapshot = latestTick?.Snapshot;
     var chart = ChartSummary;
     var book = OrderBookData;
-    var spread = Spread;
-    var status = Status;
     var trades = RecentTrades;
     var agents = SessionAgents;
     var isStale = latestTick is not null && (DateTimeOffset.Now - lastChartUpdate).TotalSeconds > 5;
@@ -90,14 +88,23 @@
                          new("Активы", Href: "/create-asset"),
                          new(CurrentAsset.Draft.Name, IsAsset: true),
                          new("Торги")
-                     })" />
+                     })">
+            @* Чип состояния сессии — вне <nav>, справа от пути (раздел 13).
+               Тот же компонент и то же место, что на «Агентах»: длительность
+               сессии обязана читаться одинаково на всех экранах, где сессия
+               идёт. Здесь его не было вовсе — шапка ссылалась на него, чтобы
+               не дублировать длительность, а показывать её было нечему. *@
+            <Aside>
+                <SessionChip Running="isRunning" Elapsed="@Elapsed" />
+            </Aside>
+        </Breadcrumbs>
 
         @* ── PageHeader: H1 + одна строка контекста · до двух действий ───────── *@
         <PageHead Title="Торги">
             <Context>
                 @* Формулировки из артбордов 01–03. Длительность идущей сессии здесь
-                   не повторяется: её показывает чип сессии в шапке, и второе такое же
-                   число рядом — дубль по разделу 9.0 (пункт 31). *@
+                   не повторяется: её показывает чип сессии рядом с крошками, и
+                   второе такое же число — дубль по разделу 9.0 (пункт 31). *@
                 @if (isRunning)
                 {
                     <text>Сессия открыта <span class="num-sm">@SessionOpenedAt</span> · агентов в работе <span class="num-sm">@agents.Count</span></text>
@@ -788,10 +795,6 @@
     private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
     private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
 
-    private SpreadData Spread => BuildSpreadData(latestTick);
-
-    private StatusStripData Status => BuildStatusStripData(latestTick);
-
     private TradeRow[] RecentTrades => BuildTradeRows(tradeHistory);
 
     private ChartSummaryData ChartSummary => BuildChartSummaryData(GetSelectedTimeframeState(), latestTick, lastChartUpdate);
@@ -801,6 +804,15 @@
     private SimulationTickResult? latestTick;
     private DateTimeOffset lastChartUpdate = DateTimeOffset.Now;
     private DateTimeOffset runStartedAt = DateTimeOffset.Now;
+
+    /// <summary>
+    /// Длительность идущей сессии для чипа. Считается от того же начала, что и
+    /// на «Агентах», — из сводки прогона, а не от захода на страницу: иначе
+    /// переход между экранами обнулял бы счётчик и сессия «начиналась заново»
+    /// на каждой навигации.
+    /// </summary>
+    private string Elapsed =>
+        (DateTimeOffset.Now - runStartedAt).ToString(@"hh\:mm\:ss");
     private ElementReference chartViewport;
     private IJSObjectReference? tradingChartModule;
     private bool isChartRegistered;
@@ -1990,53 +2002,6 @@
                 GetTradeClass(trade)))
             .ToArray();
 
-    private SpreadData BuildSpreadData(SimulationTickResult? tickResult)
-    {
-        var snapshot = tickResult?.Snapshot;
-        if (snapshot?.BestBid is null || snapshot.BestAsk is null)
-        {
-            return new SpreadData("— / —", "Спред недоступен");
-        }
-
-        var spread = snapshot.BestAsk.Value - snapshot.BestBid.Value;
-        var mid = (snapshot.BestAsk.Value + snapshot.BestBid.Value) / 2m;
-        var spreadPercent = mid == 0m ? 0m : spread / mid * 100m;
-
-        return new SpreadData(
-            $"{FormatMoney(snapshot.BestBid.Value)} / {FormatMoney(snapshot.BestAsk.Value)}",
-            $"Спред {FormatPrice(spread)} ₽ ({spreadPercent:0.00}%)");
-    }
-
-    private StatusStripData BuildStatusStripData(SimulationTickResult? tickResult)
-    {
-        var snapshot = tickResult?.Snapshot;
-        var prices = snapshot?.RecentPrices.Count > 0
-            ? snapshot.RecentPrices
-            : [DemoStartPrice];
-        var low = prices.Min();
-        var high = prices.Max();
-        var last = snapshot?.LastPrice ?? DemoStartPrice;
-        var rangePosition = high == low ? 50 : (int)Math.Round((last - low) / (high - low) * 100m);
-        var spread = BuildSpreadData(tickResult);
-        var bidDepth = tickResult?.OrderBook.Bids.Sum(level => level.Quantity) ?? 0m;
-        var askDepth = tickResult?.OrderBook.Asks.Sum(level => level.Quantity) ?? 0m;
-        var totalDepth = bidDepth + askDepth;
-        var liquidity = GetLiquidity(tickResult, totalDepth);
-        var elapsed = DateTimeOffset.Now - runStartedAt;
-
-        return new StatusStripData(
-            elapsed.ToString(@"hh\:mm\:ss"),
-            FormatQuantity(seenTradeIds.Count),
-            FormatQuantity(tickResult?.Agents.Count ?? 0),
-            $"{FormatMoney(low)} - {FormatMoney(high)}",
-            $"left: {Math.Clamp(rangePosition, 0, 100)}%",
-            liquidity.Label,
-            liquidity.ClassName,
-            $"{spread.Detail}; глубина {FormatQuantity(totalDepth)} шт.");
-    }
-
-    private static string FormatMoney(decimal value) => $"{value:F2} ₽";
-
     private static string FormatPrice(decimal value) => value.ToString("F2");
 
     private static string FormatQuantity(decimal value) => value % 1m == 0m
@@ -2125,30 +2090,6 @@
         return builder.ToString();
     }
 
-    private static (string Label, string ClassName) GetLiquidity(SimulationTickResult? tickResult, decimal totalDepth)
-    {
-        if (tickResult?.Snapshot.BestBid is null || tickResult.Snapshot.BestAsk is null)
-        {
-            return ("Нет данных", "");
-        }
-
-        var mid = (tickResult.Snapshot.BestBid.Value + tickResult.Snapshot.BestAsk.Value) / 2m;
-        var spreadPercent = mid == 0m ? 100m : (tickResult.Snapshot.BestAsk.Value - tickResult.Snapshot.BestBid.Value) / mid *
-100m;
-
-        if (spreadPercent <= 0.5m && totalDepth >= 10m)
-        {
-            return ("Высокая", "positive");
-        }
-
-        if (spreadPercent <= 2m && totalDepth >= 4m)
-        {
-            return ("Средняя", "");
-        }
-
-        return ("Низкая", "negative");
-    }
-
     private void HandleNewsFeedChanged() => _ = InvokeAsync(StateHasChanged);
 
     public void Dispose()
@@ -2187,16 +2128,6 @@
         IReadOnlyList<OrderBookRow> Asks,
         IReadOnlyList<OrderBookRow> Bids);
     private sealed record OrderBookRow(string Price, string Volume, string Orders, int Depth, string DepthStyle, bool IsEmpty);
-    private sealed record SpreadData(string Value, string Detail);
-    private sealed record StatusStripData(
-        string Elapsed,
-        string TradeCount,
-        string Participants,
-        string Range,
-        string RangeMarkerStyle,
-        string Liquidity,
-        string LiquidityClass,
-        string LiquidityDetail);
     private sealed record TradeRow(string Time, string Price, string Volume, string Buyer, string Seller, string SideClass);
     /// <summary>
     /// Поля MarketState здесь больше нет: оно не читалось нигде и было третьим
