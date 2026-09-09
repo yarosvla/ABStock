@@ -18,10 +18,13 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
     private List<ITradeAgent> _agents = [];
     private SimulationTickResult? _current;
     private Guid _currentRunId = Guid.Empty;
+    private string? _assetName;
     private volatile NewsSignal? _pendingNews;
     private int _tick;
 
     public event Action<SimulationTickResult>? OnTick;
+
+    public event Action? OnStateChanged;
 
     public SimulationTickResult? Current
     {
@@ -41,6 +44,22 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             lock (_sync)
             {
                 return _runTask is { IsCompleted: false };
+            }
+        }
+    }
+
+    /// <summary>
+    /// Имя актива идущего прогона. Читается тем же замком и тем же условием,
+    /// что <see cref="IsRunning"/>: состояние и имя не могут разойтись, и
+    /// имя остановленного прогона наружу не выходит.
+    /// </summary>
+    public string? CurrentAssetName
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _runTask is { IsCompleted: false } ? _assetName : null;
             }
         }
     }
@@ -87,11 +106,14 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
 
             var exchange = _exchangeEngineFactory.Create(config.StartPrice);
             var agents = _agentFactory.Create(config.Agents).ToList();
+            EnsureUniqueAgentNames(agents);
+            SetInitialPortfolioValue(agents, config.StartPrice);
             var startedAt = DateTimeOffset.UtcNow;
 
             _exchange = exchange;
             _agents = agents;
             _currentRunId = _marketHistoryStore.StartRun(config, startedAt);
+            _assetName = config.AssetName;
             _tick = 0;
             _current = null;
             _pendingNews = null;
@@ -99,9 +121,10 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             _runCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var runCts = _runCts;
             _runTask = Task.Run(() => RunLoopAsync(config, runCts.Token), CancellationToken.None);
-
-            return Task.CompletedTask;
         }
+
+        OnStateChanged?.Invoke();
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync()
@@ -129,6 +152,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
         catch (OperationCanceledException)
         {
         }
+
+        OnStateChanged?.Invoke();
     }
 
     public SubmitResult SubmitOrder(SimulationDebugOrderRequest request)
@@ -183,12 +208,15 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             _agents.Add(agent);
 
             var marketSnapshot = _exchange.GetSnapshot();
+            SetInitialPortfolioValue([agent], marketSnapshot.LastPrice);
             agentSnapshot = new AgentSnapshot(
                 agent.State.AgentName,
                 agent.State.AgentType,
                 agent.State.Cash,
                 agent.State.Position,
-                agent.State.GetPortfolioValue(marketSnapshot.LastPrice));
+                agent.State.GetPortfolioValue(marketSnapshot.LastPrice),
+                agent.State.InitialCash,
+                agent.State.InitialPortfolioValue);
             tickResult = CreateTickResultLocked(marketSnapshot);
         }
 
@@ -197,9 +225,12 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
         return agentSnapshot;
     }
 
-    private string GetUniqueAgentNameLocked(string agentName)
+    private string GetUniqueAgentNameLocked(string agentName) =>
+        GetUniqueAgentName(_agents, agentName);
+
+    private static string GetUniqueAgentName(IReadOnlyList<ITradeAgent> existing, string agentName)
     {
-        if (_agents.All(agent => !string.Equals(agent.State.AgentName, agentName, StringComparison.Ordinal)))
+        if (existing.All(agent => !string.Equals(agent.State.AgentName, agentName, StringComparison.Ordinal)))
         {
             return agentName;
         }
@@ -211,9 +242,27 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             candidate = $"{agentName}{index}";
             index++;
         }
-        while (_agents.Any(agent => string.Equals(agent.State.AgentName, candidate, StringComparison.Ordinal)));
+        while (existing.Any(agent => string.Equals(agent.State.AgentName, candidate, StringComparison.Ordinal)));
 
         return candidate;
+    }
+
+    /// <summary>
+    /// Имя агента зашито константой в классе стратегии, поэтому несколько
+    /// агентов одного типа получают одно имя. По имени агенты сопоставляются
+    /// в ApplyTradesToAgents, OrderFinancialGuard и AgentReservations —
+    /// на дубликатах ToDictionary бросает исключение, а резервы и сделки
+    /// достались бы не тому агенту. Разводим имена сразу при создании.
+    /// </summary>
+    private static void EnsureUniqueAgentNames(IReadOnlyList<ITradeAgent> agents)
+    {
+        var named = new List<ITradeAgent>(agents.Count);
+
+        foreach (var agent in agents)
+        {
+            agent.State.AgentName = GetUniqueAgentName(named, agent.State.AgentName);
+            named.Add(agent);
+        }
     }
 
     private async Task RunLoopAsync(SimulationConfig config, CancellationToken ct)
@@ -251,6 +300,7 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
                 _exchange = null;
                 _agents = [];
                 _currentRunId = Guid.Empty;
+                _assetName = null;
                 _current = null;
                 _pendingNews = null;
             }
@@ -270,8 +320,13 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
 
         AgentReservations.Refresh(_exchange, _agents);
 
-        var allOrders = _agents
-            .SelectMany(a => a.Decide(snapshot, news).Orders)
+        // Решения агентов несут готовое Explanation — сохраняем их, а не только заявки.
+        var decisions = _agents
+            .Select(a => a.Decide(snapshot, news))
+            .ToList();
+
+        var allOrders = decisions
+            .SelectMany(decision => decision.Orders)
             .ToList();
 
         var newSnapshot = snapshot;
@@ -282,10 +337,12 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             newSnapshot = submitResult.Snapshot;
         }
 
-        return CreateTickResultLocked(newSnapshot);
+        return CreateTickResultLocked(newSnapshot, decisions);
     }
 
-    private SimulationTickResult CreateTickResultLocked(MarketSnapshot snapshot)
+    private SimulationTickResult CreateTickResultLocked(
+        MarketSnapshot snapshot,
+        IReadOnlyList<AgentDecision>? decisions = null)
     {
         if (_exchange is null)
         {
@@ -296,7 +353,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             ++_tick,
             snapshot,
             _exchange.GetOrderBookSnapshot(depth: 8),
-            GetAgentSnapshots(_agents, snapshot.LastPrice)
+            GetAgentSnapshots(_agents, snapshot.LastPrice),
+            decisions ?? []
         );
 
         _current = tickResult;
@@ -334,6 +392,14 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
         }
     }
 
+    private static void SetInitialPortfolioValue(IReadOnlyList<ITradeAgent> agents, decimal price)
+    {
+        foreach (var agent in agents)
+        {
+            agent.State.InitialPortfolioValue = agent.State.GetPortfolioValue(price);
+        }
+    }
+
     private static IReadOnlyList<AgentSnapshot> GetAgentSnapshots(
         IReadOnlyList<ITradeAgent> agents,
         decimal lastPrice) =>
@@ -342,6 +408,8 @@ public sealed class SimulationRunner : ISimulationRunner, ISimulationDebugContro
             a.State.AgentType,
             a.State.Cash,
             a.State.Position,
-            a.State.GetPortfolioValue(lastPrice)
+            a.State.GetPortfolioValue(lastPrice),
+            a.State.InitialCash,
+            a.State.InitialPortfolioValue
         )).ToArray();
 }

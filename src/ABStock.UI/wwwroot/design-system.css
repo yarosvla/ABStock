@@ -1,0 +1,424 @@
+/* ============================================================================
+   ABStock Design System v2.0 — «Инструмент»
+   Монохром · стекло только на плавающих слоях · плоский фон
+   Единственный источник значений. Ни макет, ни .razor.css не объявляет свой hex.
+   ============================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  /* ---------- 1. ГРАФИТ ---------- */
+  --gph-950: #08090B;   /* фон документа */
+  --gph-900: #0C0D0F;   /* базовый слой */
+  --gph-850: #101113;   /* ПАНЕЛЬ (основная рабочая поверхность) */
+  --gph-800: #141618;   /* вложенная поверхность */
+  --gph-750: #191B1E;   /* строка hover, инпут */
+  --gph-700: #1F2225;   /* строка выбранная */
+  --gph-600: #292C30;
+  --gph-500: #383C41;   /* скроллбар, непрозрачные бордюры */
+  --gph-400: #4A4F55;
+
+  /* ---------- 2. ТЕКСТ ---------- */
+  --text-1: #F0F1F2;
+  --text-2: #A8ACB1;
+  --text-3: #7C8288;
+  --text-4: #4E545A;
+
+  /* ---------- 3. АКЦЕНТ ----------
+     Акцент — не цвет, а СВЕТ. Первичное действие = светлая заливка.
+     Значения здесь — пресет «Графит» (раздел 3.1): собственный облик
+     системы, монохромный, и значение по умолчанию. Блок
+     [data-accent="graphite"] ниже повторяет их дословно, поэтому
+     документ без атрибута и документ с graphite неразличимы.
+
+     Кольца фокуса отдельным токеном нет: седьмой токен не входит в
+     пресет и разошёлся бы с шестью остальными при смене акцента.
+     Фокус берёт --acc-400 (раздел 3.1).                                   */
+  --acc-400: #F5F6F7;   /* hover заливки · кольцо фокуса */
+  --acc-500: #E9EBEE;   /* PRIMARY заливка */
+  --acc-600: #CBCCCF;   /* active / pressed */
+  --acc-ink:  #0C0D0F;  /* текст поверх светлой заливки */
+  --acc-soft: rgba(255, 255, 255, 0.075);  /* фон выбранного состояния */
+  --acc-line: rgba(240, 241, 243, 0.42);   /* кромка активного элемента */
+
+  /* ---------- 4. РЫНОК — приглушённый, «печатный», не неон ---------- */
+  --up-400:  #59BE93;
+  --up-500:  #3FA37A;
+  --up-700:  #2A6E53;
+  --up-soft: rgba(63, 163, 122, 0.14);
+  --up-bar:  rgba(63, 163, 122, 0.16);
+
+  --down-400:  #E3767F;
+  --down-500:  #D2555F;
+  --down-700:  #93373F;
+  --down-soft: rgba(210, 85, 95, 0.14);
+  --down-bar:  rgba(210, 85, 95, 0.16);
+
+  --warn-500: #C99A4E;
+  --warn-soft: rgba(201, 154, 78, 0.14);
+
+  /* ---------- 5. АГЕНТЫ — низкая насыщенность, «чернила» ---------- */
+  --agent-trend:   #8E96C4;
+  --agent-counter: #6FA5A8;
+  --agent-mm:      #A8A17A;
+  --agent-news:    #C08E63;
+
+  /* Приглушённые варианты — линия типа, погашенная на время подсветки
+     соседней (30 % непрозрачности). Готовыми значениями, а не вычислением
+     из основных: график читает их как строки и подставляет без разбора. */
+  --agent-trend-dim:   rgba(142, 150, 196, 0.30);
+  --agent-counter-dim: rgba(111, 165, 168, 0.30);
+  --agent-mm-dim:      rgba(168, 161, 122, 0.30);
+  --agent-news-dim:    rgba(192, 142, 99, 0.30);
+
+  /* ---------- 6. ЛИНИИ И НЕЙТРАЛЬНАЯ ЗАЛИВКА ---------- */
+  /* Фон чипа и hover вторичной кнопки — раздел 9.6 и 9.2. Нейтральная,
+     НЕ акцентная: чип тикера и чип отрасли не интерактивны, и красить их
+     акцентом значило бы красить данные (раздел 3.1). --acc-soft здесь
+     когда-то стоял именно поэтому и был снят.                             */
+  --fill-soft: rgba(255, 255, 255, 0.045);
+
+  --line-1: rgba(255, 255, 255, 0.055);  /* разделители внутри панели */
+  --line-2: rgba(255, 255, 255, 0.085);  /* кромка панели */
+  --line-3: rgba(255, 255, 255, 0.16);   /* hover / активная кромка */
+
+  /* ---------- 7. СПЕЙСИНГ (шаг 4) ---------- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --s-14: 56px; --s-18: 72px;
+
+  /* ---------- 8. РАДИУСЫ — сдержанные ---------- */
+  --r-xs: 4px;
+  --r-sm: 6px;    /* инпут, кнопка sm, чип */
+  --r-md: 8px;    /* кнопка, вложенная поверхность */
+  --r-lg: 12px;   /* ПАНЕЛЬ */
+  --r-xl: 16px;   /* модалка */
+  --r-pill: 999px;
+
+  /* ---------- 9. ТЕНИ — только у того, что реально висит ---------- */
+  --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --sh-md: 0 8px 24px -12px rgba(0, 0, 0, 0.65);
+  --sh-lg: 0 24px 56px -24px rgba(0, 0, 0, 0.78);
+
+  /* ---------- 10. ТИПОГРАФИКА ---------- */
+  --font-ui:  'Golos Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-num: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Размеры отдельно от шорткатов. Шорткат --t-* задаёт сразу начертание,
+     размер и интерлиньяж — это удобно тексту и вредно контролу: кнопке из
+     него нужен ТОЛЬКО размер, а начертание у неё своё (500 у обычной, 600 у
+     первичной) и интерлиньяж свой (line-height: 1, иначе текст не встаёт по
+     центру фиксированной высоты). Раньше кнопка объявляла 13px, 12px и 14px
+     литералами, потому что взять их было неоткуда: пункт 3
+     docs/ui-backlog.md. Шкала — те же семь размеров, что задаёт таблица
+     раздела 4, и шорткаты ниже собраны из неё же, чтобы у размера был один
+     источник. */
+  --fs-display: 30px;
+  --fs-h1:      22px;
+  --fs-h2:      16px;
+  --fs-body:    14px;
+  --fs-dense:   13px;
+  --fs-caption: 12px;
+  --fs-micro:   11px;
+
+  --t-display: 600 var(--fs-display)/36px var(--font-ui);
+  --t-h1:      600 var(--fs-h1)/28px var(--font-ui);
+  --t-h2:      600 var(--fs-h2)/22px var(--font-ui);
+  --t-h3:      600 var(--fs-body)/20px var(--font-ui);
+  --t-body:    400 var(--fs-body)/20px var(--font-ui);
+  --t-body-sm: 400 var(--fs-dense)/18px var(--font-ui);
+  --t-caption: 400 var(--fs-caption)/16px var(--font-ui);
+  --t-micro:   500 var(--fs-micro)/14px var(--font-ui);
+
+  --n-hero: 500 34px/38px var(--font-num);
+  --n-lg:   500 20px/24px var(--font-num);
+  --n-md:   400 14px/20px var(--font-num);
+  --n-sm:   400 12px/16px var(--font-num);
+  --n-xs:   400 11px/14px var(--font-num);
+
+  /* ---------- 11. ПЛОТНОСТЬ ---------- */
+  --h-nav: 56px;
+  --h-ctl-lg: 40px;
+  --h-ctl-md: 32px;
+  --h-ctl-sm: 26px;
+  --h-chip: 22px;       /* чип — раздел 9.6 */
+  --h-badge: 20px;      /* бейдж-состояние — раздел 9.6 */
+  --h-crumbs: 24px;     /* полоса крошек — раздел 13 */
+  --h-thead: 28px;      /* шапка таблицы */
+  --h-row: 32px;        /* строка таблицы */
+  --h-row-dense: 26px;  /* строка стакана / ленты */
+  --h-row-tall: 46px;   /* строка с объяснением в две строки */
+  --rail-left: 280px;      /* левый рельс */
+  --rail-right: 340px;     /* правый рельс */
+  --rail-right-md: 300px;  /* правый рельс при <1440 */
+  --center-min: 600px;     /* ориентир минимума центра */
+  --bp-md: 1440px;
+  --bp-sm: 1280px;
+  /* Ширина модалки названа в разделе 9.12 — значит величина системная, и
+     литералу по месту там не место (18.3). Широкая объявлена вместе с узкой:
+     раздел описывает обе, и оставить половину правила без токена значит
+     завести ловушку на первое же широкое окно. */
+  --w-modal: 520px;
+  --w-modal-wide: 840px;
+
+  --page-max: 1680px;
+  --page-pad: 28px;
+  --gutter: 16px;
+
+  /* ---------- 12. ДВИЖЕНИЕ ---------- */
+  --d-instant: 100ms;
+  --d-fast:    160ms;
+  --d-base:    220ms;
+  --d-slow:    340ms;
+  --d-shimmer: 1400ms;
+  --d-pulse:   2400ms;
+  --e-out:   cubic-bezier(0.2, 0.8, 0.2, 1);
+  --e-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --e-exit:  cubic-bezier(0.4, 0, 1, 1);
+
+  /* ---------- 13. СТЕКЛО — только плавающие слои ---------- */
+  --glass-blur: 20px;
+  --glass-sat:  120%;
+  --glass-tint: rgba(16, 17, 19, 0.72);
+  --overlay-tint: rgba(8, 9, 11, 0.66);
+  --overlay-blur: 6px;
+
+  --z-bg: 0; --z-content: 1; --z-nav: 100; --z-dropdown: 200; --z-modal: 300; --z-toast: 400;
+}
+
+/* ============================================================================
+   ПРЕСЕТЫ АКЦЕНТА — раздел 3.1
+   Пресет задаёт РОВНО шесть токенов и ничего кроме. Переключение — смена
+   атрибута data-accent на корне документа, не пересборка стилей.
+
+   Акцент красит только интерактив: заливку первичной кнопки, кольцо фокуса,
+   подчёркивание активного пункта навигации, полосу выбранной строки,
+   активный сегмент, включённый тумблер, кромку поля в фокусе. Данные —
+   числа, дельты, P/L, свечи, стакан, линии агентов, бейджи тональности —
+   не красит никогда: сменивший акцент не должен увидеть, что рынок стал
+   другого цвета.
+
+   Оттенок обязан читаться не только в заливке: --acc-line и --acc-soft
+   несут тон, иначе система остаётся монохромной везде, кроме кнопки.
+   ============================================================================ */
+
+/* «Графит» — дословная копия :root. Собственный облик системы и значение
+   по умолчанию: документ без атрибута выглядит ровно так же. */
+[data-accent="graphite"]    { --acc-400:#F5F6F7; --acc-500:#E9EBEE; --acc-600:#CBCCCF; --acc-ink:#0C0D0F; --acc-soft:rgba(255,255,255,0.075); --acc-line:rgba(240,241,243,0.42); }
+[data-accent="steel"]       { --acc-400:#C8D2E0; --acc-500:#AEBBCB; --acc-600:#8C9EB5; --acc-ink:#0C0D0F; --acc-soft:rgba(128,163,208,0.15);  --acc-line:rgba(146,174,211,0.62); }
+[data-accent="ultramarine"] { --acc-400:#B2BFF5; --acc-500:#8DA0EC; --acc-600:#6F87E8; --acc-ink:#0C0D0F; --acc-soft:rgba(86,119,251,0.15);   --acc-line:rgba(108,136,249,0.62); }
+[data-accent="azure"]       { --acc-400:#B1DFF6; --acc-500:#8CCDEE; --acc-600:#5BB8E6; --acc-ink:#0C0D0F; --acc-soft:rgba(86,196,251,0.15);   --acc-line:rgba(107,202,250,0.62); }
+[data-accent="turquoise"]   { --acc-400:#B8EFE8; --acc-500:#96E3D9; --acc-600:#6AD7C9; --acc-ink:#0C0D0F; --acc-soft:rgba(97,239,220,0.15);   --acc-line:rgba(119,238,222,0.62); }
+[data-accent="lavender"]    { --acc-400:#C4B6F1; --acc-500:#A794E6; --acc-600:#8F77DF; --acc-ink:#0C0D0F; --acc-soft:rgba(129,94,243,0.15);   --acc-line:rgba(145,116,241,0.62); }
+[data-accent="amethyst"]    { --acc-400:#E3BBED; --acc-500:#D19ADF; --acc-600:#BE70D2; --acc-ink:#0C0D0F; --acc-soft:rgba(208,102,234,0.15);  --acc-line:rgba(212,123,234,0.62); }
+[data-accent="orchid"]      { --acc-400:#F0B7DB; --acc-500:#E495C7; --acc-600:#D968B0; --acc-ink:#0C0D0F; --acc-soft:rgba(241,95,188,0.15);   --acc-line:rgba(240,117,195,0.62); }
+[data-accent="brass"]       { --acc-400:#F4E3B4; --acc-500:#EAD290; --acc-600:#E1BF60; --acc-ink:#0C0D0F; --acc-soft:rgba(248,206,89,0.15);   --acc-line:rgba(246,210,111,0.62); }
+[data-accent="copper"]      { --acc-400:#F3C9B4; --acc-500:#E8AE91; --acc-600:#DF8C62; --acc-ink:#0C0D0F; --acc-soft:rgba(246,142,90,0.15);   --acc-line:rgba(244,157,113,0.62); }
+
+
+/* ============================================================================
+   БАЗА
+   ============================================================================ */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--gph-950);
+  color: var(--text-2);
+  font: var(--t-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+/* ----------------------------------------------------------------------------
+   Наследование шрифта элементами форм и выравнивание строчного svg.
+
+   Эти два правила система раньше получала даром — из reboot bootstrap, и на
+   них молча опиралась. Браузер сам шрифт кнопкам, полям и спискам не
+   наследует: без правила он ставит им собственный Arial 13.3333px/normal, и
+   вместе с ними съезжают иконки внутри — svg наследует шрифт от кнопки.
+   Строчный svg без vertical-align стоит на базовой линии текста, а не по
+   центру строки, и знак уезжает вниз относительно подписи рядом.
+
+   Правила повторяют reboot дословно: значения те же, что были, — снятие
+   bootstrap не должно двигать ни пикселя. Теперь система самодостаточна.
+   ---------------------------------------------------------------------------- */
+button, input, optgroup, select, textarea {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+svg { overflow: hidden; vertical-align: middle; }
+
+h1, h2, h3, h4 { margin: 0; color: var(--text-1); letter-spacing: -0.015em; }
+h1 { font: var(--t-h1); }
+h2 { font: var(--t-h2); }
+h3 { font: var(--t-h3); }
+
+.num      { font: var(--n-md); font-variant-numeric: tabular-nums; color: var(--text-1); }
+.num-hero { font: var(--n-hero); font-variant-numeric: tabular-nums; color: var(--text-1); letter-spacing: -0.02em; }
+.num-lg   { font: var(--n-lg); font-variant-numeric: tabular-nums; color: var(--text-1); letter-spacing: -0.01em; }
+.num-sm   { font: var(--n-sm); font-variant-numeric: tabular-nums; }
+/* .num-xs объявлялся тремя страницами по отдельности, и кто забывал — получал
+   тикающее число шрифтом интерфейса вместо моноширинного: разряды дёргались
+   каждую секунду. Пункты 4 и 5 docs/ui-backlog.md. */
+.num-xs   { font: var(--n-xs); font-variant-numeric: tabular-nums; }
+.label    { font: var(--t-micro); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+.up { color: var(--up-500); } .down { color: var(--down-500); }
+
+/* Пара «ключ — значение» колонкой. Объявлялась дословно «Торгами»,
+   «Новостями» и «Профилем» (пункт 4 docs/ui-backlog.md). Выносить её было
+   нельзя, пока то же имя на детальной агента означало СТРОКУ: глобальное
+   flex-direction: column сложило бы её в колонку, потому что scoped-правило
+   детальной этого свойства не задавало и потому не перекрыло бы. Имя там
+   разведено (.kv-row, пункт 100), и теперь вынос безопасен.
+
+   Оформление dt/dd остаётся за страницами: у «Профиля» подпись набрана
+   --t-body-sm, у остальных --t-caption. Общее здесь только раскладка. */
+.kv { margin: 0; display: flex; flex-direction: column; }
+
+/* Прочерк на месте отсутствующего значения — раздел 10: «Нет данных — —
+   (--text-4). Не „0“, не „N/A“». Объявлялся тремя страницами дословно. */
+.nodata { color: var(--text-4); }
+
+/* Рыночный тон значения. Объявлялся четырьмя страницами, причём .tone-flat
+   означал --text-2 на «Агентах» и детальной, а --text-3 на «Торгах» и
+   «Новостях» — одно имя на два цвета (пункт 99 docs/ui-backlog.md). Сведён к
+   --text-2: ноль это данные, а --text-3 в системе несёт лейблы.
+
+   Страницы, где на элементе висит ещё и классовое правило с большей
+   специфичностью, объявляют тон явно — .agents__c-num.tone-up на «Торгах»,
+   .roster__table .num-sm.tone-up на «Агентах», .price__ohlc .num-sm.tone-up
+   на детальной. Без этого глобальное правило (0,1,0) проигрывает. */
+.tone-up { color: var(--up-500); }
+.tone-down { color: var(--down-500); }
+.tone-flat { color: var(--text-2); }
+
+/* ============================================================================
+   СЛУЖЕБНЫЕ СТРАНИЦЫ — «не найдена» и «ошибка».
+
+   У них нет ни крошек, ни шапки раздела, ни данных: только оболочка и одно
+   пустое состояние по 9.15. Оболочка одна на обе — иначе два файла стилей
+   слово в слово повторяли бы друг друга.
+   ============================================================================ */
+.util-shell {
+  position: relative;
+  z-index: var(--z-content);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* Единственная панель на пустом экране прижимается по центру: вверху она
+   висела бы обрубком. */
+.util-page {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: var(--page-max);
+  margin-inline: auto;
+  padding: var(--page-pad);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ============================================================================
+   ФОН — плоский. Никаких пятен, никакой ауры.
+   ============================================================================ */
+.app-bg {
+  position: fixed; inset: 0; z-index: var(--z-bg); pointer-events: none;
+  background:
+    radial-gradient(140% 90% at 50% -20%, #121417 0%, var(--gph-950) 58%);
+}
+.app-bg__noise {
+  position: absolute; inset: 0; opacity: 0.022; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============================================================================
+   ПОВЕРХНОСТИ
+   .panel — рабочая поверхность страницы. НЕПРОЗРАЧНАЯ. Без блюра.
+   .glass — ТОЛЬКО плавающие слои: шапка, дропдаун, модалка, тултип, тост.
+   ============================================================================ */
+.panel {
+  background: var(--gph-850);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+}
+.panel--quiet { background: transparent; border-color: var(--line-1); box-shadow: none; }
+.panel__head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-3); padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line-1);
+}
+.panel__body { padding: var(--s-5); }
+.panel__body--flush { padding: 0; }
+
+.surface { background: var(--gph-800); border: 1px solid var(--line-1); border-radius: var(--r-md); }
+
+.glass {
+  background: var(--glass-tint);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-sat));
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.07), var(--sh-lg);
+}
+.glass--nav {
+  border-radius: 0; border-width: 0 0 1px 0;
+  box-shadow: none;
+}
+.overlay {
+  position: fixed; inset: 0; z-index: var(--z-modal);
+  background: var(--overlay-tint);
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
+}
+
+/* хайрлайн-группировка: разделять линиями, а не вкладывать коробки в коробки */
+.hairline-top { border-top: 1px solid var(--line-1); }
+.hairline-left { border-left: 1px solid var(--line-1); }
+
+/* ============================================================================
+   ДВИЖЕНИЕ
+   ============================================================================ */
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise var(--d-slow) var(--e-enter) both; }
+.rise-1{animation-delay:30ms}.rise-2{animation-delay:60ms}.rise-3{animation-delay:90ms}
+.rise-4{animation-delay:120ms}.rise-5{animation-delay:150ms}.rise-6{animation-delay:180ms}
+
+@keyframes tick-up   { 0%{background:var(--up-soft)}   100%{background:transparent} }
+@keyframes tick-down { 0%{background:var(--down-soft)} 100%{background:transparent} }
+.tick-up   { animation: tick-up   var(--d-slow) var(--e-exit); }
+.tick-down { animation: tick-down var(--d-slow) var(--e-exit); }
+
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.5} }
+.status-dot--live { animation: pulse-dot var(--d-pulse) ease-in-out infinite; }
+
+@keyframes shimmer { from { background-position: -180% 0; } to { background-position: 180% 0; } }
+.ui-skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.075) 50%, rgba(255,255,255,0.035) 100%);
+  background-size: 180% 100%;
+  animation: shimmer var(--d-shimmer) linear infinite;
+  border-radius: var(--r-sm);
+}
+
+/* ============================================================================
+   ФОКУС, СКРОЛЛБАР, ВЫДЕЛЕНИЕ
+   ============================================================================ */
+:focus-visible { outline: 2px solid var(--acc-400); outline-offset: 2px; border-radius: var(--r-sm); }
+::selection { background: rgba(255,255,255,0.14); color: var(--text-1); }
+* { scrollbar-width: thin; scrollbar-color: var(--gph-500) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--gph-500); border-radius: var(--r-pill); }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* animation-delay гасится вместе с длительностью, и это не мелочь: .rise-N
+   стоит с fill: both, и элемент с задержкой 180ms оставался бы невидимым эти
+   180ms, а потом возникал скачком — то есть при выключенном движении экран
+   собирался бы рывками заметнее, чем при включённом. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}

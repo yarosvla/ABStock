@@ -1,0 +1,63 @@
+/* Полоса баланса — раздел 9.18. Половины различаются светлотой, не цветом.
+
+   Светлота графита, а не акцент: полоса показывает данные (баланс факторов
+   профиля), а акцент данные не красит никогда (раздел 3.1). Пока здесь
+   стояли --acc-600 / --acc-ink / --acc-soft, смена акцента перекрашивала
+   соотношение факторов заодно с кнопкой. */
+
+.ui-balance {
+    display: flex;
+    gap: var(--s-1);
+    height: 22px;
+    min-width: 0;
+}
+
+.ui-balance__half {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    min-width: 0;
+    padding: 0 var(--s-2);
+    border: 1px solid transparent;
+    border-radius: var(--r-xs);
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.ui-balance__half--positive {
+    background: var(--gph-400);
+    color: var(--gph-950);
+}
+
+.ui-balance__half--negative {
+    justify-content: flex-end;
+    background: var(--fill-soft);
+    border-color: var(--line-3);
+    color: var(--text-2);
+}
+
+.ui-balance__half--empty {
+    justify-content: center;
+    background: transparent;
+    border-color: var(--line-1);
+    color: var(--text-4);
+}
+
+/* Затронутая новостью половина. Кромкой --text-1, а не заливкой: заливка
+   несёт долю, и подсветка ею соврала бы о соотношении. */
+.ui-balance__half.is-touched { border-color: var(--text-1); }
+
+.ui-balance__count {
+    font: var(--n-sm);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: inherit;
+}
+
+.ui-balance__caption {
+    font: var(--t-caption);
+    font-weight: 500;
+    color: inherit;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

@@ -16,34 +16,34 @@ public class NewsDrivenAgent : AgentBase
     public override AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal)
     {
         if (newsSignal is null)
-            return HoldDecision("No news");
+            return HoldDecision("новостей в сессии не было — сигнала нет, заявки не выставляются");
 
         if (newsSignal.Polarity == SignalPolarity.Positive)
         {
             if (snapshot.BestAsk is null)
-                return HoldDecision("Positive news, but no asks to buy from");
+                return HoldDecision("новость позитивная, но покупать не у кого — асков нет");
 
             if (!CanBuy(snapshot.BestAsk.Value, _orderQuantity))
-                return HoldDecision("Positive news, but insufficient funds");
+                return HoldDecision("новость позитивная, но денег на покупку не хватает");
 
             var order = CreateMarketOrder(OrderSide.Buy, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
-                $"Positive news (confidence={newsSignal.Confidence:F2}), market buy", [order]);
+                $"позитивная новость, уверенность {newsSignal.Confidence:F2} — покупаю по рынку", [order]);
         }
 
         if (newsSignal.Polarity == SignalPolarity.Negative)
         {
             if (snapshot.BestBid is null)
-                return HoldDecision("Negative news, but no bids to sell into");
+                return HoldDecision("новость негативная, но продавать некому — бидов нет");
 
             if (!CanSell(_orderQuantity))
-                return HoldDecision("Negative news, but insufficient position");
+                return HoldDecision("новость негативная, но позиции для продажи нет");
 
             var order = CreateMarketOrder(OrderSide.Sell, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
-                $"Negative news (confidence={newsSignal.Confidence:F2}), market sell", [order]);
+                $"негативная новость, уверенность {newsSignal.Confidence:F2} — продаю по рынку", [order]);
         }
 
-        return HoldDecision($"News is {newsSignal.Polarity}, holding");
+        return HoldDecision($"новость нейтральная — держу позицию");
     }
 }

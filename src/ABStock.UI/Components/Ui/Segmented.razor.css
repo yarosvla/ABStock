@@ -1,0 +1,47 @@
+/* Высота — --h-ctl-sm, как подписано в артборде «Профиль · Подробности».
+   Прежние 28px не попадали ни в один размер шкалы контролов (26/32/40) и
+   численно совпадали с --h-thead, высотой шапки таблицы, к которой контрол
+   отношения не имеет: пункт 3 docs/ui-backlog.md.
+
+   gap и padding по 2px остаются литералами намеренно: это не шаг раскладки,
+   а внутренний зазор, которым активная плашка вписана в дорожку. Шкала --s-*
+   начинается с 4px, и 4px здесь съели бы половину высоты сегмента. */
+.ui-seg {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: var(--h-ctl-sm);
+    padding: 2px;
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-md);
+    background: var(--gph-800);
+}
+
+.ui-seg__item {
+    height: 20px;
+    padding: 0 var(--s-2);
+    border: 0;
+    border-radius: var(--r-xs);
+    background: transparent;
+    color: var(--text-3);
+    font: var(--n-sm);
+    font-variant-numeric: tabular-nums;
+    line-height: 20px;
+    cursor: pointer;
+    transition: background var(--d-base) var(--e-out), color var(--d-base) var(--e-out);
+}
+
+.ui-seg__item:hover { color: var(--text-2); }
+
+/* Спор 9.5 и 3.1, разрешённый в 2.17: заливка остаётся ТЁМНОЙ — светлая
+   зарезервирована за первичным действием, — а акцент входит слабой
+   подложкой --acc-soft поверх неё и кромкой --acc-line. Сегмент не
+   становится светлым и при этом отзывается на смену акцента. */
+.ui-seg__item.is-active {
+    background: var(--gph-600);
+    /* Подложка налита inset-тенью, а не градиентом из двух одинаковых
+       стопов: градиент на кнопке запрещён разделом 2.9, а заливка нужна
+       плоская. Кромка стоит в списке первой — ранние тени рисуются поверх. */
+    box-shadow: inset 0 0 0 1px var(--acc-line), inset 0 0 0 100px var(--acc-soft);
+    color: var(--text-1);
+}

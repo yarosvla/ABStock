@@ -1,0 +1,51 @@
+/* Тумблер — 36 × 20, ручка 16, по артборду «Профиль · Подробности».
+   Пункт 3 docs/ui-backlog.md искал для прежних 34px ближайший токен и не
+   находил: искать было нечего, это размер из макета. Ход ручки при этом
+   остаётся 14: 36 − 2 кромки − 4 паддинга − 16 ручка.
+
+   Выключенное положение — gph-600 на дорожке и gph-400 на ручке, там же.
+   Прежние --gph-700 и --text-4 подходили по светлоте, но --text-4 это цвет
+   ТЕКСТА, и на ручке он оказался по совпадению, а не по роли. */
+
+.ui-toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.ui-toggle {
+    display: flex;
+    align-items: center;
+    flex: none;
+    width: 36px;
+    height: 20px;
+    padding: 0 2px;
+    background: var(--gph-600);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-pill);
+    cursor: pointer;
+    transition: background var(--d-fast) var(--e-out);
+}
+
+.ui-toggle__knob {
+    width: 16px;
+    height: 16px;
+    border-radius: var(--r-pill);
+    background: var(--gph-400);
+    transition: transform var(--d-fast) var(--e-out), background var(--d-fast) var(--e-out);
+}
+
+.ui-toggle.is-on {
+    background: var(--acc-500);
+    border-color: transparent;
+}
+
+.ui-toggle.is-on .ui-toggle__knob {
+    background: var(--acc-ink);
+    transform: translateX(14px);
+}
+
+.ui-toggle:disabled { cursor: default; opacity: 0.5; }
+
+.ui-toggle__text { font: var(--t-body-sm); color: var(--text-3); }
+.ui-toggle__text.is-on { color: var(--text-1); }

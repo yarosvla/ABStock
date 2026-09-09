@@ -87,7 +87,12 @@ internal sealed class EfSimulationHistoryReader(IDbContextFactory<AbStockDbConte
             .Select(trade => new SimulationActivityItem(
                 trade.ExecutedAt,
                 "Сделка исполнена",
-                $"{trade.BuyerAgentName} ↔ {trade.SellerAgentName} · {trade.Price:F2} ₽"))
+                // Внутреннее имя агента совпадает с именем типа, и в строку
+                // события оно попадало как есть — «CounterTrend ↔ MarketMaker».
+                // Английские слова в русском интерфейсе допустимы только для
+                // тикеров и таймфреймов (раздел 17).
+                $"{ABStock.Shared.AgentTypeNames.LabelForAgentName(trade.BuyerAgentName)} ↔ " +
+                $"{ABStock.Shared.AgentTypeNames.LabelForAgentName(trade.SellerAgentName)} · {trade.Price:F2} ₽"))
             .ToArray();
 
         var recentActivity = recentRunActivity
@@ -110,7 +115,7 @@ internal sealed class EfSimulationHistoryReader(IDbContextFactory<AbStockDbConte
             ABStock.Shared.AssetType.Stock => "Акция",
             ABStock.Shared.AssetType.Bond => "Облигация",
             ABStock.Shared.AssetType.Commodity => "Товар",
-            ABStock.Shared.AssetType.Crypto => "Криптоактив",
+            ABStock.Shared.AssetType.Crypto => "Криптовалюта",
             _ => assetType.ToString()
         };
 }

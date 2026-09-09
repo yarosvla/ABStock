@@ -1,0 +1,63 @@
+@* Кнопка — раздел 9.2. Primary = светлая заливка (акцент как свет, не как цвет).
+   Размеры 26/32/40. Loading не меняет ширину кнопки.
+
+   Содержимое собрано разметкой, а не RenderTreeBuilder-ом со счётчиком:
+   номера последовательности должны быть константами времени компиляции,
+   иначе диффер Blazor путает узлы и привязывает обработчики не к тем кнопкам. *@
+
+@if (Href is null)
+{
+    <button type="button"
+            class="@CssClass"
+            disabled="@IsDisabled"
+            @onclick="OnClick"
+            @attributes="Extra">
+        @if (Loading)
+        {
+            <span class="ui-btn__spinner" aria-hidden="true"></span>
+        }
+        else if (Icon is not null)
+        {
+            <Icon Name="@Icon" Size="@GlyphSize" />
+        }
+        @if (ChildContent is not null)
+        {
+            <span class="ui-btn__label">@ChildContent</span>
+        }
+    </button>
+}
+else
+{
+    <a href="@Href" class="@CssClass" @attributes="Extra">
+        @if (Icon is not null)
+        {
+            <Icon Name="@Icon" Size="@GlyphSize" />
+        }
+        @if (ChildContent is not null)
+        {
+            <span class="ui-btn__label">@ChildContent</span>
+        }
+    </a>
+}
+
+@code {
+    [Parameter] public string Variant { get; set; } = "secondary";
+    [Parameter] public int Size { get; set; } = 32;
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public IReadOnlyDictionary<string, object>? Extra { get; set; }
+
+    private bool IsDisabled => Disabled || Loading;
+
+    private int GlyphSize => Size >= 40 ? 18 : 16;
+
+    private string CssClass =>
+        $"ui-btn ui-btn--{Variant} ui-btn--{Size}{(Loading ? " ui-btn--loading" : "")} {Class}".TrimEnd();
+}

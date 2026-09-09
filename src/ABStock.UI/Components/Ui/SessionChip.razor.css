@@ -1,0 +1,20 @@
+/* Чип сессии — раздел 9.6: pill, высота 22, фон выбранного состояния. */
+
+.ui-session-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-2);
+    /* Высота чипа — раздел 9.6, токен --h-chip. */
+    height: var(--h-chip);
+    padding: 0 var(--s-3);
+    border-radius: var(--r-pill);
+    background: var(--fill-soft);
+}
+
+.ui-session-chip__text {
+    font: var(--t-caption);
+    color: var(--text-2);
+    white-space: nowrap;
+}
+
+.ui-session-chip__text .num-xs { color: var(--text-2); }

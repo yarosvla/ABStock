@@ -9,7 +9,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddABStockAI(this IServiceCollection services)
     {
         services.AddSingleton<INewsProcessingService>(
-            _ => new NewsProcessingService(new StubFinBertAnalyzer(), new StubAspectMatcher()));
+            _ => new NewsProcessingService(new StubFinBertAnalyzer(), new ProfileAspectMatcher()));
         services.AddSingleton<IAssetProfileService, AssetProfileService>();
         return services;
     }

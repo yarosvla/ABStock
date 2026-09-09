@@ -1,92 +1,114 @@
 @using ABStock.Application.Simulation
+@using ABStock.UI.Services
 @implements IDisposable
 @inject ISimulationRunner SimulationRunner
+@inject IUserPreferences Preferences
+@inject INotificationFeed NotificationFeed
+@inject IAgentEquityHistory EquityHistory
 
-<nav class="top-navigation" aria-label="Основная навигация">
-    <a class="brand" href="/" aria-label="ABStock">
-        <span class="brand-mark" aria-hidden="true">
-            <img src="images/abstock-logo.png" alt="" />
-        </span>
-        <span class="brand-name">ABStock</span>
-    </a>
+@* Оболочка приложения — раздел 13. Шапка 56px, стекло (под ней реально
+   проезжает контент), нижняя кромка --line-1. Активный раздел — --text-1
+   плюс светлая линия 2px снизу. *@
 
-    <div class="nav-links" aria-label="Разделы">
-        <a class="@(ActivePage == "CreateAsset" ? "active" : "")" href="/create-asset">Создание актива</a>
-        <a class="@(ActivePage == "Trading" ? "active" : "")" href="/trading">Торги</a>
-        <a class="@(ActivePage == "News" ? "active" : "")" href="/news">Новости</a>
-        <a class="@(ActivePage == "Agents" ? "active" : "")" href="/agents">Агенты</a>
-        <a class="@(ActivePage == "Profile" ? "active" : "")" href="/profile">Профиль</a>
+<nav class="topnav glass glass--nav" aria-label="Основная навигация">
+    <div class="topnav__left">
+        @* Знак слева от слова — раздел 9.22. Цвет знака наследуется от ссылки
+           (--text-1) и на смену акцента не отзывается. *@
+        <a class="topnav__brand" href="/">
+            <BrandMark />
+            <span>ABStock</span>
+        </a>
+
+        <div class="topnav__links">
+            @foreach (var item in Sections)
+            {
+                var isActive = item.Key == ActivePage;
+                <a class="topnav__link @(isActive ? "is-active" : null)"
+                   href="@item.Href"
+                   aria-current="@(isActive ? "page" : null)">
+                    @item.Title
+                    @if (isActive)
+                    {
+                        <span class="topnav__underline" aria-hidden="true"></span>
+                    }
+                </a>
+            }
+        </div>
     </div>
 
-    <div class="nav-actions">
-        <span class="market-status @(IsTradingActive ? "is-running" : "is-stopped")">
-            <span aria-hidden="true"></span>@MarketStatusLabel
-        </span>
+    <div class="topnav__right">
+        <StatusDot Tone="@(IsTradingActive ? "up" : "muted")" Live="IsTradingActive">@MarketStatusLabel</StatusDot>
+
         @if (ShowClock)
         {
-            <span class="clock-chip"><i class="bi bi-clock" aria-hidden="true"></i>@Clock.Time</span>
-            <span class="date-chip">@Clock.Date</span>
+            <span class="topnav__clock num-sm">@Clock</span>
         }
 
-        <div class="notification-wrapper">
-            <button class="icon-button" type="button" aria-label="Уведомления" @onclick="ToggleNotifications">
-                <i class="bi bi-bell" aria-hidden="true"></i>
+        <div class="topnav__bell">
+            <button class="topnav__icon-button" type="button"
+                    aria-label="@NotificationSummaryText"
+                    aria-expanded="@(IsNotificationsOpen ? "true" : "false")"
+                    @onclick="ToggleNotifications">
+                <Icon Name="bell" Size="16" />
                 @if (UnreadNotificationsCount > 0)
                 {
-                    <span class="notification-badge">@UnreadNotificationsCount</span>
+                    <span class="topnav__unread" aria-hidden="true"></span>
                 }
             </button>
         </div>
 
-        <a class="icon-button" href="/profile" aria-label="Настройки">
-            <i class="bi bi-gear" aria-hidden="true"></i>
-        </a>
-        <a class="avatar-button" href="/profile" aria-label="Профиль пользователя">
+        <a class="topnav__avatar" href="/profile" aria-label="Профиль пользователя">
             <span>@AvatarInitials</span>
-            @if (ActivePage == "CreateAsset")
-            {
-                <i class="bi bi-chevron-down" aria-hidden="true"></i>
-            }
         </a>
     </div>
 </nav>
 
 @if (IsNotificationsOpen)
 {
-    <div class="notification-layer" @onclick="CloseNotifications">
-        <div class="notification-dropdown glass-card" @onclick:stopPropagation="true">
-            <div class="notification-header">
+    <div class="notif-layer" @onclick="CloseNotifications">
+        <div class="notif glass" role="dialog" aria-label="Уведомления" @onclick:stopPropagation="true">
+            <div class="notif__head">
                 <div>
                     <h3>Уведомления</h3>
-                    <span>@NotificationSummaryText</span>
+                    <span class="notif__summary">@NotificationSummaryText</span>
                 </div>
-                <button class="mark-all-read" @onclick="ClearNotifications">Очистить</button>
+                <AppButton Variant="ghost" Size="26" OnClick="ClearNotifications">Очистить</AppButton>
             </div>
-            <div class="notification-list">
-                @if (Notifications.Any())
+
+            @* Строка — раздел 9.14 и 2: без иконки, время моноширинное, вид
+               события различается подписью, а не цветной плашкой. *@
+            <div class="notif__list">
+                @if (Visible.Count > 0)
                 {
-                    @foreach (var notification in Notifications)
+                    @foreach (var notification in Visible)
                     {
-                        <div class="notification-item @(notification.IsRead ? "read" : "unread")">
-                            <span class="notification-accent" aria-hidden="true"></span>
-                            <i class="bi @notification.Icon" aria-hidden="true"></i>
-                            <div class="notification-content">
-                                <div class="notification-title-row">
-                                    <strong>@notification.Title</strong>
-                                    @if (!notification.IsRead)
-                                    {
-                                        <span class="notification-pill">Новое</span>
-                                    }
-                                </div>
-                                <p>@notification.Message</p>
-                                <small>@notification.Time</small>
+                        <div class="notif__item @(notification.IsRead ? null : "is-unread")">
+                            <span class="notif__dot" aria-hidden="true"></span>
+                            <div class="notif__body">
+                                <span class="notif__kind label">@KindLabel(notification.Kind)</span>
+                                <strong>@notification.Title</strong>
+                                <p>@notification.Detail</p>
                             </div>
+                            <time class="notif__time num-xs" datetime="@notification.At.ToString("O")">@notification.At.ToString("HH:mm:ss")</time>
                         </div>
                     }
                 }
+                else if (HasHiddenByFilter)
+                {
+                    @* Честная причина пустоты: события есть, но их вид выключен
+                       на «Профиле». Пустое состояние «уведомлений нет» здесь
+                       было бы неправдой. *@
+                    <EmptyState IconName="bell" Title="Все виды событий выключены"
+                                Description="Включить их можно в настройках интерфейса.">
+                        <Action>
+                            <AppButton Variant="secondary" Size="26" Href="/profile">Открыть «Профиль»</AppButton>
+                        </Action>
+                    </EmptyState>
+                }
                 else
                 {
-                    <div class="notification-empty">Нет новых уведомлений</div>
+                    <EmptyState IconName="bell" Title="Событий пока нет"
+                                Description="Запустите торги — здесь появится хронология сессии." />
                 }
             </div>
         </div>
@@ -96,11 +118,73 @@
 @code {
     [Parameter] public string ActivePage { get; set; } = "CreateAsset";
     [Parameter] public bool ShowClock { get; set; } = false;
-    [Parameter] public string AvatarInitials { get; set; } = "АК";
 
-    private bool IsNotificationsOpen { get; set; } = false;
+    /// <summary>
+    /// Инициалы считаются из имени оператора, а не задаются параметром.
+    /// Пока здесь стояла константа «АК», шапка и «Профиль» показывали разных
+    /// людей на одном экране.
+    /// </summary>
+    private string AvatarInitials => UserPreferences.GetInitials(Preferences.OperatorName);
+
+    // Ровно пять разделов — раздел 16.
+    private static readonly NavSection[] Sections =
+    [
+        new("CreateAsset", "/create-asset", "Создание актива"),
+        new("Trading", "/trading", "Торги"),
+        new("News", "/news", "Новости"),
+        new("Agents", "/agents", "Агенты"),
+        new("Profile", "/profile", "Профиль")
+    ];
+
+    private bool IsNotificationsOpen { get; set; }
     private bool IsTradingActive => SimulationRunner.IsRunning;
-    private string MarketStatusLabel => IsTradingActive ? "Торги запущены" : "Торги не запущены";
+
+    /// <summary>
+    /// Три состояния, а не два. До первого запуска торги не «остановлены» —
+    /// их не было, и утверждать обратное значит говорить о прошлом, которого
+    /// не случилось (пункт 95 docs/ui-backlog.md). Артборды «Создания актива»
+    /// показывают здесь «Торги не запущены», и подзаголовок «Агентов» уже
+    /// различает эти два случая — не различала только шапка.
+    ///
+    /// Признак «прогон был» — идентификатор в истории: она заполняется первым
+    /// же тиком и переживает остановку, в отличие от CurrentRunId раннера.
+    /// </summary>
+    private string MarketStatusLabel => IsTradingActive
+        ? "Торги активны"
+        : EquityHistory.RunId == Guid.Empty
+            ? "Торги не запущены"
+            : "Торги остановлены";
+    private string Clock => DateTimeOffset.Now.ToString("HH:mm:ss");
+
+    /// <summary>
+    /// Фильтрация происходит ЗДЕСЬ, при отображении, а не при записи в ленту:
+    /// выключенный на «Профиле» вид перестаёт показываться, но события не
+    /// теряются, и включение обратно возвращает их.
+    /// </summary>
+    private IReadOnlyList<NotificationEntry> Visible =>
+        NotificationFeed.Entries.Where(entry => IsKindEnabled(entry.Kind)).ToArray();
+
+    /// <summary>События в ленте есть, но все их виды выключены.</summary>
+    private bool HasHiddenByFilter => NotificationFeed.Entries.Count > 0;
+
+    private bool IsKindEnabled(NotificationKind kind) => kind switch
+    {
+        NotificationKind.Trade => Preferences.NotifyTrades,
+        NotificationKind.News => Preferences.NotifyNews,
+        _ => Preferences.NotifySystem
+    };
+
+    private static string KindLabel(NotificationKind kind) => kind switch
+    {
+        NotificationKind.Trade => "сделки",
+        NotificationKind.News => "новости",
+        _ => "система"
+    };
+
+    // Счётчик считает по тому же фильтру, что и список: иначе колокольчик
+    // показывал бы число, которого в открытом списке не найти.
+    private int UnreadNotificationsCount => Visible.Count(entry => !entry.IsRead);
+
     private string NotificationSummaryText => UnreadNotificationsCount switch
     {
         0 => "Нет новых событий",
@@ -110,67 +194,50 @@
 
     protected override void OnInitialized()
     {
+        // Имя оператора и переключатели уведомлений живут в настройках, а
+        // шапка показывает и то, и другое: без подписки инициалы и счётчик
+        // застыли бы на значениях, прочитанных при создании контура.
+        Preferences.Changed += HandlePreferencesChanged;
+        NotificationFeed.Changed += HandleNotificationsChanged;
+
         SimulationRunner.OnTick += HandleSimulationTick;
+
+        // После остановки тики прекращаются, поэтому одной подписки на OnTick
+        // мало: статус навсегда застывал бы на «Торги активны».
+        SimulationRunner.OnStateChanged += HandleStateChanged;
     }
+
+    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandlePreferencesChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void HandleNotificationsChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void ToggleNotifications()
     {
         IsNotificationsOpen = !IsNotificationsOpen;
+
+        // Открыли список — значит прочитали. Счётчик непрочитанного, который
+        // не сбрасывается при просмотре, перестаёт что-либо значить.
+        if (IsNotificationsOpen)
+        {
+            NotificationFeed.MarkAllRead();
+        }
     }
 
-    private void CloseNotifications()
-    {
-        IsNotificationsOpen = false;
-    }
+    private void CloseNotifications() => IsNotificationsOpen = false;
 
-    private int UnreadNotificationsCount => Notifications.Count(n => !n.IsRead);
+    private void ClearNotifications() => NotificationFeed.Clear();
 
-    private void ClearNotifications()
-    {
-        Notifications.Clear();
-    }
-
-    private void HandleSimulationTick(SimulationTickResult tick)
-    {
-        _ = InvokeAsync(StateHasChanged);
-    }
+    private void HandleSimulationTick(SimulationTickResult tick) => _ = InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {
         SimulationRunner.OnTick -= HandleSimulationTick;
+        SimulationRunner.OnStateChanged -= HandleStateChanged;
+        Preferences.Changed -= HandlePreferencesChanged;
+        NotificationFeed.Changed -= HandleNotificationsChanged;
     }
 
-    private List<NotificationModel> Notifications = new()
-    {
-        new NotificationModel { Title = "Рынок запущен", Message = "Торговая сессия успешно начата.", Time = "10:00", Icon = "bi-play-circle", IsRead = false },
-        new NotificationModel { Title = "Агент MarketMaker", Message = "Агент начал выставлять заявки.", Time = "10:05", Icon = "bi-robot", IsRead = false },
-        new NotificationModel { Title = "Риск-менеджмент", Message = "Превышен лимит позиций для CounterTrend.", Time = "12:30", Icon = "bi-exclamation-triangle", IsRead = true }
-    };
-
-    private sealed class NotificationModel
-    {
-        public string Title { get; set; } = "";
-        public string Message { get; set; } = "";
-        public string Time { get; set; } = "";
-        public string Icon { get; set; } = "";
-        public bool IsRead { get; set; } = false;
-    }
-
-    private ClockData Clock => BuildClockData();
-
-    private static ClockData BuildClockData()
-    {
-        var now = DateTimeOffset.Now;
-        return new ClockData(now.ToString("HH:mm:ss"), $"{now.Day} {GetRussianMonthName(now.Month)} {now.Year}");
-    }
-
-    private static string GetRussianMonthName(int month) => month switch
-    {
-        1 => "января", 2 => "февраля", 3 => "марта", 4 => "апреля",
-        5 => "мая", 6 => "июня", 7 => "июля", 8 => "августа",
-        9 => "сентября", 10 => "октября", 11 => "ноября", 12 => "декабря",
-        _ => ""
-    };
-
-    private sealed record ClockData(string Time, string Date);
+    private sealed record NavSection(string Key, string Href, string Title);
 }

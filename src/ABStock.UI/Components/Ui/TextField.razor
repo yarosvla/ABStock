@@ -1,0 +1,57 @@
+@* Поле ввода — раздел 9.3. Высота 32, фон --gph-750, кромка --line-2.
+   В фокусе кромка --acc-line и кольцо: рамка поля в фокусе — интерактив,
+   и красится акцентом (раздел 3.1).
+
+   Ошибка оформляется кромкой --down-500 ТОЛЬКО там, где это ошибка ввода
+   в смысле 9.3. Валидация формы по разделу 3 идёт охрой --warn-500:
+   красный в этой системе означает падение цены и ничего больше. Поэтому
+   тон ошибки задаётся параметром, а не зашит. *@
+
+<span class="ui-field @Class">
+    <input class="ui-field__input @(Invalid ? $"is-invalid is-invalid--{InvalidTone}" : null)"
+           id="@Id"
+           type="text"
+           value="@Value"
+           aria-describedby="@DescribedBy"
+           placeholder="@Placeholder"
+           aria-label="@Label"
+           aria-labelledby="@LabelledBy"
+           aria-invalid="@(Invalid ? "true" : null)"
+           maxlength="@MaxLength"
+           disabled="@Disabled"
+           @oninput="OnInput"
+           @onkeydown="OnKeyDown"
+           @ref="Element" />
+</span>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    /// <summary>id поля — когда снаружи стоит &lt;label for&gt;.</summary>
+    [Parameter] public string? Id { get; set; }
+
+    /// <summary>id строки с ошибкой или пояснением под полем.</summary>
+    [Parameter] public string? DescribedBy { get; set; }
+
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? LabelledBy { get; set; }
+
+    [Parameter] public bool Invalid { get; set; }
+
+    /// <summary>Тон ошибки: warn — валидация формы (раздел 3), down — ошибка ввода (9.3).</summary>
+    [Parameter] public string InvalidTone { get; set; } = "warn";
+
+    [Parameter] public int? MaxLength { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    [Parameter] public EventCallback<KeyboardEventArgs> OnKeyDown { get; set; }
+
+    /// <summary>Ссылка на само поле — чтобы страница могла поставить в него фокус.</summary>
+    public ElementReference Element { get; private set; }
+
+    private Task OnInput(ChangeEventArgs args) =>
+        ValueChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+}

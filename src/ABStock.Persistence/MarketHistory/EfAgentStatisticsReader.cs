@@ -42,7 +42,7 @@ internal sealed class EfAgentStatisticsReader(IDbContextFactory<AbStockDbContext
             .Where(tick => tick.SimulationRunId == runId)
             .AsEnumerable()
             .OrderBy(tick => tick.CapturedAt)
-            .Select(tick => new AgentPricePoint(tick.CapturedAt, tick.LastPrice))
+            .Select(tick => new AgentPricePoint(tick.CapturedAt, tick.LastPrice, tick.TotalVolume))
             .ToArray();
 
         return new AgentStatisticsReport(agentName, trades, priceSeries);

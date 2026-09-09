@@ -1,0 +1,20 @@
+@* Статус-точка — раздел 9.6. Торги активны: --up-500 + дыхание 2400ms.
+   Остановлены: --text-3, без анимации. *@
+
+<span class="ui-status">
+    <span class="ui-status__dot ui-status__dot--@Tone @(Live ? "status-dot--live" : null)" aria-hidden="true"></span>
+    @if (ChildContent is not null)
+    {
+        <span class="ui-status__label">@ChildContent</span>
+    }
+</span>
+
+@code {
+    /// <summary>up · down · warn · muted · agent-trend · agent-counter · agent-mm · agent-news</summary>
+    [Parameter] public string Tone { get; set; } = "muted";
+
+    /// <summary>Дыхание ~0,4 Гц — только когда процесс реально идёт.</summary>
+    [Parameter] public bool Live { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}
