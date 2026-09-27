@@ -1,0 +1,10 @@
+.git
+.vs
+.idea
+**/bin
+**/obj
+**/TestResults
+**/abstock*.db
+**/abstock*.db-shm
+**/abstock*.db-wal
+*.env

@@ -187,6 +187,17 @@ ConnectionStrings__ABStock="Data Source=/tmp/abstock.db" dotnet run --project sr
 
 Сценарий первого запуска: **создать актив** описанием → **Торги** → задать состав агентов → **Запустить торги** → через минуту-другую зайти в **Новости** и ввести любой текст про эту компанию.
 
+### Запуск через Docker
+
+Нужен запущенный Docker Desktop с движком Linux-контейнеров. Из корня репозитория:
+
+```powershell
+docker compose up --build
+```
+
+После запуска откройте http://localhost:5062. `Dockerfile` собирает приложение на .NET 10, а `docker-compose.yml` запускает его и сохраняет SQLite-базу в томе `abstock-data`. Остановить сервис можно `Ctrl+C`, затем `docker compose down`; данные в томе сохранятся.
+
+
 ---
 
 ## Тесты
