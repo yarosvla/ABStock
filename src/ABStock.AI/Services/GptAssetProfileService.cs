@@ -12,7 +12,7 @@ internal sealed class GptAssetProfileService : IAssetProfileService
     private readonly IEmbeddingService _embeddingService;
     private readonly IProfilePromptBuilder _promptBuilder;
 
-    internal GptAssetProfileService(
+    public GptAssetProfileService(
         HttpClient httpClient,
         IEmbeddingService embeddingService,
         IProfilePromptBuilder promptBuilder)

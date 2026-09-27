@@ -15,6 +15,8 @@ public static class ServiceCollectionExtensions
             _ => new NewsProcessingService(new StubFinBertAnalyzer(), new ProfileAspectMatcher()));
         services.AddSingleton<IAssetProfileService, AssetProfileService>();
         */
+        services.AddHttpClient();
+
         services.AddSingleton<IFinBertAnalyzer,
             RealFinBertAnalyzer>();
 
