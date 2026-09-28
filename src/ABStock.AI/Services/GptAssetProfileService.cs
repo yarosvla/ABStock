@@ -28,20 +28,50 @@ internal sealed class GptAssetProfileService : IAssetProfileService
     {
         var prompt = _promptBuilder.BuildPrompt(request);
 
-        var response =
-            await _httpClient.PostAsJsonAsync(
-                "http://localhost:8001/generate-profile",
-                new { prompt },
-                ct);
+        AssetProfileGenerationResponse? result = null;
 
-        response.EnsureSuccessStatusCode();
-
-        var result =
-            await response.Content.ReadFromJsonAsync<AssetProfileGenerationResponse>(ct);
-
-        if (result?.Factors == null || result.Factors.Count == 0)
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            throw new Exception("Invalid GPT response: empty factors");
+            var response =
+                await _httpClient.PostAsJsonAsync(
+                    "http://localhost:8001/generate-profile",
+                    new { prompt },
+                    ct);
+
+            response.EnsureSuccessStatusCode();
+
+            result =
+                await response.Content.ReadFromJsonAsync<AssetProfileGenerationResponse>(ct);
+
+            if (result?.Factors == null)
+            {
+                continue;
+            }
+
+            var positiveCount =
+                result.Factors.Count(f => f.IsPositive);
+
+            var negativeCount =
+                result.Factors.Count(f => !f.IsPositive);
+
+            var valid =
+                result.Factors.Count >= 40 &&
+                result.Factors.Count <= 50 &&
+                positiveCount >= 15 &&
+                negativeCount >= 15;
+
+            if (valid)
+            {
+                break;
+            }
+
+            result = null;
+        }
+
+        if (result == null)
+        {
+            throw new Exception(
+                "GPT failed to generate a valid asset profile after 3 attempts.");
         }
 
         var assetEmbedding =

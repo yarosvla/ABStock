@@ -10,11 +10,6 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddABStockAI(this IServiceCollection services, IConfiguration configuration)
     {
-        /*
-        services.AddSingleton<INewsProcessingService>(
-            _ => new NewsProcessingService(new StubFinBertAnalyzer(), new ProfileAspectMatcher()));
-        services.AddSingleton<IAssetProfileService, AssetProfileService>();
-        */
         services.AddHttpClient();
 
         services.AddSingleton<IFinBertAnalyzer,
@@ -23,9 +18,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IFactorMatcher,
             RealFactorMatcher>();
 
+        var apiKey =
+            Environment.GetEnvironmentVariable("OPENAI_API_KEY")
+            ?? configuration["OpenAI:ApiKey"];
+
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            throw new InvalidOperationException(
+                "OPENAI_API_KEY is not configured.");
+        }
+
         services.AddSingleton<IEmbeddingService>(
-            _ => new OpenAIEmbeddingService(
-                configuration["OpenAI:ApiKey"]!));
+            _ => new OpenAIEmbeddingService(apiKey));
 
         services.AddSingleton<INewsProcessingService,
             NewsProcessingService>();
