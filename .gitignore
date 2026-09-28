@@ -442,3 +442,6 @@ FodyWeavers.xsd
 design/
 docs/
 tools/
+
+# Python-сервис AI
+.venv/

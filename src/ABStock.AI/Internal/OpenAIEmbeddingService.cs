@@ -25,4 +25,26 @@ internal sealed class OpenAIEmbeddingService
 
         return response.Value.ToFloats().ToArray();
     }
+
+    public async Task<IReadOnlyList<float[]>> CreateEmbeddingsAsync(
+        IReadOnlyList<string> texts,
+        CancellationToken ct = default)
+    {
+        if (texts.Count == 0)
+        {
+            return [];
+        }
+
+        // Один запрос на все тексты: полсотни параллельных запросов на каждый
+        // фактор упирались в лимит частоты запросов OpenAI.
+        var response =
+            await _client.GenerateEmbeddingsAsync(
+                texts,
+                cancellationToken: ct);
+
+        return response.Value
+            .OrderBy(embedding => embedding.Index)
+            .Select(embedding => embedding.ToFloats().ToArray())
+            .ToArray();
+    }
 }

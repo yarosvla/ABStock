@@ -4,21 +4,29 @@ using ABStock.Shared;
 
 namespace ABStock.AI.Services;
 
-public sealed class NewsProcessingService : INewsProcessingService
+internal sealed class NewsProcessingService : INewsProcessingService
 {
+    /// <summary>
+    /// С какой близости фактор считается задетым новостью. У
+    /// text-embedding-3-small косинус несвязанных текстов около 0,1–0,3,
+    /// новости и фактора на одну тему — около 0,4–0,6. Прежний порог 0,75
+    /// почти не достигался, и любая новость выходила «ни о чём».
+    /// </summary>
+    internal const decimal RelevanceThreshold = 0.40m;
+
     private readonly IFinBertAnalyzer _finBert;
     private readonly IFactorMatcher _matcher;
 
     private readonly IEmbeddingService _embeddingService;
 
-    internal NewsProcessingService(IFinBertAnalyzer finBert, IFactorMatcher matcher, IEmbeddingService embeddingService)
+    public NewsProcessingService(IFinBertAnalyzer finBert, IFactorMatcher matcher, IEmbeddingService embeddingService)
     {
         _finBert = finBert;
         _matcher = matcher;
         _embeddingService = embeddingService;
     }
 
-    async public Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default)
+    public async Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default)
     {
         var newsEmbedding =
             await _embeddingService.CreateEmbeddingAsync(
@@ -38,19 +46,10 @@ public sealed class NewsProcessingService : INewsProcessingService
 
         var relevantMatches =
             matches
-                .Where(x => x.Similarity > 0.75m)
+                .Where(x => x.Similarity > RelevanceThreshold)
+                .OrderByDescending(x => x.Similarity)
                 .ToList();
-        /*
-        var averageSimilarity =
-            relevantMatches.Any()
-                ? relevantMatches.Average(x => x.Similarity)
-                : 0m;
 
-        var averageImportance =
-            relevantMatches.Any()
-                ? relevantMatches.Average(x => x.Factor.Importance)
-                : 0m;
-        */
         decimal totalImpact = 0;
 
         foreach (var match in relevantMatches)
@@ -73,13 +72,7 @@ public sealed class NewsProcessingService : INewsProcessingService
         }
 
         var polarity = DeterminePolarity(finBertResult);
-        /*
-        var impactScore =
-            finBertResult.Confidence
-            * averageSimilarity
-            * averageImportance
-            * request.Profile.NewsSensitivity;
-        */
+
         var impactScore =
             totalImpact
             * request.Profile.NewsSensitivity;
@@ -96,7 +89,21 @@ public sealed class NewsProcessingService : INewsProcessingService
             Confidence: finBertResult.Confidence,
             ImpactScore: Math.Round(impactScore, 4),
             Explanation: explanation
-        );
+        )
+        {
+            PositiveMatches = relevantMatches.Count(x => x.Factor.IsPositive),
+            NegativeMatches = relevantMatches.Count(x => !x.Factor.IsPositive),
+            MatchScore = relevantMatches.Count == 0
+                ? 0m
+                : Math.Round(relevantMatches.Average(x => x.Similarity), 4),
+            Factors = relevantMatches
+                .Select(x => new NewsFactorMatch(
+                    x.Factor.IsPositive ? NewsFactorKind.Positive : NewsFactorKind.Negative,
+                    x.Factor.Name,
+                    Math.Round(x.Similarity, 4),
+                    x.Factor.Importance))
+                .ToArray()
+        };
     }
 
     private static SignalPolarity DeterminePolarity(
@@ -120,42 +127,37 @@ public sealed class NewsProcessingService : INewsProcessingService
 
         return SignalPolarity.Neutral;
     }
-    
+
     private static string BuildExplanation(
         SignalPolarity polarity,
         FinBertResult finBert,
         IReadOnlyList<FactorMatchResult> relevantMatches,
         decimal impactScore)
     {
+        var header =
+            $"Новость определена как {PolarityName(polarity)}. " +
+            $"Уверенность FinBERT: {finBert.Confidence:F2}. " +
+            $"Сила влияния: {impactScore:F2}.";
+
         if (!relevantMatches.Any())
         {
-            return
-                $"Signal: {polarity}. " +
-                $"FinBERT confidence: {finBert.Confidence:F2}. " +
-                $"Impact: {impactScore:F2}. " +
-                $"No sufficiently relevant business factors matched.";
+            return header + " Ни один фактор профиля не оказался достаточно близок к новости.";
         }
 
         var factorLines =
             relevantMatches.Select(x =>
-            {
-                var factorType =
-                    x.Factor.IsPositive
-                        ? "positive"
-                        : "negative";
+                $"{x.Factor.Name} " +
+                $"({(x.Factor.IsPositive ? "позитивный" : "негативный")}, " +
+                $"вес {x.Factor.Importance:F2}, " +
+                $"близость {x.Similarity:F2})");
 
-                return
-                    $"{x.Factor.Name} " +
-                    $"[{factorType}] " +
-                    $"importance: {x.Factor.Importance:F2}, " +
-                    $"similarity: {x.Similarity:F2}";
-            });
+        return header + $" Задетые факторы: {string.Join("; ", factorLines)}.";
+    }
 
-        return
-            $"Signal: {polarity}. " +
-            $"FinBERT confidence: {finBert.Confidence:F2}. " +
-            $"Impact: {impactScore:F2}. " +
-            $"Matched factors: " +
-            $"{string.Join("; ", factorLines)}.";
-        }
+    private static string PolarityName(SignalPolarity polarity) => polarity switch
+    {
+        SignalPolarity.Positive => "позитивная",
+        SignalPolarity.Negative => "негативная",
+        _ => "нейтральная"
+    };
 }

@@ -8,35 +8,49 @@ namespace ABStock.AI.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    private const string DefaultServiceUrl = "http://127.0.0.1:8000/";
+
     public static IServiceCollection AddABStockAI(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddHttpClient();
-
-        services.AddSingleton<IFinBertAnalyzer,
-            RealFinBertAnalyzer>();
-
-        services.AddSingleton<IFactorMatcher,
-            RealFactorMatcher>();
-
         var apiKey =
             Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? configuration["OpenAI:ApiKey"];
 
-        if (string.IsNullOrWhiteSpace(apiKey))
+        var settings = new OpenAISettings
         {
-            throw new InvalidOperationException(
-                "OPENAI_API_KEY is not configured.");
-        }
+            ApiKey = string.IsNullOrWhiteSpace(apiKey) ? null : apiKey,
+            // Слэш в конце обязателен: без него относительный путь "analyze"
+            // заменил бы последний сегмент адреса, а не дописался к нему.
+            ServiceUrl = new Uri((configuration["AI:ServiceUrl"] ?? DefaultServiceUrl).TrimEnd('/') + "/")
+        };
 
+        services.AddSingleton(settings);
+
+        // FinBERT и генерация профиля — один Python-сервис (Python/main.py).
+        services.AddHttpClient<IFinBertAnalyzer, RealFinBertAnalyzer>(client =>
+            client.BaseAddress = settings.ServiceUrl);
+
+        // 40–50 факторов от gpt-4o-mini — это десятки секунд, до трёх попыток.
+        services.AddHttpClient<IAssetProfileService, GptAssetProfileService>(client =>
+        {
+            client.BaseAddress = settings.ServiceUrl;
+            client.Timeout = TimeSpan.FromMinutes(3);
+        });
+
+        // Без ключа приложение всё равно запускается: профиль соберётся
+        // запасным алгоритмом, а «Новости» покажут причину, по которой
+        // разбор не выполнен.
         services.AddSingleton<IEmbeddingService>(
-            _ => new OpenAIEmbeddingService(apiKey));
+            settings.ApiKey is { } key
+                ? new OpenAIEmbeddingService(key)
+                : new UnavailableEmbeddingService());
 
-        services.AddSingleton<INewsProcessingService,
+        services.AddSingleton<IFactorMatcher,
+            RealFactorMatcher>();
+
+        services.AddTransient<INewsProcessingService,
             NewsProcessingService>();
 
-        services.AddSingleton<IAssetProfileService,
-            GptAssetProfileService>();
-            
         services.AddSingleton<IProfilePromptBuilder,
             ProfilePromptBuilder>();
 

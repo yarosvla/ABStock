@@ -2,11 +2,20 @@ using System.Net.Http.Json;
 
 namespace ABStock.AI.Internal;
 
+/// <summary>
+/// FinBERT из Python-сервиса. Адрес — из AI:ServiceUrl, клиент — из
+/// IHttpClientFactory: свой new HttpClient() в singleton держал бы
+/// соединения вечно и не видел смены DNS.
+/// </summary>
 internal sealed class RealFinBertAnalyzer
     : IFinBertAnalyzer
 {
-    private readonly HttpClient _httpClient =
-        new();
+    private readonly HttpClient _httpClient;
+
+    public RealFinBertAnalyzer(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+    }
 
     public async Task<FinBertResult> AnalyzeAsync(
         string text,
@@ -14,7 +23,7 @@ internal sealed class RealFinBertAnalyzer
     {
         var response =
             await _httpClient.PostAsJsonAsync(
-                "http://127.0.0.1:8000/analyze",
+                "analyze",
                 new { text },
                 ct);
 

@@ -1,6 +1,6 @@
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from openai import OpenAI
 
@@ -50,13 +50,25 @@ def analyze(req: Request):
         "negative": negative
     }
 
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+# Клиент создаётся при первом запросе: OpenAI() без ключа бросает исключение,
+# и на уровне модуля это роняло весь сервис — вместе с FinBERT, которому ключ
+# не нужен.
+_client = None
+
+def get_client():
+    global _client
+    if _client is None:
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not set")
+        _client = OpenAI(api_key=api_key)
+    return _client
 
 @app.post("/generate-profile")
 def generate_profile(req: dict):
     prompt = req["prompt"]
 
-    response = client.chat.completions.create(
+    response = get_client().chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {

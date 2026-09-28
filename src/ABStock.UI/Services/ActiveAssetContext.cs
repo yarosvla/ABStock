@@ -134,62 +134,46 @@ public static class ActiveAssetDefaults
 
     public static AssetProfile BuildProfile(ActiveAssetDraft draft)
     {
-        var positiveFactors = new List<string>
+        // Векторов у демо-факторов нет: их досчитает сопоставитель новостей,
+        // так что демо-актив на «Новостях» разбирается той же моделью.
+        var factors = new List<AssetFactor>
         {
-            $"Спрос в секторе «{draft.Industry}»",
-            "Технологическая специализация"
-        };
-        var negativeFactors = new List<string>
-        {
-            "Капиталоемкость проектов",
-            "Зависимость от темпа внедрения"
-        };
-        var risks = new List<string>
-        {
-            "Регуляторный риск",
-            "Операционные задержки"
+            new($"Спрос в секторе «{draft.Industry}»", true, 0.7m, []),
+            new("Технологическая специализация", true, 0.6m, []),
+            new("Капиталоемкость проектов", false, 0.6m, []),
+            new("Зависимость от темпа внедрения", false, 0.5m, []),
+            new("Регуляторный риск", false, 0.5m, []),
+            new("Операционные задержки", false, 0.4m, [])
         };
 
         if (draft.IncludeGovernmentSupport)
         {
-            positiveFactors.Insert(0, "Государственная поддержка");
+            factors.Insert(0, new("Государственная поддержка", true, 0.8m, []));
         }
         else
         {
-            negativeFactors.Add("Ограниченная институциональная поддержка");
+            factors.Add(new("Ограниченная институциональная поддержка", false, 0.5m, []));
         }
 
         if (draft.GrowthPotential >= 75)
         {
-            positiveFactors.Add("Высокий потенциал роста");
+            factors.Add(new("Высокий потенциал роста", true, 0.6m, []));
         }
 
-        // Тот же масштаб, что у генератора: середина шкалы плюс отклонение
-        // потенциала роста от 50. Иначе демо-актив на «Торгах» и «Новостях»
-        // показывал бы чувствительность по другой линейке.
+        // Тот же масштаб, что у запасного генератора: середина шкалы плюс
+        // отклонение потенциала роста от 50. Иначе демо-актив на «Торгах» и
+        // «Новостях» показывал бы чувствительность по другой линейке.
         var newsSensitivity = Math.Clamp(
             0.62m + (Math.Clamp(draft.GrowthPotential, 0, 100) - 50) / 400m,
             0.45m,
             0.95m);
-        var keywords = new[]
-        {
-            draft.Name,
-            draft.Industry,
-            // Русское название типа, а не идентификатор перечисления: «Stock»
-            // в чипах читался как чужое слово в русском интерфейсе.
-            AgentDisplay.GetAssetTypeLabel(draft.AssetType),
-            draft.IncludeGovernmentSupport ? "господдержка" : "рыночный спрос"
-        };
 
         return new AssetProfile(
             draft.Name,
             draft.AssetType,
             draft.Description,
-            positiveFactors,
-            negativeFactors,
-            risks,
-            newsSensitivity,
-            keywords)
+            factors,
+            newsSensitivity)
         {
             // Демо-профиль собирается здесь же, без языковой модели.
             Source = ProfileSource.Fallback

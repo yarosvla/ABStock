@@ -14,7 +14,7 @@ internal sealed class StubFactorMatcher : IFactorMatcher
 
         foreach (var factor in profile.Factors)
         {
-            if (factor.Embedding is null)
+            if (factor.Embedding.Length == 0)
             {
                 continue;
             }

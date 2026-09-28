@@ -16,9 +16,11 @@ internal sealed class ProfilePromptBuilder
               ---
 
               ## ASSET CONTEXT
-              Name: {request.Name}
-              Type: {request.AssetType}
-              Description: {request.Description}
+              Name: {{request.Name}}
+              Type: {{request.AssetType}}
+              Description: {{request.Description}}
+              Industry: {{(string.IsNullOrWhiteSpace(request.Industry) ? "not specified" : request.Industry)}}
+              Government support: {{(request.IncludeGovernmentSupport ? "yes" : "not specified")}}
 
               ---
 
@@ -53,6 +55,8 @@ internal sealed class ProfilePromptBuilder
               5. Generate 40 to 50 factors total.
 
               6. Factors must be non-overlapping (no duplicates or near duplicates).
+
+              7. Write every factor name in Russian: the application UI and the news are in Russian.
 
               ---
 

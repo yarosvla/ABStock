@@ -283,10 +283,6 @@ main.news-page ::deep .ui-causality__note {
     padding: var(--s-4);
 }
 
-.factors-summary__counts { display: flex; gap: var(--s-5); }
-.factors-summary__count { font: var(--t-caption); color: var(--text-3); }
-.factors-summary__count .num-sm { color: var(--text-1); }
-
 .factors-summary__note {
     margin: 0;
     font: var(--t-caption);
@@ -359,37 +355,6 @@ main.news-page ::deep .ui-causality__note {
 }
 
 .profile__meta { font: var(--t-caption); color: var(--text-3); }
-
-/* Дорожка рисков: высота и радиус те же, что у половин полосы баланса
-   (9.18), заливки нет — риск не участвует в балансе, он условие. */
-.risks {
-    display: flex;
-    align-items: center;
-    gap: var(--s-1);
-    height: 22px;
-    padding: 0 var(--s-2);
-    border: 1px solid var(--line-1);
-    border-radius: var(--r-xs);
-}
-
-.risks__count { color: var(--text-1); }
-.risks__label { font: var(--t-caption); font-weight: 500; color: var(--text-2); }
-.risks__hint { margin-left: auto; font: var(--t-caption); color: var(--text-4); }
-
-.profile__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
-
-.chip {
-    display: inline-flex;
-    align-items: center;
-    /* Раздел 9.6 фиксирует высоту чипа в 22px, отдельного токена под неё нет —
-       то же значение стоит на «Создании актива». */
-    height: 22px;
-    padding: 0 var(--s-3);
-    border-radius: var(--r-pill);
-    background: var(--fill-soft);
-    font: var(--t-caption);
-    color: var(--text-2);
-}
 
 /* ---------- рынок ---------- */
 .market { display: flex; flex-direction: column; gap: var(--s-3); }

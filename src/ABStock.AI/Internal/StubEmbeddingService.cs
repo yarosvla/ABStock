@@ -17,4 +17,18 @@ internal sealed class StubEmbeddingService : IEmbeddingService
 
         return Task.FromResult(vector);
     }
+
+    public async Task<IReadOnlyList<float[]>> CreateEmbeddingsAsync(
+        IReadOnlyList<string> texts,
+        CancellationToken ct = default)
+    {
+        var vectors = new float[texts.Count][];
+
+        for (int i = 0; i < texts.Count; i++)
+        {
+            vectors[i] = await CreateEmbeddingAsync(texts[i], ct);
+        }
+
+        return vectors;
+    }
 }
