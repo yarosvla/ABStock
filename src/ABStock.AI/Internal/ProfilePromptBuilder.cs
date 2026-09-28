@@ -38,9 +38,12 @@ internal sealed class ProfilePromptBuilder
                 - "Restrictions on export of advanced AI chips to China affecting NVIDIA revenue"
                 - "Adoption of CUDA ecosystem by enterprise AI workloads increasing lock-in"
 
-              3. Each factor must clearly be either:
-                - Positive impact for the asset (isPositive = true)
-                - Negative impact for the asset (isPositive = false)
+              3. Generate BOTH positive and negative factors.
+                - Positive factors: isPositive = true
+                - Negative factors: isPositive = false
+                - At least 15 factors MUST be positive.
+                - At least 15 factors MUST be negative.
+                - Do not generate a list containing factors of only one polarity.
 
               4. Importance must reflect how strongly this factor can influence the asset price or revenue:
                 - Range: 0.0 to 1.0
@@ -87,6 +90,12 @@ internal sealed class ProfilePromptBuilder
                 - generic industry statements
 
               ---
+
+              Before returning the JSON, verify:
+                - there are 40 to 50 factors;
+                - at least 15 have isPositive = true;
+                - at least 15 have isPositive = false;
+                - no factors are duplicates or near duplicates.
 
               Now generate the factors.
               """;

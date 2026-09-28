@@ -23,8 +23,8 @@ def analyze(req: Request):
 
     results = classifier(
         req.text,
-        return_all_scores=True
-    )[0]
+        top_k=None
+    )
 
     positive = 0.0
     neutral = 0.0
