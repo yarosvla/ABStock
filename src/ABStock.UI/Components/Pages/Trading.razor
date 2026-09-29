@@ -857,22 +857,36 @@
         ? Math.Round(summary.TradeCount * 60m / summary.TickCount, 0, MidpointRounding.AwayFromZero)
         : null;
 
-    /// <summary>Шаг агрегации уровней стакана — разница соседних отображаемых цен.</summary>
+    /// <summary>
+    /// Шаг агрегации уровней стакана — разница соседних ОТОБРАЖАЕМЫХ цен.
+    /// Раньше шаг считался по сырым ценам заявок: разница между ними бывает
+    /// меньше копейки, и шапка показывала «шаг 0,00» над стаканом, где
+    /// соседние уровни отстоят на 0,04. Уровни берутся после той же
+    /// агрегации, что и строки стакана, каждая сторона отдельно: зазор между
+    /// лучшим бидом и лучшим аском — спред, а не шаг.
+    /// </summary>
     private decimal? BookStep
     {
         get
         {
-            var prices = latestTick?.OrderBook.Asks
-                .Select(level => level.Price)
-                .OrderBy(price => price)
-                .ToArray() ?? [];
-
-            if (prices.Length < 2)
+            if (latestTick is null)
             {
                 return null;
             }
 
-            var steps = prices.Zip(prices.Skip(1), (a, b) => b - a).Where(step => step > 0m).ToArray();
+            var steps = new[]
+                {
+                    GetVisibleOrderBookLevels(latestTick.OrderBook.Asks, reverse: false, isAsk: true),
+                    GetVisibleOrderBookLevels(latestTick.OrderBook.Bids, reverse: false, isAsk: false)
+                }
+                .SelectMany(levels =>
+                {
+                    var prices = levels.Select(level => level.Price).Distinct().OrderBy(price => price).ToArray();
+                    return prices.Zip(prices.Skip(1), (a, b) => b - a);
+                })
+                .Where(step => step > 0m)
+                .ToArray();
+
             return steps.Length == 0 ? null : steps.Min();
         }
     }
