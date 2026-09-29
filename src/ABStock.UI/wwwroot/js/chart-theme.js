@@ -40,11 +40,12 @@ export function readChartTheme() {
         volumeCurrent: volumeCurrent === "" || volumeCurrent === "auto" ? null : volumeCurrent,
         stoppedOpacity: Number.isFinite(stoppedOpacity) ? stoppedOpacity : 1,
         lastPriceByCandle: token("--chart-last-price") === "candle",
+        sellMarkerSquare: token("--chart-sell-marker") === "square",
         agent: {
-            trend: { on: token("--agent-trend"), off: token("--agent-trend-dim") },
-            counter: { on: token("--agent-counter"), off: token("--agent-counter-dim") },
-            mm: { on: token("--agent-mm"), off: token("--agent-mm-dim") },
-            news: { on: token("--agent-news"), off: token("--agent-news-dim") }
+            trend: { on: token("--agent-trend"), off: token("--agent-trend-dim"), mark: token("--agent-trend-mark") },
+            counter: { on: token("--agent-counter"), off: token("--agent-counter-dim"), mark: token("--agent-counter-mark") },
+            mm: { on: token("--agent-mm"), off: token("--agent-mm-dim"), mark: token("--agent-mm-mark") },
+            news: { on: token("--agent-news"), off: token("--agent-news-dim"), mark: token("--agent-news-mark") }
         },
         /** Цвет из имени токена («--agent-news») или готовая строка как есть. */
         resolve: value => typeof value === "string" && value.startsWith("--") ? token(value) : value

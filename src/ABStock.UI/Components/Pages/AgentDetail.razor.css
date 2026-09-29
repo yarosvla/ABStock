@@ -40,13 +40,12 @@
     --marker-size: 9px;   /* точка легенды под маркер на графике, макет 02 */
 }
 
-/* Цвет маркеров — цвет типа этого агента. Пара «обычный и приглушённый»
-   объявляется один раз на странице и дальше берётся легендой и js-модулем
-   из тех же токенов. */
-.detail-page.agent-trend   { --marker-tone: var(--agent-trend);   --marker-tone-dim: var(--agent-trend-dim); }
-.detail-page.agent-counter { --marker-tone: var(--agent-counter); --marker-tone-dim: var(--agent-counter-dim); }
-.detail-page.agent-mm      { --marker-tone: var(--agent-mm);      --marker-tone-dim: var(--agent-mm-dim); }
-.detail-page.agent-news    { --marker-tone: var(--agent-news);    --marker-tone-dim: var(--agent-news-dim); }
+/* Цвет маркеров — цвет типа этого агента. Объявляется один раз на странице
+   и дальше берётся легендой; js-модуль читает те же токены агента. */
+.detail-page.agent-trend   { --marker-tone: var(--agent-trend);   --marker-sell: var(--agent-trend-mark); }
+.detail-page.agent-counter { --marker-tone: var(--agent-counter); --marker-sell: var(--agent-counter-mark); }
+.detail-page.agent-mm      { --marker-tone: var(--agent-mm);      --marker-sell: var(--agent-mm-mark); }
+.detail-page.agent-news    { --marker-tone: var(--agent-news);    --marker-sell: var(--agent-news-mark); }
 
 /* ============================================================================
    Заголовок: имя экземпляра, чип стратегии, чип состояния
@@ -252,7 +251,14 @@
 }
 
 .marker--buy { background: var(--marker-tone, var(--agent-trend)); }
-.marker--sell { background: var(--marker-tone-dim, var(--agent-trend-dim)); }
+/* Цвет маркера продажи под --sell-marker-opacity, а не -dim: в графите
+   это цвет агента под теми же 30 % (пиксель в пиксель), а белая тема ставит
+   1, квадрат и --agent-*-mark — как маркер на графике (раздел 19). */
+.marker--sell {
+    background: var(--marker-sell, var(--agent-trend-mark));
+    opacity: var(--sell-marker-opacity);
+    border-radius: var(--sell-marker-radius);
+}
 .marker--current { background: var(--text-1); }
 
 .price__note,

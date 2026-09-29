@@ -235,11 +235,17 @@ function buildMarkers(bundle) {
     return trades.map(trade => {
         const isActive = trade.index === activeIndex;
 
+        // Продажа в белой теме — квадрат цветом --agent-*-mark (не ниже 3:1 к
+        // белому): приглушённый вариант (30 %) там не виден (раздел 19). В
+        // графите — как было.
+        const square = !trade.isBuy && bundle.tokens.sellMarkerSquare;
+        const sellColor = bundle.tokens.sellMarkerSquare ? tone.mark : tone.off;
+
         return {
             time: trade.time,
             position: trade.isBuy ? "belowBar" : "aboveBar",
-            color: isActive ? bundle.tokens.text1 : (trade.isBuy ? tone.on : tone.off),
-            shape: "circle",
+            color: isActive ? bundle.tokens.text1 : (trade.isBuy ? tone.on : sellColor),
+            shape: square && !isActive ? "square" : "circle",
             size: isActive ? 2 : 1,
             text: isActive
                 ? `${trade.isBuy ? "покупка" : "продажа"} ${quantityFormatter.format(trade.quantity)} по ${priceFormatter.format(trade.price)}`

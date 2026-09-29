@@ -75,6 +75,13 @@
   --agent-mm-dim:      rgba(232, 147, 12, 0.30);
   --agent-news-dim:    rgba(210, 31, 176, 0.30);
 
+  /* Маркер продажи: ≥ 3:1 к белому. Янтарь mm затемнён (3,8:1), остальные
+     и так выше 4:1. */
+  --agent-trend-mark:   #2962FF;
+  --agent-counter-mark: #8B5CF6;
+  --agent-mm-mark:      #B87300;
+  --agent-news-mark:    #D21FB0;
+
   /* ---------- 6. ЛИНИИ И НЕЙТРАЛЬНАЯ ЗАЛИВКА ---------- */
   --fill-soft: #F6F6F7;   /* чип, hover вторичной кнопки */
 
@@ -82,13 +89,6 @@
   --line-2: #DCDCE0;   /* граница панели — та же hairline */
   --line-3: #D4D4D8;   /* hover, инпуты */
 
-  /* ---------- 6a. ГРАФИК ---------- */
-  --chart-grid:        #DCDCE0;
-  --chart-crosshair:   rgba(10, 10, 11, 0.28);
-  --chart-price-line:  #63636B;           /* пунктир текущей цены — text-3 */
-  --chart-wick-up:     #089981;           /* фитиль того же цвета, что тело */
-  --chart-wick-down:   #F23645;
-  --chart-news-marker: #63636B;
   /* Выбранное ≠ фокус: чёрная кромка остаётся только у фокуса (артборд 03). */
   --selected-edge: #D4D4D8;       /* плитка: лёгкая заливка + кромка line-3 */
   --segment-edge:  transparent;   /* сегмент: заливка #EEEEF0 без рамки */
@@ -107,7 +107,17 @@
   --stopped-price: #63636B;
   --stopped-dot:   #A1A1AA;
 
+  /* ---------- 6a. ГРАФИК ---------- */
+  --chart-grid:        #DCDCE0;
+  --chart-crosshair:   rgba(10, 10, 11, 0.28);
+  --chart-price-line:  #63636B;           /* пунктир текущей цены — text-3 */
+  --chart-wick-up:     #089981;           /* фитиль того же цвета, что тело */
+  --chart-wick-down:   #F23645;
+  --chart-news-marker: #63636B;
   --chart-last-price: candle;             /* плашка — заливка по направлению свечи */
+  --chart-sell-marker: square;            /* продажа — полный цвет агента, квадрат */
+  --sell-marker-opacity: 1;
+  --sell-marker-radius: 1px;
   --chart-stopped-opacity: 0.58;
 
   /* ---------- 9. ТЕНИ — только всплывающие слои ---------- */
