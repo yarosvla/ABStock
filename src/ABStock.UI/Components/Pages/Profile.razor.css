@@ -238,6 +238,26 @@
 
 .swatch.is-chosen .swatch__name { color: var(--text-1); }
 
+/* Белая тема: пресет не применяется (раздел 20). Образцы остаются
+   портретами тёмных пресетов — выбор виден, — но закрыты и приглушены. */
+.accent__inked {
+    grid-column: 1 / -1;
+    margin: 0;
+    font: var(--t-body-sm);
+    color: var(--text-2);
+}
+
+.accent.is-inked .swatch { cursor: default; opacity: 0.5; }
+.accent.is-inked .swatch:not(.is-chosen):hover .swatch__stage { background: var(--gph-800); border-color: var(--line-1); }
+
+/* Зеркало «Нейтрально» объявляет data-accent="graphite", и в белой теме
+   атрибут вернул бы колонке светлую заливку графита. Здесь все шесть
+   токенов наследуются от корня — то есть чернила. */
+:root[data-theme="light"] .preview__col--fixed {
+    --acc-400: inherit; --acc-500: inherit; --acc-600: inherit;
+    --acc-ink: inherit; --acc-soft: inherit; --acc-line: inherit;
+}
+
 /* Обещание, которое доказывает колонка «Не меняется никогда» справа. */
 .accent__promise {
     grid-column: 1 / -1;

@@ -102,9 +102,23 @@
                 </Panel>
 
                 <Panel Title="Акцент интерфейса" Class="rise rise-2">
-                    <MetaContent>@UserPreferences.GetAccentLabel(Preferences.Accent)</MetaContent>
+                    <MetaContent>@AccentMeta</MetaContent>
                     <ChildContent>
-                        <div class="accent">
+                        <div class="accent @(Preferences.IsLightTheme ? "is-inked" : null)">
+
+                            @* Пресеты рассчитаны на тёмный фон: светлая заливка,
+                               тёмный текст. В белой теме акцент — чернила, и
+                               пресет не применяется (раздел 20). Выбор при этом
+                               не теряется: образцы остаются видны, но закрыты,
+                               и строка говорит, почему. *@
+                            @if (Preferences.IsLightTheme)
+                            {
+                                <p class="accent__inked">
+                                    В белой теме акцент — чернила. Выбранный пресет
+                                    «@UserPreferences.GetAccentLabel(Preferences.Accent)»
+                                    вернётся вместе с тёмной темой.
+                                </p>
+                            }
 
                             @* Радиогруппа, а не набор кнопок: стрелками между
                                образцами, пробелом или Enter выбор. Выбранный
@@ -113,6 +127,7 @@
                             <div class="swatches"
                                  role="radiogroup"
                                  aria-label="Акцент интерфейса"
+                                 aria-disabled="@(Preferences.IsLightTheme ? "true" : null)"
                                  @onkeydown="HandleSwatchKey">
                                 @for (var i = 0; i < UserPreferences.Accents.Count; i++)
                                 {
@@ -125,6 +140,7 @@
                                             role="radio"
                                             aria-checked="@(isChosen ? "true" : "false")"
                                             tabindex="@(isChosen ? 0 : -1)"
+                                            disabled="@Preferences.IsLightTheme"
                                             title="@preset.Label"
                                             @ref="swatchRefs[index]"
                                             @onclick="() => ChooseAccent(preset.Key)">
@@ -239,6 +255,21 @@
                     <MetaContent>Применяются сразу</MetaContent>
                     <ChildContent>
                         <div class="settings">
+
+                            @* Тема — раздел 20. Дублирует кнопку в шапке: там
+                               её переключают на ходу, здесь она стоит среди
+                               остальных настроек, где её станут искать. *@
+                            <div class="setting">
+                                <div class="setting__text">
+                                    <span class="setting__name">Тема</span>
+                                    <span class="setting__note">Белая — для проектора. Запоминается в этом браузере.</span>
+                                </div>
+                                <Segmented TValue="string"
+                                           Items="@ThemeItems"
+                                           Value="@Preferences.Theme"
+                                           ValueChanged="SetTheme"
+                                           Label="Тема" />
+                            </div>
 
                             <div class="setting">
                                 <div class="setting__text">
@@ -474,6 +505,13 @@
     /// Таймфреймы настройки — все шесть: это рабочий контрол, и человек
     /// выбирает из полного списка.
     /// </summary>
+    private static readonly SegmentedItem<string>[] ThemeItems =
+        UserPreferences.Themes.Select(option => new SegmentedItem<string>(option.Key, option.Label)).ToArray();
+
+    private string AccentMeta => Preferences.IsLightTheme
+        ? "Чернила · белая тема"
+        : UserPreferences.GetAccentLabel(Preferences.Accent);
+
     private static readonly SegmentedItem<string>[] SettingTimeframes =
         Timeframes.All.Select(option => new SegmentedItem<string>(option.Key, option.Label)).ToArray();
 
@@ -610,6 +648,11 @@
     /// </summary>
     private async Task HandleSwatchKey(KeyboardEventArgs args)
     {
+        if (Preferences.IsLightTheme)
+        {
+            return;
+        }
+
         var presets = UserPreferences.Accents;
         var current = presets.ToList().FindIndex(preset => preset.Key == Preferences.Accent);
 
@@ -641,6 +684,8 @@
     }
 
     // ───────────────────────────── настройки ─────────────────────────────
+
+    private Task SetTheme(string key) => Preferences.SetThemeAsync(key);
 
     private Task SetTimeframe(string key) => Preferences.SetDefaultTimeframeAsync(key);
 

@@ -44,17 +44,31 @@
             <span class="topnav__clock num-sm">@Clock</span>
         }
 
-        <div class="topnav__bell">
+        @* Тема и уведомления — одна группа значков: между ними зазор
+           кнопки, а не шаг шапки. *@
+        <div class="topnav__tools">
+            @* Тема — раздел 20. Здесь, а не только на «Профиле»: на защите тему
+               переключают на ходу, перед проектором, и уходить ради этого со
+               «Торгов» нельзя. Значок показывает, КУДА переключит нажатие. *@
             <button class="topnav__icon-button" type="button"
-                    aria-label="@NotificationSummaryText"
-                    aria-expanded="@(IsNotificationsOpen ? "true" : "false")"
-                    @onclick="ToggleNotifications">
-                <Icon Name="bell" Size="16" />
-                @if (UnreadNotificationsCount > 0)
-                {
-                    <span class="topnav__unread" aria-hidden="true"></span>
-                }
+                    aria-label="@ThemeToggleLabel"
+                    title="@ThemeToggleLabel"
+                    @onclick="ToggleTheme">
+                <Icon Name="@(Preferences.IsLightTheme ? "moon" : "sun")" Size="16" />
             </button>
+
+            <div class="topnav__bell">
+                <button class="topnav__icon-button" type="button"
+                        aria-label="@NotificationSummaryText"
+                        aria-expanded="@(IsNotificationsOpen ? "true" : "false")"
+                        @onclick="ToggleNotifications">
+                    <Icon Name="bell" Size="16" />
+                    @if (UnreadNotificationsCount > 0)
+                    {
+                        <span class="topnav__unread" aria-hidden="true"></span>
+                    }
+                </button>
+            </div>
         </div>
 
         <a class="topnav__avatar" href="/profile" aria-label="Профиль пользователя">
@@ -224,6 +238,13 @@
             NotificationFeed.MarkAllRead();
         }
     }
+
+    private string ThemeToggleLabel => Preferences.IsLightTheme
+        ? "Включить тёмную тему"
+        : "Включить белую тему";
+
+    private Task ToggleTheme() => Preferences.SetThemeAsync(
+        Preferences.IsLightTheme ? UserPreferences.DarkTheme : UserPreferences.LightTheme);
 
     private void CloseNotifications() => IsNotificationsOpen = false;
 

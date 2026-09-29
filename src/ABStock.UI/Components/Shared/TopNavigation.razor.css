@@ -83,6 +83,8 @@
 
 .topnav__clock { color: var(--text-3); }
 
+.topnav__tools { display: flex; align-items: center; gap: var(--s-1); }
+
 .topnav__bell { position: relative; display: flex; }
 
 .topnav__icon-button {
