@@ -466,7 +466,11 @@
 
 .agents tfoot th, .agents tfoot td { height: var(--h-row); padding: 0; font: var(--t-caption); color: var(--text-3); }
 .agents tfoot th { text-align: left; font-weight: inherit; }
-.agents tfoot .num-sm, .agents tfoot .num { color: var(--text-2); }
+/* Число в итогах — моноширинным, как в строках. Правило подвала выше
+   ставит всей строке шрифт подписи, и без возврата --n-sm сумма набиралась
+   Golos: узкий неразрывный пробел между разрядами там почти нулевой, и
+   «465 000» читалось как «465000» под «110 000» строк. */
+.agents tfoot .num-sm, .agents tfoot .num { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-2); }
 
 .agents__skeleton { display: flex; flex-direction: column; padding: var(--s-3) var(--s-5); }
 
@@ -680,7 +684,7 @@
 }
 
 .compose tfoot th { text-align: left; font-weight: inherit; }
-.compose tfoot .num-sm { color: var(--text-2); }
+.compose tfoot .num-sm { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-2); }
 
 .compose__warn {
     display: inline-flex;
