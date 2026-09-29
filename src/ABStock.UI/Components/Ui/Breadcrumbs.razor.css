@@ -34,7 +34,7 @@
 .ui-crumbs a:hover { color: var(--text-2); }
 
 /* Icon — дочерний компонент, до него скоуп страницы не достаёт без ::deep. */
-.ui-crumbs ::deep .ui-icon { color: var(--text-4); }
+.ui-crumbs ::deep .ui-icon { color: var(--text-quiet); }
 
 /* Имя актива и его статус — ОДИН элемент пути. Зазор внутри него меньше, чем
    зазор между элементами пути: --s-1 против --s-2 у .ui-crumbs.

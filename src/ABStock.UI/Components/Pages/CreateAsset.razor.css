@@ -141,7 +141,7 @@
 
 .field__no {
     font: var(--n-xs);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 .field__hint { font: var(--t-caption); color: var(--text-3); }
@@ -253,7 +253,7 @@
 
 .param__range {
     font: var(--n-sm);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 /* Дорожка потенциала роста — показывает положение, не принимает ввод
@@ -288,7 +288,7 @@
 .param__track-max {
     position: absolute;
     top: var(--s-3);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 .param__track-min { left: 0; }
@@ -429,7 +429,7 @@
     align-items: start;
 }
 
-.factors__empty { margin: 0; padding: var(--s-4) var(--s-5); color: var(--text-4); }
+.factors__empty { margin: 0; padding: var(--s-4) var(--s-5); color: var(--text-quiet); }
 
 .factor-list {
     margin: 0;
@@ -487,7 +487,7 @@
     gap: var(--s-1);
 }
 
-.aside-row__hint { font: var(--t-caption); color: var(--text-4); }
+.aside-row__hint { font: var(--t-caption); color: var(--text-quiet); }
 
 .aside-row__body {
     flex: 1;
@@ -552,7 +552,7 @@
 }
 
 .loading__step--wide { flex: 1.9; }
-.loading__arrow { flex: none; font: var(--t-body); color: var(--text-4); }
+.loading__arrow { flex: none; font: var(--t-body); color: var(--text-quiet); }
 
 .loading__balance { display: flex; flex-direction: column; gap: var(--s-2); }
 

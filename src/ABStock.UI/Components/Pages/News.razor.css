@@ -31,7 +31,7 @@
    Полоса связи — содержимое шагов.
    Сама полоса и стрелки живут в ките (раздел 9.19).
    ============================================================================ */
-.strip__idle { font: var(--t-body-sm); color: var(--text-4); }
+.strip__idle { font: var(--t-body-sm); color: var(--text-quiet); }
 .strip__dash { color: var(--text-4); }
 .strip__value { color: var(--text-1); }
 .strip__impact { color: var(--text-1); }
@@ -374,7 +374,7 @@ main.news-page ::deep .ui-causality__note {
 
 .risks__count { color: var(--text-1); }
 .risks__label { font: var(--t-caption); font-weight: 500; color: var(--text-2); }
-.risks__hint { margin-left: auto; font: var(--t-caption); color: var(--text-4); }
+.risks__hint { margin-left: auto; font: var(--t-caption); color: var(--text-quiet); }
 
 .profile__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 

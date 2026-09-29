@@ -112,7 +112,7 @@
     margin: 0;
     padding: var(--s-3) var(--s-5);
     font: var(--t-caption);
-    color: var(--text-4);
+    color: var(--text-quiet);
     border-top: 1px solid var(--line-1);
 }
 
@@ -311,7 +311,7 @@
     align-items: center;
     justify-content: center;
     font: var(--t-caption);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 .chart-empty-state[hidden] { display: none; }
@@ -325,12 +325,12 @@
     margin-top: var(--s-3);
     padding-top: var(--s-2);
     border-top: 1px solid var(--line-1);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
-.chart-foot__credit { font: var(--t-caption); color: var(--text-4); text-decoration: none; }
+.chart-foot__credit { font: var(--t-caption); color: var(--text-quiet); text-decoration: none; }
 .chart-foot__credit:hover { color: var(--text-3); }
-.chart-foot .num-xs { color: var(--text-4); }
+.chart-foot .num-xs { color: var(--text-quiet); }
 
 /* ============================================================================
    Таблица агентов — строка 46px под две строки «действие + объяснение»
@@ -458,7 +458,7 @@
 }
 
 .agents__title { font: var(--t-h3); color: var(--text-1); }
-.agents__kind { font: var(--t-caption); color: var(--text-4); }
+.agents__kind { font: var(--t-caption); color: var(--text-quiet); }
 .agents__c-num.num-sm { color: var(--text-2); }
 .agents__c-num.num { color: var(--text-1); }
 .agents__c-num.tone-up { color: var(--up-text); }
@@ -571,7 +571,7 @@
 .tape__time { color: var(--text-3); }
 .tape__qty { margin-left: auto; color: var(--text-2); }
 .tape__pair { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-1); width: 52px; }
-.tape__arrow { color: var(--text-4); }
+.tape__arrow { color: var(--text-quiet); }
 
 @keyframes tape-in {
     from { opacity: 0; transform: translateY(-4px); }

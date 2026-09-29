@@ -40,7 +40,7 @@
     justify-content: center;
     background: transparent;
     border-color: var(--line-1);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 /* Затронутая новостью половина. Кромкой --text-1, а не заливкой: заливка

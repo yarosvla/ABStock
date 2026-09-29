@@ -108,7 +108,7 @@
 }
 
 .operator__edit ::deep .ui-field { width: var(--w-name-field); }
-.operator__hint { font: var(--t-caption); color: var(--text-4); }
+.operator__hint { font: var(--t-caption); color: var(--text-quiet); }
 
 /* Валидация — охра. Красный означает падение цены и ничего больше (раздел 3).
    На артборде 06 это нарисовано красным; здесь прав раздел 3. */

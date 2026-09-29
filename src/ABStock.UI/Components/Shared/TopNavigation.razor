@@ -221,6 +221,21 @@
         SimulationRunner.OnStateChanged += HandleStateChanged;
     }
 
+    /// <summary>
+    /// Шапка читает настройки сама. Макет статический — интерактивность
+    /// задана страницами, — и его OnAfterRenderAsync не вызывается вовсе:
+    /// без этого на «Агентах», «Новостях» и «Создании актива» значок темы и
+    /// инициалы оставались значениями по умолчанию. EnsureLoadedAsync
+    /// идемпотентен, повторное чтение хранилища не случится.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Preferences.EnsureLoadedAsync();
+        }
+    }
+
     private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void HandlePreferencesChanged() => _ = InvokeAsync(StateHasChanged);
