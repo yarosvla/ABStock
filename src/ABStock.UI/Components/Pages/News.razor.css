@@ -182,10 +182,10 @@ main.news-page ::deep .ui-causality__note {
     gap: var(--s-2);
     margin: 0;
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
 }
 
-.composer__error .num-sm { color: var(--down-500); }
+.composer__error .num-sm { color: var(--down-text); }
 
 .composer__actions { display: flex; align-items: center; gap: var(--s-4); }
 .composer__count { color: var(--text-3); }

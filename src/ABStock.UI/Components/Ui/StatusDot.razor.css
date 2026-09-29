@@ -12,8 +12,8 @@
     background: var(--text-3);
 }
 
-.ui-status__dot--up           { background: var(--up-500); }
-.ui-status__dot--down         { background: var(--down-500); }
+.ui-status__dot--up           { background: var(--up-fill); }
+.ui-status__dot--down         { background: var(--down-fill); }
 .ui-status__dot--warn         { background: var(--warn-500); }
 .ui-status__dot--muted        { background: var(--text-3); }
 .ui-status__dot--agent-trend  { background: var(--agent-trend); }

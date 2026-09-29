@@ -152,7 +152,7 @@
     color: var(--text-3);
 }
 
-.field__counter.is-invalid { color: var(--down-500); }
+.field__counter.is-invalid { color: var(--down-text); }
 
 /* Ошибка — кромка --down-500 плюс строка с иконкой (раздел 9.3). */
 .field__error {
@@ -160,7 +160,7 @@
     align-items: center;
     gap: var(--s-1);
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
 }
 
 /* ::deep обязателен: .ui-icon приходит из компонента Icon со своим scope,

@@ -223,8 +223,8 @@
 
 .price__ohlc small { margin-right: var(--s-2); color: var(--text-3); }
 .price__ohlc .num-sm { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-1); }
-.price__ohlc .num-sm.tone-up { color: var(--up-500); }
-.price__ohlc .num-sm.tone-down { color: var(--down-500); }
+.price__ohlc .num-sm.tone-up { color: var(--up-text); }
+.price__ohlc .num-sm.tone-down { color: var(--down-text); }
 
 .price__stage { height: var(--h-price); }
 

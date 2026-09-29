@@ -119,7 +119,7 @@
     width: 100%;
     margin: 0;
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
 }
 
 .operator__error ::deep .ui-icon { flex: none; }

@@ -189,8 +189,8 @@
 .strip__item { display: flex; align-items: baseline; gap: var(--s-2); }
 .strip__label { font: var(--t-caption); color: var(--text-3); }
 .strip__item .num-sm { color: var(--text-1); }
-.strip__item .num-sm.tone-up { color: var(--up-500); }
-.strip__item .num-sm.tone-down { color: var(--down-500); }
+.strip__item .num-sm.tone-up { color: var(--up-text); }
+.strip__item .num-sm.tone-down { color: var(--down-text); }
 .strip__sep { width: 1px; flex: none; height: var(--s-3); background: var(--line-2); }
 .strip__item { flex: none; }
 
@@ -461,8 +461,8 @@
 .agents__kind { font: var(--t-caption); color: var(--text-4); }
 .agents__c-num.num-sm { color: var(--text-2); }
 .agents__c-num.num { color: var(--text-1); }
-.agents__c-num.tone-up { color: var(--up-500); }
-.agents__c-num.tone-down { color: var(--down-500); }
+.agents__c-num.tone-up { color: var(--up-text); }
+.agents__c-num.tone-down { color: var(--down-text); }
 
 .agents tfoot th, .agents tfoot td { height: var(--h-row); padding: 0; font: var(--t-caption); color: var(--text-3); }
 .agents tfoot th { text-align: left; font-weight: inherit; }
@@ -517,8 +517,8 @@
     transition: width var(--d-fast) var(--e-out);
 }
 
-.book__bar--ask { background: var(--down-bar); }
-.book__bar--bid { background: var(--up-bar); }
+.book__bar--ask { background: var(--down-wash); }
+.book__bar--bid { background: var(--up-wash); }
 
 .book__spread {
     display: flex;
@@ -707,6 +707,6 @@
     gap: var(--s-1);
     margin-top: var(--s-1);
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
     text-align: right;
 }

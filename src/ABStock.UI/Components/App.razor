@@ -7,6 +7,10 @@
     <base href="/" />
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["design-system.css"]" />
+    @* Белая тема (раздел 20) — только переопределение значений под
+       :root[data-theme="light"]. После design-system.css, чтобы при равной
+       специфичности всё равно выигрывала белая. *@
+    <link rel="stylesheet" href="@Assets["design-system-light.css"]" />
     <link rel="stylesheet" href="@Assets["ABStock.UI.styles.css"]" />
     <ImportMap />
     @* Иконка вкладки — раздел 9.22: знак на графитовой подложке, а не знак
