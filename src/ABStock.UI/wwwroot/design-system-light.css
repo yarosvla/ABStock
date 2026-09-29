@@ -89,6 +89,7 @@
   --chart-wick-up:     #089981;           /* фитиль того же цвета, что тело */
   --chart-wick-down:   #F23645;
   --chart-news-marker: #63636B;
+  --chart-last-price: candle;             /* плашка — заливка по направлению свечи */
   --chart-stopped-opacity: 0.58;
 
   /* ---------- 9. ТЕНИ — только всплывающие слои ---------- */

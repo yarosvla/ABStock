@@ -1007,6 +1007,8 @@
             var payload = pendingChartSync;
             await tradingChartModule.InvokeVoidAsync("sync", chartViewport, payload);
             pendingChartSync = null;
+
+            await SyncChartSessionStateAsync();
         }
         catch (JSDisconnectedException)
         {
@@ -1027,6 +1029,38 @@
         if (pendingChartSync is not null)
         {
             await TrySyncChartAsync();
+        }
+        else
+        {
+            await SyncChartSessionStateAsync();
+        }
+    }
+
+    private bool? chartSessionActive;
+
+    /// <summary>
+    /// Остановленные торги гасят свечи (раздел 20: в белой теме до 58 %, в
+    /// графите токен равен 1 и вид не меняется). Отдельным вызовом, а не полем
+    /// данных: после остановки тиков нет, и синхронизации данных не будет.
+    /// Кнопка «Остановить торги» перерисовывает страницу, так что сюда
+    /// попадаем после каждой смены состояния.
+    /// </summary>
+    private async Task SyncChartSessionStateAsync()
+    {
+        var active = SimulationRunner.IsRunning;
+
+        if (!isChartRegistered || tradingChartModule is null || chartSessionActive == active)
+        {
+            return;
+        }
+
+        try
+        {
+            await tradingChartModule.InvokeVoidAsync("setSessionActive", chartViewport, active);
+            chartSessionActive = active;
+        }
+        catch (JSDisconnectedException)
+        {
         }
     }
 
@@ -1587,7 +1621,7 @@
                 slot.ToUnixTimeSeconds(),
                 "aboveBar",
                 "arrowDown",
-                "rgba(240, 241, 243, 0.42)",
+                "--chart-news-marker",
                 Fixed2(entry.ImpactScore)));
         }
 
@@ -1610,7 +1644,7 @@
                 slot.ToUnixTimeSeconds(),
                 "belowBar",
                 "circle",
-                "#C08E63",
+                "--agent-news",
                 string.Empty));
         }
 
@@ -2144,6 +2178,10 @@
 
     /// <param name="Position">`aboveBar` или `belowBar` — сторона свечи.</param>
     /// <param name="Shape">Форма значка библиотеки: `circle`, `arrowDown`.</param>
+    /// <param name="Color">
+    /// Имя токена (`--agent-news`), а не цвет: скрипт графика берёт значение
+    /// из текущей темы и перекрашивает маркер при её смене (раздел 20).
+    /// </param>
     private sealed record ChartMarker(
         long Time,
         string Position,

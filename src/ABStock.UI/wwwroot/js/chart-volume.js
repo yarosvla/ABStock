@@ -7,12 +7,6 @@
  * столбиков означали бы, что один и тот же объём выглядит по-разному.
  */
 
-// Те же цвета, что у свечи, с alpha 0.30 (раздел 11). Цвет столбика задаётся
-// точкой, а не темой серии: он зависит от направления свечи, а у гистограммы
-// нет понятия up/down.
-export const VOLUME_UP = "rgba(63, 163, 122, 0.30)";
-export const VOLUME_DOWN = "rgba(210, 85, 95, 0.30)";
-
 /** Идентификатор собственной ценовой шкалы объёма. */
 export const VOLUME_SCALE_ID = "volume";
 
@@ -36,11 +30,26 @@ export function addVolumeSeries(chart) {
     return series;
 }
 
-/** Точка гистограммы из нормализованной свечи (время уже локальное). */
-export function toVolumePoint(candle) {
+/**
+ * Точка гистограммы из нормализованной свечи (время уже локальное).
+ *
+ * Цвет задаётся точкой, а не темой серии: у гистограммы нет понятия
+ * up/down. В графите это цвета свечи с alpha 0.30 (раздел 11); в белой
+ * теме оба токена нейтрально-серые, а текущий столбик выделен
+ * --volume-current (раздел 20).
+ */
+export function toVolumePoint(candle, theme, isCurrent = false) {
     return {
         time: candle.time,
         value: candle.volume ?? 0,
-        color: candle.close >= candle.open ? VOLUME_UP : VOLUME_DOWN
+        color: isCurrent && theme.volumeCurrent
+            ? theme.volumeCurrent
+            : candle.close >= candle.open ? theme.upVolume : theme.downVolume
     };
+}
+
+/** Весь ряд объёма: последний столбик — текущий. */
+export function toVolumePoints(candles, theme) {
+    const last = candles.length - 1;
+    return candles.map((candle, index) => toVolumePoint(candle, theme, index === last));
 }

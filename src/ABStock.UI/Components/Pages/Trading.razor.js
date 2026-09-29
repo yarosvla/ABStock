@@ -4,7 +4,14 @@ import {
     LineStyle,
     createChart
 } from "/lib/lightweight-charts/lightweight-charts.standalone.production.mjs";
-import { addVolumeSeries, toVolumePoint } from "/js/chart-volume.js";
+import { addVolumeSeries, toVolumePoint, toVolumePoints } from "/js/chart-volume.js";
+import {
+    lastPriceSeriesOptions,
+    onThemeChange,
+    readChartTheme,
+    syncLastPriceLine,
+    withAlpha
+} from "/js/chart-theme.js";
 
 const FOLLOW_THRESHOLD_PX = 24;
 
@@ -331,7 +338,8 @@ function ensureViewport(controller, { forceScrollToRealtime = false, fitContent 
 function replaceData(controller, data, forceScrollToRealtime, fitContent) {
     controller.data = data;
     controller.series.setData(data);
-    controller.volumeSeries.setData(data.map(toVolumePoint));
+    controller.volumeSeries.setData(toVolumePoints(data, controller.theme));
+    syncPriceLine(controller);
     updateEmptyState(controller);
     refreshLegend(controller);
 
@@ -343,20 +351,94 @@ function replaceData(controller, data, forceScrollToRealtime, fitContent) {
 
 function upsertPoint(controller, point) {
     const lastPoint = controller.data.length > 0 ? controller.data[controller.data.length - 1] : null;
+    const appended = !lastPoint || lastPoint.time !== point.time;
 
-    controller.volumeSeries.update(toVolumePoint(point));
-
-    if (lastPoint && lastPoint.time === point.time) {
+    if (appended) {
+        controller.data.push(point);
+    } else {
         controller.data[controller.data.length - 1] = point;
+    }
+
+    // Текущий столбик объёма выделен своим цветом (белая тема). С новой
+    // свечой прежний текущий обязан вернуть обычный цвет, а update умеет
+    // трогать только последнюю точку — поэтому ряд целиком.
+    if (appended && lastPoint && controller.theme.volumeCurrent) {
+        controller.volumeSeries.setData(toVolumePoints(controller.data, controller.theme));
         return;
     }
 
-    controller.data.push(point);
+    controller.volumeSeries.update(toVolumePoint(point, controller.theme, true));
+}
+
+/**
+ * Оформление холста из токенов (раздел 11, раздел 20). Значения графита —
+ * дословно прежние литералы этого файла, поэтому тёмная тема не меняется.
+ */
+function chartThemeOptions(theme) {
+    const crosshairLine = {
+        color: theme.crosshair,
+        style: LineStyle.Dashed,
+        width: 1,
+        labelBackgroundColor: theme.labelBackground
+    };
+
+    return {
+        layout: { textColor: theme.text3 },
+        grid: {
+            vertLines: { color: theme.grid, style: LineStyle.Solid },
+            horzLines: { color: theme.grid, style: LineStyle.Solid }
+        },
+        crosshair: { vertLine: crosshairLine, horzLine: { ...crosshairLine } },
+        rightPriceScale: { borderColor: theme.line1 },
+        timeScale: { borderColor: theme.line1 }
+    };
+}
+
+/**
+ * Цвета свечей. При остановленных торгах свечи гаснут до
+ * --chart-stopped-opacity: те же up/down, без полых свечей и без серого.
+ * В графите токен равен 1, и график не меняется. Плашка последней цены
+ * берёт цвет последней свечи сама — отдельного цвета у неё нет.
+ */
+function candleOptions(theme, active) {
+    const opacity = active ? 1 : theme.stoppedOpacity;
+
+    return {
+        upColor: withAlpha(theme.upFill, opacity),
+        downColor: withAlpha(theme.downFill, opacity),
+        wickUpColor: withAlpha(theme.wickUp, opacity),
+        wickDownColor: withAlpha(theme.wickDown, opacity),
+        ...lastPriceSeriesOptions(theme)
+    };
+}
+
+function syncPriceLine(controller) {
+    const last = controller.data.length > 0 ? controller.data[controller.data.length - 1] : null;
+    syncLastPriceLine(controller, controller.series, controller.theme, Number(last?.close));
+}
+
+/** Маркеры приходят с именем токена вместо цвета — цвет берётся из темы. */
+function applyMarkers(controller) {
+    controller.series.setMarkers(controller.markers.map(marker => ({
+        ...marker,
+        color: controller.theme.resolve(marker.color)
+    })));
+}
+
+/** Тема сменилась: перечитать токены и перекрасить готовый график. */
+function applyTheme(controller) {
+    controller.theme = readChartTheme();
+    controller.chart.applyOptions(chartThemeOptions(controller.theme));
+    controller.series.applyOptions(candleOptions(controller.theme, controller.active));
+    controller.volumeSeries.setData(toVolumePoints(controller.data, controller.theme));
+    applyMarkers(controller);
+    syncPriceLine(controller);
 }
 
 function updateLatestPoint(controller, point, forceScrollToRealtime) {
     upsertPoint(controller, point);
     controller.series.update(point);
+    syncPriceLine(controller);
     updateEmptyState(controller);
     refreshLegend(controller);
 
@@ -396,13 +478,14 @@ export function register(root) {
         return priceFormatter.format(value);
     };
 
+    const theme = readChartTheme();
+
     const chart = createChart(surface, {
         width: initialSize.width,
         height: initialSize.height,
         autoSize: false,
         layout: {
             background: { type: ColorType.Solid, color: "transparent" },
-            textColor: "#7C8288",
             fontFamily: "'JetBrains Mono', ui-monospace, 'SF Mono', monospace",
             fontSize: 11,
             attributionLogo: false
@@ -411,30 +494,8 @@ export function register(root) {
             locale: "ru-RU",
             priceFormatter: axisPriceFormatter
         },
-        grid: {
-            vertLines: {
-                color: "rgba(255, 255, 255, 0.03)",
-                style: LineStyle.Solid
-            },
-            horzLines: {
-                color: "rgba(255, 255, 255, 0.03)",
-                style: LineStyle.Solid
-            }
-        },
         crosshair: {
-            mode: CrosshairMode.Magnet,
-            vertLine: {
-                color: "rgba(255, 255, 255, 0.28)",
-                style: LineStyle.Dashed,
-                width: 1,
-                labelBackgroundColor: "#292C30"
-            },
-            horzLine: {
-                color: "rgba(255, 255, 255, 0.28)",
-                style: LineStyle.Dashed,
-                width: 1,
-                labelBackgroundColor: "#292C30"
-            }
+            mode: CrosshairMode.Magnet
         },
         handleScroll: {
             mouseWheel: true,
@@ -452,7 +513,6 @@ export function register(root) {
         },
         rightPriceScale: {
             borderVisible: true,
-            borderColor: "rgba(255, 255, 255, 0.055)",
             scaleMargins: {
                 top: 0.12,
                 bottom: 0.12
@@ -463,7 +523,6 @@ export function register(root) {
         },
         timeScale: {
             borderVisible: true,
-            borderColor: "rgba(255, 255, 255, 0.055)",
             timeVisible: true,
             secondsVisible: true,
             rightOffset: 0,
@@ -474,16 +533,12 @@ export function register(root) {
             allowShiftVisibleRangeOnWhitespaceReplacement: true
         }
     });
+    chart.applyOptions(chartThemeOptions(theme));
 
     const series = chart.addCandlestickSeries({
-        upColor: "#3FA37A",
-        downColor: "#D2555F",
+        ...candleOptions(theme, true),
         borderVisible: false,
-        wickUpColor: "rgba(63, 163, 122, 0.55)",
-        wickDownColor: "rgba(210, 85, 95, 0.55)",
         // Линия текущей цены — пунктир с ценовой меткой на шкале.
-        priceLineVisible: true,
-        priceLineColor: "rgba(255, 255, 255, 0.45)",
         priceLineStyle: LineStyle.Dashed,
         priceLineWidth: 1,
         lastValueVisible: true
@@ -497,6 +552,12 @@ export function register(root) {
         series,
         volumeSeries,
         surface,
+        theme,
+        // Торги идут, пока «Торги» не скажут обратное (setSessionActive).
+        active: true,
+        markers: [],
+        priceLine: null,
+        themeUnsubscribe: null,
         legend: root.querySelector(".chart-hover-legend"),
         emptyState: root.querySelector(".chart-empty-state"),
         liveButton: root.querySelector(".chart-live-reset"),
@@ -544,6 +605,7 @@ export function register(root) {
     });
 
     controller.resizeObserver.observe(surface);
+    controller.themeUnsubscribe = onThemeChange(() => applyTheme(controller));
     toggleLiveReset(controller);
     controllers.set(root, controller);
 }
@@ -565,13 +627,14 @@ export function sync(root, payload) {
     // собственный слой поверх боевого графика значит завести второй график,
     // который разъедется с первым при первом же зуме.
     if (Array.isArray(normalized.markers)) {
-        controller.series.setMarkers(normalized.markers.map(marker => ({
+        controller.markers = normalized.markers.map(marker => ({
             time: toLocalChartTime(marker.time ?? marker.Time),
             position: marker.position ?? marker.Position,
             shape: marker.shape ?? marker.Shape,
             color: marker.color ?? marker.Color,
             text: marker.text ?? marker.Text ?? ""
-        })));
+        }));
+        applyMarkers(controller);
     }
 
     if (normalized.action === "update" && normalized.candle) {
@@ -596,6 +659,20 @@ export function sync(root, payload) {
     );
 }
 
+/**
+ * Торги идут или остановлены. Остановленные гасят свечи до
+ * --chart-stopped-opacity (в белой теме 0.58, в графите 1 — без изменений).
+ */
+export function setSessionActive(root, active) {
+    const controller = getController(root);
+    if (!controller || controller.active === Boolean(active)) {
+        return;
+    }
+
+    controller.active = Boolean(active);
+    controller.series.applyOptions(candleOptions(controller.theme, controller.active));
+}
+
 export function dispose(root) {
     const controller = getController(root);
     if (!controller) {
@@ -606,6 +683,7 @@ export function dispose(root) {
     controller.chart.unsubscribeCrosshairMove(controller.crosshairHandler);
     controller.liveButton?.removeEventListener("click", controller.liveButtonHandler);
     controller.resizeObserver?.disconnect();
+    controller.themeUnsubscribe?.();
     controller.chart.remove();
     controllers.delete(root);
 }

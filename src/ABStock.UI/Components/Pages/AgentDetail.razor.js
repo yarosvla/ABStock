@@ -4,7 +4,13 @@ import {
     LineStyle,
     createChart
 } from "/lib/lightweight-charts/lightweight-charts.standalone.production.mjs";
-import { addVolumeSeries, toVolumePoint } from "/js/chart-volume.js";
+import { addVolumeSeries, toVolumePoints } from "/js/chart-volume.js";
+import {
+    lastPriceSeriesOptions,
+    onThemeChange,
+    readChartTheme,
+    syncLastPriceLine
+} from "/js/chart-theme.js";
 
 const charts = new WeakMap();
 
@@ -50,23 +56,20 @@ function toLocalChartTime(utcSeconds) {
     return seconds - new Date(seconds * 1000).getTimezoneOffset() * 60;
 }
 
+/**
+ * Токены детальной. Сетка и кромки здесь — --line-1/--line-2, а фитиль
+ * полным цветом свечи: так детальная рисовалась и до переноса в токены, и
+ * графит от переноса не меняется.
+ */
 function readTokens() {
-    const root = getComputedStyle(document.documentElement);
-    const token = name => root.getPropertyValue(name).trim();
+    const theme = readChartTheme();
 
     return {
-        text3: token("--text-3"),
-        text1: token("--text-1"),
-        grid: token("--line-1"),
-        border: token("--line-2"),
-        up: token("--up-500"),
-        down: token("--down-500"),
-        agent: {
-            trend: { on: token("--agent-trend"), off: token("--agent-trend-dim") },
-            counter: { on: token("--agent-counter"), off: token("--agent-counter-dim") },
-            mm: { on: token("--agent-mm"), off: token("--agent-mm-dim") },
-            news: { on: token("--agent-news"), off: token("--agent-news-dim") }
-        }
+        ...theme,
+        grid: theme.line1,
+        border: theme.line2,
+        up: theme.upFill,
+        down: theme.downFill
     };
 }
 
@@ -78,15 +81,53 @@ function getCanvasSize(element, fallbackHeight) {
     };
 }
 
+/** Цвета холста — всё, что меняется вместе с темой. */
+function themeOptions(tokens) {
+    const crosshairLine = {
+        color: tokens.crosshair,
+        style: LineStyle.Dashed,
+        width: 1,
+        labelBackgroundColor: tokens.labelBackground
+    };
+
+    return {
+        layout: { textColor: tokens.text3 },
+        grid: {
+            vertLines: { color: tokens.grid, style: LineStyle.Solid },
+            horzLines: { color: tokens.grid, style: LineStyle.Solid }
+        },
+        crosshair: { vertLine: crosshairLine, horzLine: { ...crosshairLine } },
+        rightPriceScale: { borderColor: tokens.border },
+        timeScale: { borderColor: tokens.border }
+    };
+}
+
+function candleOptions(tokens) {
+    return {
+        upColor: tokens.up,
+        downColor: tokens.down,
+        wickUpColor: tokens.up,
+        wickDownColor: tokens.down,
+        ...lastPriceSeriesOptions(tokens)
+    };
+}
+
+function syncPriceLine(bundle) {
+    const last = bundle.candles.length > 0 ? bundle.candles[bundle.candles.length - 1] : null;
+    syncLastPriceLine(bundle, bundle.series, bundle.tokens, Number(last?.close));
+}
+
 /** Общая тема раздела 11: та же, что на «Торгах». */
 function baseOptions(tokens, size) {
+    const colors = themeOptions(tokens);
+
     return {
         width: size.width,
         height: size.height,
         autoSize: false,
         layout: {
             background: { type: ColorType.Solid, color: "transparent" },
-            textColor: tokens.text3,
+            textColor: colors.layout.textColor,
             fontFamily: "'JetBrains Mono', ui-monospace, 'SF Mono', monospace",
             fontSize: 11,
             attributionLogo: false
@@ -95,24 +136,10 @@ function baseOptions(tokens, size) {
             locale: "ru-RU",
             priceFormatter: value => priceFormatter.format(value)
         },
-        grid: {
-            vertLines: { color: tokens.grid, style: LineStyle.Solid },
-            horzLines: { color: tokens.grid, style: LineStyle.Solid }
-        },
+        grid: colors.grid,
         crosshair: {
             mode: CrosshairMode.Magnet,
-            vertLine: {
-                color: "rgba(255, 255, 255, 0.28)",
-                style: LineStyle.Dashed,
-                width: 1,
-                labelBackgroundColor: "#292C30"
-            },
-            horzLine: {
-                color: "rgba(255, 255, 255, 0.28)",
-                style: LineStyle.Dashed,
-                width: 1,
-                labelBackgroundColor: "#292C30"
-            }
+            ...colors.crosshair
         },
         rightPriceScale: {
             borderVisible: true,
@@ -233,13 +260,8 @@ export function renderPrice(element, payload, dotNetRef) {
         const chart = createChart(element, baseOptions(tokens, getCanvasSize(element, 300)));
 
         const series = chart.addCandlestickSeries({
-            upColor: tokens.up,
-            downColor: tokens.down,
+            ...candleOptions(tokens),
             borderVisible: false,
-            wickUpColor: tokens.up,
-            wickDownColor: tokens.down,
-            priceLineVisible: true,
-            priceLineColor: "rgba(255, 255, 255, 0.45)",
             priceLineStyle: LineStyle.Dashed,
             priceLineWidth: 1,
             lastValueVisible: true
@@ -253,10 +275,23 @@ export function renderPrice(element, payload, dotNetRef) {
             volumeSeries,
             tokens,
             trades: [],
+            candles: [],
             activeIndex: -1,
+            toneKey: "trend",
             tone: tokens.agent.trend,
             resizeObserver: attachResize(chart, element)
         };
+
+        // Смена темы перекрашивает готовый график без перезагрузки.
+        bundle.themeUnsubscribe = onThemeChange(() => {
+            bundle.tokens = readTokens();
+            bundle.tone = bundle.tokens.agent[bundle.toneKey] ?? bundle.tokens.agent.trend;
+            bundle.chart.applyOptions(themeOptions(bundle.tokens));
+            bundle.series.applyOptions(candleOptions(bundle.tokens));
+            bundle.volumeSeries.setData(toVolumePoints(bundle.candles, bundle.tokens));
+            bundle.series.setMarkers(buildMarkers(bundle));
+            syncPriceLine(bundle);
+        });
 
         // Обратная сторона связки: клик по холсту выбирает ближайшую по времени
         // сделку, и строка в рельсе подсвечивается вслед за маркером.
@@ -280,12 +315,16 @@ export function renderPrice(element, payload, dotNetRef) {
     }
 
     bundle.dotNetRef = dotNetRef ?? bundle.dotNetRef;
-    bundle.tone = tokens.agent[payload?.tone ?? payload?.Tone] ?? tokens.agent.trend;
+    bundle.tokens = tokens;
+    bundle.toneKey = payload?.tone ?? payload?.Tone ?? "trend";
+    bundle.tone = tokens.agent[bundle.toneKey] ?? tokens.agent.trend;
     bundle.trades = normalizeTrades(payload?.trades ?? payload?.Trades);
 
     const candles = normalizeCandles(payload?.candles ?? payload?.Candles);
+    bundle.candles = candles;
     bundle.series.setData(candles);
-    bundle.volumeSeries.setData(candles.map(toVolumePoint));
+    bundle.volumeSeries.setData(toVolumePoints(candles, tokens));
+    syncPriceLine(bundle);
     bundle.series.setMarkers(buildMarkers(bundle));
 
     if (candles.length > 0) {
@@ -327,9 +366,19 @@ export function renderEquity(element, points, toneKey) {
         });
 
         bundle = { chart, series, tokens, resizeObserver: attachResize(chart, element) };
+
+        bundle.themeUnsubscribe = onThemeChange(() => {
+            bundle.tokens = readTokens();
+            bundle.chart.applyOptions(themeOptions(bundle.tokens));
+            bundle.series.applyOptions({
+                color: (bundle.tokens.agent[bundle.toneKey] ?? bundle.tokens.agent.trend).on
+            });
+        });
+
         charts.set(element, bundle);
     }
 
+    bundle.toneKey = toneKey;
     const tone = tokens.agent[toneKey] ?? tokens.agent.trend;
     bundle.series.applyOptions({ color: tone.on });
 
@@ -348,6 +397,7 @@ export function dispose(element) {
     }
 
     bundle.resizeObserver?.disconnect();
+    bundle.themeUnsubscribe?.();
     bundle.chart.remove();
     charts.delete(element);
 }
