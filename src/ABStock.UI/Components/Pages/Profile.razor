@@ -104,150 +104,150 @@
                 <Panel Title="Акцент интерфейса" Class="rise rise-2">
                     <MetaContent>@AccentMeta</MetaContent>
                     <ChildContent>
-                        <div class="accent @(Preferences.IsLightTheme ? "is-inked" : null)">
-
-                            @* Пресеты рассчитаны на тёмный фон: светлая заливка,
-                               тёмный текст. В белой теме акцент — чернила, и
-                               пресет не применяется (раздел 19). Выбор при этом
-                               не теряется: образцы остаются видны, но закрыты,
-                               и строка говорит, почему. *@
-                            @if (Preferences.IsLightTheme)
-                            {
-                                <p class="accent__inked">
-                                    В белой теме акцент — чернила. Выбранный пресет
-                                    «@UserPreferences.GetAccentLabel(Preferences.Accent)»
-                                    вернётся вместе с тёмной темой.
-                                </p>
-                            }
-
-                            @* Радиогруппа, а не набор кнопок: стрелками между
-                               образцами, пробелом или Enter выбор. Выбранный
-                               помечается обводкой --acc-line, а не галочкой
-                               поверх цвета. *@
-                            <div class="swatches"
-                                 role="radiogroup"
-                                 aria-label="Акцент интерфейса"
-                                 aria-disabled="@(Preferences.IsLightTheme ? "true" : null)"
-                                 @onkeydown="HandleSwatchKey">
-                                @for (var i = 0; i < UserPreferences.Accents.Count; i++)
-                                {
-                                    var index = i;
-                                    var preset = UserPreferences.Accents[index];
-                                    var isChosen = preset.Key == Preferences.Accent;
-                                    <button type="button"
-                                            class="swatch @(isChosen ? "is-chosen" : null)"
-                                            data-accent="@preset.Key"
-                                            role="radio"
-                                            aria-checked="@(isChosen ? "true" : "false")"
-                                            tabindex="@(isChosen ? 0 : -1)"
-                                            disabled="@Preferences.IsLightTheme"
-                                            title="@preset.Label"
-                                            @ref="swatchRefs[index]"
-                                            @onclick="() => ChooseAccent(preset.Key)">
-                                        @* Образец собран из тех же трёх токенов,
-                                           что несут акцент в системе: заливка,
-                                           линия, подложка. Не картинка цвета —
-                                           маленький портрет пресета. *@
-                                        <span class="swatch__stage" aria-hidden="true">
-                                            <span class="swatch__fill"></span>
-                                            <span class="swatch__line"></span>
-                                            <span class="swatch__soft"></span>
-                                        </span>
-                                        <span class="swatch__name">@preset.Label</span>
-                                    </button>
-                                }
-                            </div>
-
-                            <div class="preview hairline-left">
-                                <div class="preview__col">
-                                    <span class="label">С акцентом</span>
-
-                                    <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
-
-                                    <TextField Value="@CurrentAsset.Draft.Name"
-                                               Label="Пример поля в фокусе"
-                                               Class="preview__field" />
-
-                                    <div class="preview__rows">
-                                        <div class="preview__row">
-                                            <span>Трендовый</span>
-                                            <span class="num-sm up">@Pnl2(18_240m)</span>
-                                        </div>
-                                        <div class="preview__row is-selected">
-                                            <span>Контр-тренд</span>
-                                            <span class="num-sm down">@Pnl2(-6_110m)</span>
-                                        </div>
-                                    </div>
-
-                                    @* Компоненты кита настоящие, а состояние у них
-                                       своё: живая настройка таймфрейма стоит ниже,
-                                       в «Настройках интерфейса», и второй такой же
-                                       рабочий контрол на одном экране был бы дублем
-                                       (раздел 9.0). Здесь он показывает акцент. *@
-                                    <Segmented TValue="string"
-                                               Items="@PreviewTimeframes"
-                                               Value="@previewTimeframe"
-                                               ValueChanged="@(value => previewTimeframe = value)"
-                                               Label="Пример переключателя" />
-
-                                    <Toggle Value="previewToggle"
-                                            ValueChanged="@(value => previewToggle = value)"
-                                            Text="@(previewToggle ? "Включено" : "Выключено")"
-                                            Label="Пример тумблера" />
-                                </div>
-
-                                @* Зеркало: те же шесть контролов под пресетом по умолчанию.
-                                   data-accent="graphite" — не имитация, а настоящие токены:
-                                   пресеты в design-system.css объявлены атрибутом, и вложенный
-                                   элемент отдаёт детям графитовые значения. Человек видит один
-                                   и тот же контрол с акцентом и без (артборд 02).
-
-                                   Раньше здесь стояли рыночные данные и подпись «Не меняется
-                                   никогда». Доказывать неизменность рынка эта панель не обязана:
-                                   раздел 3.1 говорит, что «пресет проверяется не на „Профиле“,
-                                   а на „Торгах“», и для этого есть артборды 03 и 04 с тремя
-                                   полноразмерными экранами рядом. Пункт 55 docs/ui-backlog.md. *@
-                                <div class="preview__col preview__col--fixed" data-accent="graphite">
-                                    <span class="label">Нейтрально</span>
-
-                                    <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
-
-                                    <TextField Value="@CurrentAsset.Draft.Name"
-                                               Label="Пример поля без акцента"
-                                               Class="preview__field" />
-
-                                    <div class="preview__rows">
-                                        <div class="preview__row">
-                                            <span>Трендовый</span>
-                                            <span class="num-sm up">@Pnl2(18_240m)</span>
-                                        </div>
-                                        @* Выбранная строка помечена и здесь: её левая полоса —
-                                           одно из шести мест, куда идёт акцент (раздел 3.1), и
-                                           без неё зеркало не показало бы, что именно меняется. *@
-                                        <div class="preview__row is-selected">
-                                            <span>Контр-тренд</span>
-                                            <span class="num-sm down">@Pnl2(-6_110m)</span>
-                                        </div>
-                                    </div>
-
-                                    <Segmented TValue="string"
-                                               Items="@PreviewTimeframes"
-                                               Value="@previewTimeframe"
-                                               ValueChanged="@(value => previewTimeframe = value)"
-                                               Label="Пример переключателя без акцента" />
-
-                                    <Toggle Value="previewToggle"
-                                            ValueChanged="@(value => previewToggle = value)"
-                                            Text="@(previewToggle ? "Включено" : "Выключено")"
-                                            Label="Пример тумблера без акцента" />
-                                </div>
-                            </div>
-
-                            <p class="accent__promise hairline-top">
-                                Акцент меняет только элементы управления. Цвета рынка, агентов и
-                                графиков не меняются никогда.
+                        @* Пресеты рассчитаны на тёмный фон: светлая заливка, тёмный
+                           текст. В белой теме акцент — чернила, пресет не
+                           применяется (раздел 19), и палитра с превью показали бы
+                           десять бледных образцов и две одинаковые колонки. Вместо
+                           них — одна строка; выбор не теряется и возвращается
+                           вместе с тёмной темой. *@
+                        @if (Preferences.IsLightTheme)
+                        {
+                            <p class="accent__inked">
+                                В белой теме акцент — чернила; выбранный пресет
+                                «@UserPreferences.GetAccentLabel(Preferences.Accent)» вернётся с тёмной темой.
                             </p>
-                        </div>
+                        }
+                        else
+                        {
+                            <div class="accent">
+
+                                @* Радиогруппа, а не набор кнопок: стрелками между
+                                   образцами, пробелом или Enter выбор. Выбранный
+                                   помечается обводкой --acc-line, а не галочкой
+                                   поверх цвета. *@
+                                <div class="swatches"
+                                     role="radiogroup"
+                                     aria-label="Акцент интерфейса"
+                                     @onkeydown="HandleSwatchKey">
+                                    @for (var i = 0; i < UserPreferences.Accents.Count; i++)
+                                    {
+                                        var index = i;
+                                        var preset = UserPreferences.Accents[index];
+                                        var isChosen = preset.Key == Preferences.Accent;
+                                        <button type="button"
+                                                class="swatch @(isChosen ? "is-chosen" : null)"
+                                                data-accent="@preset.Key"
+                                                role="radio"
+                                                aria-checked="@(isChosen ? "true" : "false")"
+                                                tabindex="@(isChosen ? 0 : -1)"
+                                                title="@preset.Label"
+                                                @ref="swatchRefs[index]"
+                                                @onclick="() => ChooseAccent(preset.Key)">
+                                            @* Образец собран из тех же трёх токенов,
+                                               что несут акцент в системе: заливка,
+                                               линия, подложка. Не картинка цвета —
+                                               маленький портрет пресета. *@
+                                            <span class="swatch__stage" aria-hidden="true">
+                                                <span class="swatch__fill"></span>
+                                                <span class="swatch__line"></span>
+                                                <span class="swatch__soft"></span>
+                                            </span>
+                                            <span class="swatch__name">@preset.Label</span>
+                                        </button>
+                                    }
+                                </div>
+
+                                <div class="preview hairline-left">
+                                    <div class="preview__col">
+                                        <span class="label">С акцентом</span>
+
+                                        <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
+
+                                        <TextField Value="@CurrentAsset.Draft.Name"
+                                                   Label="Пример поля в фокусе"
+                                                   Class="preview__field" />
+
+                                        <div class="preview__rows">
+                                            <div class="preview__row">
+                                                <span>Трендовый</span>
+                                                <span class="num-sm up">@Pnl2(18_240m)</span>
+                                            </div>
+                                            <div class="preview__row is-selected">
+                                                <span>Контр-тренд</span>
+                                                <span class="num-sm down">@Pnl2(-6_110m)</span>
+                                            </div>
+                                        </div>
+
+                                        @* Компоненты кита настоящие, а состояние у них
+                                           своё: живая настройка таймфрейма стоит ниже,
+                                           в «Настройках интерфейса», и второй такой же
+                                           рабочий контрол на одном экране был бы дублем
+                                           (раздел 9.0). Здесь он показывает акцент. *@
+                                        <Segmented TValue="string"
+                                                   Items="@PreviewTimeframes"
+                                                   Value="@previewTimeframe"
+                                                   ValueChanged="@(value => previewTimeframe = value)"
+                                                   Label="Пример переключателя" />
+
+                                        <Toggle Value="previewToggle"
+                                                ValueChanged="@(value => previewToggle = value)"
+                                                Text="@(previewToggle ? "Включено" : "Выключено")"
+                                                Label="Пример тумблера" />
+                                    </div>
+
+                                    @* Зеркало: те же шесть контролов под пресетом по умолчанию.
+                                       data-accent="graphite" — не имитация, а настоящие токены:
+                                       пресеты в design-system.css объявлены атрибутом, и вложенный
+                                       элемент отдаёт детям графитовые значения. Человек видит один
+                                       и тот же контрол с акцентом и без (артборд 02).
+
+                                       Раньше здесь стояли рыночные данные и подпись «Не меняется
+                                       никогда». Доказывать неизменность рынка эта панель не обязана:
+                                       раздел 3.1 говорит, что «пресет проверяется не на „Профиле“,
+                                       а на „Торгах“», и для этого есть артборды 03 и 04 с тремя
+                                       полноразмерными экранами рядом. Пункт 55 docs/ui-backlog.md. *@
+                                    <div class="preview__col preview__col--fixed" data-accent="graphite">
+                                        <span class="label">Нейтрально</span>
+
+                                        <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
+
+                                        <TextField Value="@CurrentAsset.Draft.Name"
+                                                   Label="Пример поля без акцента"
+                                                   Class="preview__field" />
+
+                                        <div class="preview__rows">
+                                            <div class="preview__row">
+                                                <span>Трендовый</span>
+                                                <span class="num-sm up">@Pnl2(18_240m)</span>
+                                            </div>
+                                            @* Выбранная строка помечена и здесь: её левая полоса —
+                                               одно из шести мест, куда идёт акцент (раздел 3.1), и
+                                               без неё зеркало не показало бы, что именно меняется. *@
+                                            <div class="preview__row is-selected">
+                                                <span>Контр-тренд</span>
+                                                <span class="num-sm down">@Pnl2(-6_110m)</span>
+                                            </div>
+                                        </div>
+
+                                        <Segmented TValue="string"
+                                                   Items="@PreviewTimeframes"
+                                                   Value="@previewTimeframe"
+                                                   ValueChanged="@(value => previewTimeframe = value)"
+                                                   Label="Пример переключателя без акцента" />
+
+                                        <Toggle Value="previewToggle"
+                                                ValueChanged="@(value => previewToggle = value)"
+                                                Text="@(previewToggle ? "Включено" : "Выключено")"
+                                                Label="Пример тумблера без акцента" />
+                                    </div>
+                                </div>
+
+                                <p class="accent__promise hairline-top">
+                                    Акцент меняет только элементы управления. Цвета рынка, агентов и
+                                    графиков не меняются никогда.
+                                </p>
+                            </div>
+                        }
                     </ChildContent>
                 </Panel>
 
@@ -648,11 +648,6 @@
     /// </summary>
     private async Task HandleSwatchKey(KeyboardEventArgs args)
     {
-        if (Preferences.IsLightTheme)
-        {
-            return;
-        }
-
         var presets = UserPreferences.Accents;
         var current = presets.ToList().FindIndex(preset => preset.Key == Preferences.Accent);
 
