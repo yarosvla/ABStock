@@ -80,7 +80,7 @@
 <div class="trading-shell">
     <TopNavigation ActivePage="Trading" ShowClock="true" />
 
-    <main class="trading-page">
+    <main class="trading-page @(isRunning ? null : "is-stopped")">
 
         @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
         <Breadcrumbs Items="@(new Crumb[]
@@ -753,7 +753,7 @@
                                 {
                                     <div class="tape__row" title="@trade.Buyer ← @trade.Seller">
                                         <span class="num-xs tape__time">@trade.Time</span>
-                                        <span class="num-sm @(trade.SideClass == "buy" ? "tone-up" : "tone-down")">
+                                        <span class="num-sm tape__price @(trade.SideClass == "buy" ? "tone-up" : "tone-down")">
                                             @(trade.SideClass == "buy" ? "↗" : "↘") @trade.Price
                                         </span>
                                         <span class="num-sm tape__qty">@trade.Volume</span>

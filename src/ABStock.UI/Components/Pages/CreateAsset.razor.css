@@ -228,7 +228,7 @@
 
 .type.is-selected {
     background: var(--acc-soft);
-    border-color: var(--acc-line);
+    border-color: var(--selected-edge);
 }
 
 .type.is-selected small { color: var(--text-2); }

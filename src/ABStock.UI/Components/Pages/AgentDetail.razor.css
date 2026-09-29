@@ -324,6 +324,6 @@
     background: var(--gph-800);
 }
 
-.balance__buy { background: var(--line-3); }
-.balance__sell { flex: 1; background: var(--line-1); }
+.balance__buy { background: var(--split-strong); }
+.balance__sell { flex: 1; background: var(--split-weak); }
 

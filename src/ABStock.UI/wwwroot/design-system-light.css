@@ -89,6 +89,24 @@
   --chart-wick-up:     #089981;           /* фитиль того же цвета, что тело */
   --chart-wick-down:   #F23645;
   --chart-news-marker: #63636B;
+  /* Выбранное ≠ фокус: чёрная кромка остаётся только у фокуса (артборд 03). */
+  --selected-edge: #D4D4D8;       /* плитка: лёгкая заливка + кромка line-3 */
+  --segment-edge:  transparent;   /* сегмент: заливка #EEEEF0 без рамки */
+
+  /* Полоса баланса: тёмно-серая доля с белым текстом (10,4:1) против
+     #EEEEF0 с text-2 (9,0:1) — различимы с одного взгляда. */
+  --balance-strong:      #3F3F46;
+  --balance-strong-ink:  #FFFFFF;
+  --balance-weak:        #EEEEF0;
+  --balance-weak-edge:   #EEEEF0;
+  --split-strong:        #3F3F46;
+  --split-weak:          #E4E4E7;
+
+  /* Торги остановлены: цены ленты без рыночного цвета, точки агентов
+     серые. Цвета агентов остаются в легенде и «Составе агентов». */
+  --stopped-price: #63636B;
+  --stopped-dot:   #A1A1AA;
+
   --chart-last-price: candle;             /* плашка — заливка по направлению свечи */
   --chart-stopped-opacity: 0.58;
 

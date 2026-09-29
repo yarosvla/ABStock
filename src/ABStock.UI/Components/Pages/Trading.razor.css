@@ -577,6 +577,13 @@
 .tape__pair { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-1); width: 52px; }
 .tape__arrow { color: var(--text-quiet); }
 
+/* Торги остановлены (раздел 19): лента — история, а не рынок. В белой теме
+   цены без up/down-цвета (стрелка направления остаётся) и точки агентов
+   серые; в графите токены не заданы, и лента выглядит как раньше. */
+.trading-page.is-stopped .tape__price.tone-up { color: var(--stopped-price, var(--up-text)); }
+.trading-page.is-stopped .tape__price.tone-down { color: var(--stopped-price, var(--down-text)); }
+.trading-page.is-stopped .tape__pair { --status-dot-override: var(--stopped-dot); }
+
 @keyframes tape-in {
     from { opacity: 0; transform: translateY(-4px); }
     to { opacity: 1; transform: none; }
