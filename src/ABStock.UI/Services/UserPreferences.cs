@@ -15,7 +15,7 @@ public interface IUserPreferences
     /// <summary>Настройки уже прочитаны из хранилища.</summary>
     bool IsLoaded { get; }
 
-    /// <summary>Тема: <c>dark</c> или <c>light</c> (раздел 20).</summary>
+    /// <summary>Тема: <c>dark</c> или <c>light</c> (раздел 19).</summary>
     string Theme { get; }
 
     /// <summary>Белая тема включена — пресет акцента не применяется.</summary>
@@ -114,7 +114,7 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
 
     /// <summary>
     /// Те же два ключа, что в загрузочном скрипте App.razor. Тёмная — по
-    /// умолчанию; белая — для проектора (раздел 20).
+    /// умолчанию; белая — для проектора (раздел 19).
     /// </summary>
     public static readonly IReadOnlyList<ThemeOption> Themes =
     [

@@ -36,7 +36,7 @@ export function addVolumeSeries(chart) {
  * Цвет задаётся точкой, а не темой серии: у гистограммы нет понятия
  * up/down. В графите это цвета свечи с alpha 0.30 (раздел 11); в белой
  * теме оба токена нейтрально-серые, а текущий столбик выделен
- * --volume-current (раздел 20).
+ * --volume-current (раздел 19).
  */
 export function toVolumePoint(candle, theme, isCurrent = false) {
     return {
