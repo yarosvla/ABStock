@@ -158,7 +158,7 @@ main.news-page ::deep .ui-causality__note {
 
 .composer__field::placeholder { color: var(--text-4); }
 
-.composer__field:focus {
+.composer__field:focus-visible {
     outline: none;
     border-color: var(--acc-line);
     box-shadow: 0 0 0 2px var(--acc-soft);

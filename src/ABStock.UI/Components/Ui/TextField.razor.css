@@ -16,7 +16,7 @@
 .ui-field__input::placeholder { color: var(--text-4); }
 
 /* Кромка поля в фокусе — интерактив, значит акцент (раздел 3.1). */
-.ui-field__input:focus {
+.ui-field__input:focus-visible {
     outline: none;
     border-color: var(--acc-line);
     box-shadow: 0 0 0 2px var(--acc-soft);
