@@ -260,7 +260,10 @@ main.news-page ::deep .ui-causality__note {
 }
 
 .factor:last-child { border-bottom: 0; }
-.factor__kind { flex: none; justify-content: center; min-width: calc(var(--s-18) + var(--s-8)); }
+/* align-self: center возвращает бейдж на середину строки: у .badge стоит
+   flex-start — он нужен ему в колонках, — и в строке высотой --h-row-tall
+   бейдж прижимался к верхней линии. */
+.factor__kind { flex: none; align-self: center; justify-content: center; min-width: calc(var(--s-18) + var(--s-8)); }
 
 .factor__text {
     flex: 1;
