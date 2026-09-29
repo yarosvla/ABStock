@@ -19,6 +19,10 @@ const FOLLOW_THRESHOLD_PX = 24;
 // скрывается, чтобы не наезжать на метку текущей цены.
 const PRICE_LABEL_GUARD_PX = 14;
 
+// Поля ценовой шкалы. Вынесены константой: их повторная установка — способ
+// заставить библиотеку пересобрать подписи делений (refreshAxisLabels).
+const PRICE_SCALE_MARGINS = { top: 0.12, bottom: 0.12 };
+
 // Предел ширины свечи. Без него fitContent() растягивает несколько свечей
 // на треть панели, и график перестаёт читаться как свечной. При нехватке
 // данных ряд прижимается вправо, слева остаётся пустота — так делают
@@ -186,7 +190,39 @@ function recomputeLabelGuard(controller) {
         return;
     }
 
+    const previous = controller.labelGuard;
     controller.labelGuard = { price, epsilon: Math.abs(Number(neighbour) - price) };
+
+    // Сравнение с ценой, под которую подписи пересобраны в последний раз, а
+    // не с прежней зоной: presetLabelGuard уже сдвинул зону к новой цене.
+    const epsilon = controller.labelGuard.epsilon;
+    if (controller.axisLabelsPrice !== price || !previous || Math.abs(previous.epsilon - epsilon) > epsilon * 0.25) {
+        refreshAxisLabels(controller);
+    }
+}
+
+/**
+ * Библиотека собирает подписи делений один раз и держит их в кэше, пока не
+ * сменится диапазон шкалы. «Мёртвая зона» вокруг последней цены при этом не
+ * действовала: цена сдвигалась, а скрытым оставалось деление у прежней, и
+ * соседнее с новой проступало из-под плашки — две плашки друг на друге.
+ * Повторная установка тех же полей шкалы сбрасывает кэш делений.
+ */
+function refreshAxisLabels(controller) {
+    controller.axisLabelsPrice = controller.labelGuard?.price ?? null;
+    controller.chart.priceScale("right").applyOptions({ scaleMargins: PRICE_SCALE_MARGINS });
+}
+
+/**
+ * Цена «мёртвой зоны» ставится ДО обновления ряда: обновление пересобирает
+ * подписи шкалы, и они должны собраться уже вокруг новой цены. Ширина зоны
+ * уточняется после отрисовки (recomputeLabelGuard).
+ */
+function presetLabelGuard(controller, price) {
+    const close = Number(price);
+    if (controller.labelGuard && Number.isFinite(close)) {
+        controller.labelGuard = { ...controller.labelGuard, price: close };
+    }
 }
 
 function setCrosshairActive(controller, active) {
@@ -337,6 +373,7 @@ function ensureViewport(controller, { forceScrollToRealtime = false, fitContent 
 
 function replaceData(controller, data, forceScrollToRealtime, fitContent) {
     controller.data = data;
+    presetLabelGuard(controller, data[data.length - 1]?.close);
     controller.series.setData(data);
     controller.volumeSeries.setData(toVolumePoints(data, controller.theme));
     syncPriceLine(controller);
@@ -437,6 +474,7 @@ function applyTheme(controller) {
 
 function updateLatestPoint(controller, point, forceScrollToRealtime) {
     upsertPoint(controller, point);
+    presetLabelGuard(controller, point.close);
     controller.series.update(point);
     syncPriceLine(controller);
     updateEmptyState(controller);
@@ -513,10 +551,7 @@ export function register(root) {
         },
         rightPriceScale: {
             borderVisible: true,
-            scaleMargins: {
-                top: 0.12,
-                bottom: 0.12
-            }
+            scaleMargins: PRICE_SCALE_MARGINS
         },
         leftPriceScale: {
             visible: false
@@ -568,6 +603,7 @@ export function register(root) {
         hasViewport: false,
         crosshairActive: false,
         labelGuard: null,
+        axisLabelsPrice: null,
         resizeObserver: null,
         visibleRangeHandler: null,
         crosshairHandler: null,
