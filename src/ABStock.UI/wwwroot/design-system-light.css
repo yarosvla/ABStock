@@ -16,7 +16,8 @@
 :root[data-theme="light"] {
   /* ---------- 1. ПОВЕРХНОСТИ — три уровня ----------
      950/900/850 все белые: панель от фона отделяет только кромка --line-2. */
-  --gph-950: #FFFFFF;   /* фон страницы */
+  --gph-950: #F4F4F5;   /* фон страницы — холодный светлый серый: панели
+                           отделяются от него не только кромкой */
   --gph-900: #FFFFFF;
   --gph-850: #FFFFFF;   /* панель = область за hairline */
   --gph-800: #F6F6F7;   /* вложенный блок, шапка таблицы */
@@ -92,6 +93,8 @@
 
   /* ---------- 6. ЛИНИИ И НЕЙТРАЛЬНАЯ ЗАЛИВКА ---------- */
   --fill-soft: #F6F6F7;   /* чип, hover вторичной кнопки */
+  --chip-on-page:      #FFFFFF;   /* чип на сером фоне страницы — как панель */
+  --chip-on-page-edge: #DCDCE0;   /* line-1 */
 
   --line-1: #DCDCE0;   /* разделители, сетка · 1,37 на белом, 1,30 под проектором */
   --line-2: #DCDCE0;   /* граница панели — та же hairline */
@@ -153,7 +156,7 @@
 }
 
 /* Правила design-system.css, где цвет записан литералом, а не токеном. */
-:root[data-theme="light"] .app-bg { background: #FFFFFF; }
+:root[data-theme="light"] .app-bg { background: var(--gph-950); }
 :root[data-theme="light"] .app-bg__noise { display: none; }
 :root[data-theme="light"] .panel { box-shadow: none; }
 :root[data-theme="light"] .panel--quiet { border-color: var(--line-1); }

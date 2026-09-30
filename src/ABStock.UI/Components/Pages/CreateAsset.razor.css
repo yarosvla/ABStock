@@ -247,7 +247,7 @@
     height: var(--s-4);
     border-radius: var(--r-pill);
     background: var(--selected-edge);
-    color: var(--gph-950);
+    color: var(--gph-850);
 }
 
 .type.is-selected small { color: var(--text-2); }
