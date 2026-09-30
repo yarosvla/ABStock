@@ -211,8 +211,9 @@
     justify-content: center;
     gap: 2px;
     height: var(--s-14);
+    position: relative;
     padding: 0 14px;
-    background: var(--gph-800);
+    background: var(--choice-bg);
     border: 1px solid var(--line-1);
     border-radius: var(--r-md);
     text-align: left;
@@ -226,9 +227,27 @@
 .type:hover { background: var(--gph-750); border-color: var(--line-3); }
 .type:hover small { color: var(--text-2); }
 
+/* Выбранная плитка. В белой теме (раздел 19) выбор читается формой, а не
+   оттенком: кромка 1,5px (--selected-ring добирает полпикселя inset-тенью,
+   чтобы не сдвигать раскладку) и галочка в углу. */
 .type.is-selected {
-    background: var(--acc-soft);
+    background: var(--choice-selected);
     border-color: var(--selected-edge);
+    box-shadow: inset 0 0 0 var(--selected-ring) var(--selected-edge);
+}
+
+.type__check {
+    display: var(--selected-mark);
+    position: absolute;
+    top: var(--s-2);
+    right: var(--s-2);
+    align-items: center;
+    justify-content: center;
+    width: var(--s-4);
+    height: var(--s-4);
+    border-radius: var(--r-pill);
+    background: var(--selected-edge);
+    color: var(--gph-950);
 }
 
 .type.is-selected small { color: var(--text-2); }

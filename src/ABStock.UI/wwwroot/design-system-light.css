@@ -89,9 +89,20 @@
   --line-2: #DCDCE0;   /* граница панели — та же hairline */
   --line-3: #D4D4D8;   /* hover, инпуты */
 
-  /* Выбранное ≠ фокус: чёрная кромка остаётся только у фокуса (артборд 03). */
-  --selected-edge: #D4D4D8;       /* плитка: лёгкая заливка + кромка line-3 */
-  --segment-edge:  transparent;   /* сегмент: заливка #EEEEF0 без рамки */
+  /* Выбранное ≠ фокус: чёрная кромка 2px остаётся только у фокуса. Выбор
+     читается формой, а не оттенком серого: сегмент — белая «таблетка» с
+     кромкой и тенью на серой дорожке, плитка — кромка 1,5px и галочка. */
+  --segment-track:  #EEEEF0;
+  --segment-active: #FFFFFF;
+  --segment-edge:   #D4D4D8;
+  --segment-wash:   transparent;
+  --segment-lift:   0 1px 2px rgba(10, 10, 11, 0.12);
+  --segment-weight: 500;
+  --choice-bg:       #FFFFFF;
+  --choice-selected: #FFFFFF;
+  --selected-edge:   #3F3F46;   /* text-2 */
+  --selected-ring:   0.5px;     /* 1px кромки + 0.5px inset = 1,5px */
+  --selected-mark:   flex;
 
   /* Полоса баланса: тёмно-серая доля с белым текстом (10,4:1) против
      #EEEEF0 с text-2 (9,0:1) — различимы с одного взгляда. */
