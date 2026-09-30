@@ -25,14 +25,14 @@
 }
 
 .ui-balance__half--positive {
-    background: var(--gph-400);
-    color: var(--gph-950);
+    background: var(--balance-strong);
+    color: var(--balance-strong-ink);
 }
 
 .ui-balance__half--negative {
     justify-content: flex-end;
-    background: var(--fill-soft);
-    border-color: var(--line-3);
+    background: var(--balance-weak);
+    border-color: var(--balance-weak-edge);
     color: var(--text-2);
 }
 
@@ -40,7 +40,7 @@
     justify-content: center;
     background: transparent;
     border-color: var(--line-1);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 /* Затронутая новостью половина. Кромкой --text-1, а не заливкой: заливка

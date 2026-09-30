@@ -31,7 +31,7 @@
    Полоса связи — содержимое шагов.
    Сама полоса и стрелки живут в ките (раздел 9.19).
    ============================================================================ */
-.strip__idle { font: var(--t-body-sm); color: var(--text-4); }
+.strip__idle { font: var(--t-body-sm); color: var(--text-quiet); }
 .strip__dash { color: var(--text-4); }
 .strip__value { color: var(--text-1); }
 .strip__impact { color: var(--text-1); }
@@ -158,7 +158,7 @@ main.news-page ::deep .ui-causality__note {
 
 .composer__field::placeholder { color: var(--text-4); }
 
-.composer__field:focus {
+.composer__field:focus-visible {
     outline: none;
     border-color: var(--acc-line);
     box-shadow: 0 0 0 2px var(--acc-soft);
@@ -182,10 +182,10 @@ main.news-page ::deep .ui-causality__note {
     gap: var(--s-2);
     margin: 0;
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
 }
 
-.composer__error .num-sm { color: var(--down-500); }
+.composer__error .num-sm { color: var(--down-text); }
 
 .composer__actions { display: flex; align-items: center; gap: var(--s-4); }
 .composer__count { color: var(--text-3); }
@@ -260,7 +260,10 @@ main.news-page ::deep .ui-causality__note {
 }
 
 .factor:last-child { border-bottom: 0; }
-.factor__kind { flex: none; justify-content: center; min-width: calc(var(--s-18) + var(--s-8)); }
+/* align-self: center возвращает бейдж на середину строки: у .badge стоит
+   flex-start — он нужен ему в колонках, — и в строке высотой --h-row-tall
+   бейдж прижимался к верхней линии. */
+.factor__kind { flex: none; align-self: center; justify-content: center; min-width: calc(var(--s-18) + var(--s-8)); }
 
 .factor__text {
     flex: 1;
@@ -374,7 +377,7 @@ main.news-page ::deep .ui-causality__note {
 
 .risks__count { color: var(--text-1); }
 .risks__label { font: var(--t-caption); font-weight: 500; color: var(--text-2); }
-.risks__hint { margin-left: auto; font: var(--t-caption); color: var(--text-4); }
+.risks__hint { margin-left: auto; font: var(--t-caption); color: var(--text-quiet); }
 
 .profile__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 

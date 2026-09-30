@@ -12,14 +12,17 @@
     background: var(--text-3);
 }
 
-.ui-status__dot--up           { background: var(--up-500); }
-.ui-status__dot--down         { background: var(--down-500); }
+.ui-status__dot--up           { background: var(--up-fill); }
+.ui-status__dot--down         { background: var(--down-fill); }
 .ui-status__dot--warn         { background: var(--warn-500); }
 .ui-status__dot--muted        { background: var(--text-3); }
-.ui-status__dot--agent-trend  { background: var(--agent-trend); }
-.ui-status__dot--agent-counter{ background: var(--agent-counter); }
-.ui-status__dot--agent-mm     { background: var(--agent-mm); }
-.ui-status__dot--agent-news   { background: var(--agent-news); }
+/* --status-dot-override задаёт окружение точки, когда цвет агента надо
+   погасить (лента остановленных торгов, раздел 19). Не задано — цвет
+   агента. */
+.ui-status__dot--agent-trend  { background: var(--status-dot-override, var(--agent-trend)); }
+.ui-status__dot--agent-counter{ background: var(--status-dot-override, var(--agent-counter)); }
+.ui-status__dot--agent-mm     { background: var(--status-dot-override, var(--agent-mm)); }
+.ui-status__dot--agent-news   { background: var(--status-dot-override, var(--agent-news)); }
 
 .ui-status__label {
     font: var(--t-caption);

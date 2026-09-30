@@ -44,17 +44,31 @@
             <span class="topnav__clock num-sm">@Clock</span>
         }
 
-        <div class="topnav__bell">
+        @* Тема и уведомления — одна группа значков: между ними зазор
+           кнопки, а не шаг шапки. *@
+        <div class="topnav__tools">
+            @* Тема — раздел 19. Здесь, а не только на «Профиле»: на защите тему
+               переключают на ходу, перед проектором, и уходить ради этого со
+               «Торгов» нельзя. Значок показывает, КУДА переключит нажатие. *@
             <button class="topnav__icon-button" type="button"
-                    aria-label="@NotificationSummaryText"
-                    aria-expanded="@(IsNotificationsOpen ? "true" : "false")"
-                    @onclick="ToggleNotifications">
-                <Icon Name="bell" Size="16" />
-                @if (UnreadNotificationsCount > 0)
-                {
-                    <span class="topnav__unread" aria-hidden="true"></span>
-                }
+                    aria-label="@ThemeToggleLabel"
+                    title="@ThemeToggleLabel"
+                    @onclick="ToggleTheme">
+                <Icon Name="@(Preferences.IsLightTheme ? "moon" : "sun")" Size="16" />
             </button>
+
+            <div class="topnav__bell">
+                <button class="topnav__icon-button" type="button"
+                        aria-label="@NotificationSummaryText"
+                        aria-expanded="@(IsNotificationsOpen ? "true" : "false")"
+                        @onclick="ToggleNotifications">
+                    <Icon Name="bell" Size="16" />
+                    @if (UnreadNotificationsCount > 0)
+                    {
+                        <span class="topnav__unread" aria-hidden="true"></span>
+                    }
+                </button>
+            </div>
         </div>
 
         <a class="topnav__avatar" href="/profile" aria-label="Профиль пользователя">
@@ -207,6 +221,21 @@
         SimulationRunner.OnStateChanged += HandleStateChanged;
     }
 
+    /// <summary>
+    /// Шапка читает настройки сама. Макет статический — интерактивность
+    /// задана страницами, — и его OnAfterRenderAsync не вызывается вовсе:
+    /// без этого на «Агентах», «Новостях» и «Создании актива» значок темы и
+    /// инициалы оставались значениями по умолчанию. EnsureLoadedAsync
+    /// идемпотентен, повторное чтение хранилища не случится.
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Preferences.EnsureLoadedAsync();
+        }
+    }
+
     private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void HandlePreferencesChanged() => _ = InvokeAsync(StateHasChanged);
@@ -224,6 +253,13 @@
             NotificationFeed.MarkAllRead();
         }
     }
+
+    private string ThemeToggleLabel => Preferences.IsLightTheme
+        ? "Включить тёмную тему"
+        : "Включить белую тему";
+
+    private Task ToggleTheme() => Preferences.SetThemeAsync(
+        Preferences.IsLightTheme ? UserPreferences.DarkTheme : UserPreferences.LightTheme);
 
     private void CloseNotifications() => IsNotificationsOpen = false;
 

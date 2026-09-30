@@ -5,5 +5,5 @@
     margin: 0;
     text-align: center;
     font: var(--t-caption);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }

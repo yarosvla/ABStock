@@ -36,7 +36,7 @@
 
 .ui-stepper__input::placeholder { color: var(--text-4); }
 
-.ui-stepper__input:focus {
+.ui-stepper__input:focus-visible {
     outline: none;
     border-color: var(--acc-line);
     box-shadow: 0 0 0 2px var(--acc-soft);

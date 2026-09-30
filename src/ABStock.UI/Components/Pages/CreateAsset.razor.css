@@ -141,7 +141,7 @@
 
 .field__no {
     font: var(--n-xs);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 .field__hint { font: var(--t-caption); color: var(--text-3); }
@@ -152,7 +152,7 @@
     color: var(--text-3);
 }
 
-.field__counter.is-invalid { color: var(--down-500); }
+.field__counter.is-invalid { color: var(--down-text); }
 
 /* Ошибка — кромка --down-500 плюс строка с иконкой (раздел 9.3). */
 .field__error {
@@ -160,7 +160,7 @@
     align-items: center;
     gap: var(--s-1);
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
 }
 
 /* ::deep обязателен: .ui-icon приходит из компонента Icon со своим scope,
@@ -190,7 +190,7 @@
 
 .textarea::placeholder { color: var(--text-4); }
 
-.textarea:focus {
+.textarea:focus-visible {
     outline: none;
     border-color: var(--acc-line);
     box-shadow: 0 0 0 2px var(--acc-soft);
@@ -211,8 +211,9 @@
     justify-content: center;
     gap: 2px;
     height: var(--s-14);
+    position: relative;
     padding: 0 14px;
-    background: var(--gph-800);
+    background: var(--choice-bg);
     border: 1px solid var(--line-1);
     border-radius: var(--r-md);
     text-align: left;
@@ -226,9 +227,27 @@
 .type:hover { background: var(--gph-750); border-color: var(--line-3); }
 .type:hover small { color: var(--text-2); }
 
+/* Выбранная плитка. В белой теме (раздел 19) выбор читается формой, а не
+   оттенком: кромка 1,5px (--selected-ring добирает полпикселя inset-тенью,
+   чтобы не сдвигать раскладку) и галочка в углу. */
 .type.is-selected {
-    background: var(--acc-soft);
-    border-color: var(--acc-line);
+    background: var(--choice-selected);
+    border-color: var(--selected-edge);
+    box-shadow: inset 0 0 0 var(--selected-ring) var(--selected-edge);
+}
+
+.type__check {
+    display: var(--selected-mark);
+    position: absolute;
+    top: var(--s-2);
+    right: var(--s-2);
+    align-items: center;
+    justify-content: center;
+    width: var(--s-4);
+    height: var(--s-4);
+    border-radius: var(--r-pill);
+    background: var(--selected-edge);
+    color: var(--gph-850);
 }
 
 .type.is-selected small { color: var(--text-2); }
@@ -253,7 +272,7 @@
 
 .param__range {
     font: var(--n-sm);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 /* Дорожка потенциала роста — показывает положение, не принимает ввод
@@ -288,7 +307,7 @@
 .param__track-max {
     position: absolute;
     top: var(--s-3);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 .param__track-min { left: 0; }
@@ -429,7 +448,7 @@
     align-items: start;
 }
 
-.factors__empty { margin: 0; padding: var(--s-4) var(--s-5); color: var(--text-4); }
+.factors__empty { margin: 0; padding: var(--s-4) var(--s-5); color: var(--text-quiet); }
 
 .factor-list {
     margin: 0;
@@ -487,7 +506,7 @@
     gap: var(--s-1);
 }
 
-.aside-row__hint { font: var(--t-caption); color: var(--text-4); }
+.aside-row__hint { font: var(--t-caption); color: var(--text-quiet); }
 
 .aside-row__body {
     flex: 1;
@@ -552,7 +571,7 @@
 }
 
 .loading__step--wide { flex: 1.9; }
-.loading__arrow { flex: none; font: var(--t-body); color: var(--text-4); }
+.loading__arrow { flex: none; font: var(--t-body); color: var(--text-quiet); }
 
 .loading__balance { display: flex; flex-direction: column; gap: var(--s-2); }
 

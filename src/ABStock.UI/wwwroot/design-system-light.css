@@ -1,0 +1,170 @@
+/* ============================================================================
+   ABStock Design System — белая тема (docs/DESIGN.md, раздел 19)
+   Для защиты через проектор: белый холст, чернила, тонкие линии,
+   холодно-нейтральные серые (цинк). Структура — hairline-разделители,
+   тени только у всплывающих слоёв.
+
+   Только значения: имена токенов те же, что в design-system.css. Шрифты,
+   размеры, радиусы и движение не трогаем. Значения — дословно из
+   design-system-light.css проекта Claude Design «ABStock White».
+
+   Селектор :root[data-theme="light"] сильнее [data-accent="…"], поэтому
+   пресет акцента в белой теме не применяется: акцент здесь — чернила.
+   Выбранный пресет вернётся вместе с тёмной темой.
+   ============================================================================ */
+
+:root[data-theme="light"] {
+  /* ---------- 1. ПОВЕРХНОСТИ — три уровня ----------
+     950/900/850 все белые: панель от фона отделяет только кромка --line-2. */
+  --gph-950: #F4F4F5;   /* фон страницы — холодный светлый серый: панели
+                           отделяются от него не только кромкой */
+  --gph-900: #FFFFFF;
+  --gph-850: #FFFFFF;   /* панель = область за hairline */
+  --gph-800: #F6F6F7;   /* вложенный блок, шапка таблицы */
+  --gph-750: #F6F6F7;   /* hover */
+  --gph-700: #EEEEF0;   /* выбранное */
+  --gph-600: #E4E4E7;   /* активный сегмент */
+  --gph-500: #D4D4D8;   /* скроллбар */
+  --gph-400: #A1A1AA;
+
+  /* ---------- 2. ТЕКСТ (на белом · на #EEEEF0) ---------- */
+  --text-1: #0A0A0B;    /* 19,8 · 17,1 */
+  --text-2: #3F3F46;    /* 10,4 · 9,0 */
+  --text-3: #63636B;    /* 6,0 · 5,1 — оси, откр/макс/мин, шапки таблиц */
+  --text-4: #A1A1AA;    /* 2,6 — только disabled и плейсхолдер */
+  --text-quiet: var(--text-3);   /* подпись данных читается, а не гаснет */
+
+  /* ---------- 3. АКЦЕНТ — чернила ----------
+     Отдельного --focus в системе нет: кольцо фокуса берёт --acc-400. */
+  --acc-400: #27272A;
+  --acc-500: #0A0A0B;
+  --acc-600: #000000;
+  --acc-ink:  #FFFFFF;
+  --acc-soft: #EEEEF0;
+  --acc-line: #0A0A0B;
+
+  /* ---------- 4. РЫНОК — биржевая конвенция ---------- */
+  --up-fill:     #089981;                 /* свеча, фитиль, точка */
+  --up-text:     #067A67;                 /* 5,3 на белом · 4,7 на wash */
+  --up-wash:     rgba(8, 153, 129, 0.08);
+  --up-volume:   #D4D4D8;                 /* объём нейтральный: цвет несут свечи */
+
+  --down-fill:   #F23645;
+  --down-text:   #D0202E;                 /* 5,4 на белом · 4,9 на wash */
+  --down-wash:   rgba(242, 54, 69, 0.08);
+
+  /* Глубина стакана: 18 % тона fill — на проекторе видна. Цена на полосе
+     темнее обычной цифры: #05705F / #C01D2A держат ≥ 4,5:1 на самой
+     плотной части полосы. Бейджи остаются на wash 8 %. */
+  --up-depth:        rgba(8, 153, 129, 0.18);
+  --down-depth:      rgba(242, 54, 69, 0.18);
+  --up-depth-text:   #05705F;
+  --down-depth-text: #C01D2A;
+  --down-volume: #D4D4D8;
+  --volume-current: #A8A8B0;              /* текущий (последний) столбик объёма */
+
+  --up-400: #067A67;  --up-500: #089981;  --up-700: #067A67;
+  --up-soft: rgba(8, 153, 129, 0.08);  --up-bar: rgba(8, 153, 129, 0.08);
+  --down-400: #D0202E; --down-500: #F23645; --down-700: #D0202E;
+  --down-soft: rgba(242, 54, 69, 0.08); --down-bar: rgba(242, 54, 69, 0.08);
+
+  --warn-500:  #8A4B0F;   /* охра-коричневый · текст и иконка · 6,8 на белом, 6,1 на warn-soft */
+  --warn-soft: #FBF1E4;   /* тёплая подложка баннера и бейджа */
+
+  /* ---------- 5. АГЕНТЫ — вне зелёного/красного ----------
+     ПРАВИЛО: цвета агентов — только точки, линии, маркеры. Имя агента и любой
+     текст рядом — text-1 / text-2. Особенно агент-mm (янтарь, 2,4:1 на белом). */
+  --agent-trend:   #2962FF;   /* синий · 4,9 */
+  --agent-counter: #8B5CF6;   /* фиолетовый · 4,2 */
+  --agent-mm:      #E8930C;   /* янтарный · ΔE 26 до warn-500 */
+  --agent-news:    #D21FB0;   /* фуксия · ΔE ≥ 18 до красного, синего, фиолетового */
+
+  --agent-trend-dim:   rgba(41, 98, 255, 0.30);
+  --agent-counter-dim: rgba(139, 92, 246, 0.30);
+  --agent-mm-dim:      rgba(232, 147, 12, 0.30);
+  --agent-news-dim:    rgba(210, 31, 176, 0.30);
+
+  /* Маркер продажи: ≥ 3:1 к белому. Янтарь mm затемнён (3,8:1), остальные
+     и так выше 4:1. */
+  --agent-trend-mark:   #2962FF;
+  --agent-counter-mark: #8B5CF6;
+  --agent-mm-mark:      #B87300;
+  --agent-news-mark:    #D21FB0;
+
+  /* ---------- 6. ЛИНИИ И НЕЙТРАЛЬНАЯ ЗАЛИВКА ---------- */
+  --fill-soft: #F6F6F7;   /* чип, hover вторичной кнопки */
+  --chip-on-page:      #FFFFFF;   /* чип на сером фоне страницы — как панель */
+  --chip-on-page-edge: #DCDCE0;   /* line-1 */
+
+  --line-1: #DCDCE0;   /* разделители, сетка · 1,37 на белом, 1,30 под проектором */
+  --line-2: #DCDCE0;   /* граница панели — та же hairline */
+  --line-3: #D4D4D8;   /* hover, инпуты */
+
+  /* Выбранное ≠ фокус: чёрная кромка 2px остаётся только у фокуса. Выбор
+     читается формой, а не оттенком серого: сегмент — белая «таблетка» с
+     кромкой и тенью на серой дорожке, плитка — кромка 1,5px и галочка. */
+  --segment-track:  #EEEEF0;
+  --segment-active: #FFFFFF;
+  --segment-edge:   #D4D4D8;
+  --segment-wash:   transparent;
+  --segment-lift:   0 1px 2px rgba(10, 10, 11, 0.12);
+  --segment-weight: 500;
+  --choice-bg:       #FFFFFF;
+  --choice-selected: #FFFFFF;
+  --selected-edge:   #3F3F46;   /* text-2 */
+  --selected-ring:   0.5px;     /* 1px кромки + 0.5px inset = 1,5px */
+  --selected-mark:   flex;
+
+  /* Полоса баланса: тёмно-серая доля с белым текстом (10,4:1) против
+     #EEEEF0 с text-2 (9,0:1) — различимы с одного взгляда. */
+  --balance-strong:      #3F3F46;
+  --balance-strong-ink:  #FFFFFF;
+  --balance-weak:        #EEEEF0;
+  --balance-weak-edge:   #EEEEF0;
+  --split-strong:        #3F3F46;
+  --split-weak:          #E4E4E7;
+
+  /* Торги остановлены: цены ленты без рыночного цвета, точки агентов
+     серые. Цвета агентов остаются в легенде и «Составе агентов». */
+  --stopped-price: #63636B;
+  --stopped-dot:   #A1A1AA;
+
+  /* ---------- 6a. ГРАФИК ---------- */
+  --chart-grid:        #DCDCE0;
+  --chart-crosshair:   rgba(10, 10, 11, 0.28);
+  --chart-price-line:  #63636B;           /* пунктир текущей цены — text-3 */
+  --chart-wick-up:     #089981;           /* фитиль того же цвета, что тело */
+  --chart-wick-down:   #F23645;
+  --chart-news-marker: #63636B;
+  --chart-last-price: candle;             /* плашка — заливка по направлению свечи */
+  --chart-sell-marker: square;            /* продажа — полный цвет агента, квадрат */
+  --sell-marker-opacity: 1;
+  --sell-marker-radius: 1px;
+  --chart-stopped-opacity: 0.58;
+
+  /* ---------- 9. ТЕНИ — только всплывающие слои ---------- */
+  --sh-sm: none;
+  --sh-md: 0 8px 24px -8px rgba(10, 10, 11, 0.14), 0 0 0 1px rgba(10, 10, 11, 0.04);
+  --sh-lg: 0 20px 48px -16px rgba(10, 10, 11, 0.20), 0 0 0 1px rgba(10, 10, 11, 0.04);
+
+  /* ---------- 13. СТЕКЛО ---------- */
+  --glass-blur: 16px;
+  --glass-sat:  140%;
+  --glass-tint:   rgba(255, 255, 255, 0.90);
+  --overlay-tint: rgba(10, 10, 11, 0.14);   /* нейтральное затемнение, без блюра и синевы */
+  --overlay-blur: 0px;
+}
+
+/* Правила design-system.css, где цвет записан литералом, а не токеном. */
+:root[data-theme="light"] .app-bg { background: var(--gph-950); }
+:root[data-theme="light"] .app-bg__noise { display: none; }
+:root[data-theme="light"] .panel { box-shadow: none; }
+:root[data-theme="light"] .panel--quiet { border-color: var(--line-1); }
+:root[data-theme="light"] .surface { background: var(--gph-800); border-color: var(--line-1); }
+:root[data-theme="light"] .glass { box-shadow: var(--sh-lg); }
+:root[data-theme="light"] .glass--nav { box-shadow: none; background: rgba(255, 255, 255, 0.92); }
+:root[data-theme="light"] .ui-skeleton {
+  background: linear-gradient(90deg, #F6F6F7 0%, #EEEEF0 50%, #F6F6F7 100%);
+  background-size: 180% 100%;
+}
+:root[data-theme="light"] ::selection { background: #E4E4E7; color: var(--text-1); }

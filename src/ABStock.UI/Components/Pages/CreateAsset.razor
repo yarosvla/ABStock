@@ -94,6 +94,13 @@
                                                 @onclick="() => SelectAssetType(type.Type)">
                                             <strong>@type.Name</strong>
                                             <small>@type.Hint</small>
+                                            @* Отметка выбора формой, а не цветом. В графите
+                                               скрыта токеном --selected-mark: там выбор
+                                               держит подложка акцента. *@
+                                            @if (isSelected)
+                                            {
+                                                <span class="type__check" aria-hidden="true"><Icon Name="check" Size="12" /></span>
+                                            }
                                         </button>
                                     }
                                 </div>

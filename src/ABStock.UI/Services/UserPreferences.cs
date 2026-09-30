@@ -3,7 +3,7 @@ using Microsoft.JSInterop;
 namespace ABStock.UI.Services;
 
 /// <summary>
-/// Пользовательские настройки: акцент интерфейса, таймфрейм по умолчанию,
+/// Пользовательские настройки: тема, акцент интерфейса, таймфрейм по умолчанию,
 /// три переключателя уведомлений и имя оператора.
 ///
 /// Хранилище — localStorage браузера. Ни базы, ни серверного состояния:
@@ -14,6 +14,12 @@ public interface IUserPreferences
 {
     /// <summary>Настройки уже прочитаны из хранилища.</summary>
     bool IsLoaded { get; }
+
+    /// <summary>Тема: <c>dark</c> или <c>light</c> (раздел 19).</summary>
+    string Theme { get; }
+
+    /// <summary>Белая тема включена — пресет акцента не применяется.</summary>
+    bool IsLightTheme { get; }
 
     string Accent { get; }
 
@@ -35,6 +41,8 @@ public interface IUserPreferences
     /// отрисовки; повторные вызовы отдают ту же задачу и в хранилище не лезут.
     /// </summary>
     Task EnsureLoadedAsync();
+
+    Task SetThemeAsync(string theme);
 
     Task SetAccentAsync(string accent);
 
@@ -70,12 +78,17 @@ public interface IUserPreferences
 /// </summary>
 public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
 {
+    private const string ThemeKey = "abstock.theme";
     private const string AccentKey = "abstock.accent";
     private const string TimeframeKey = "abstock.timeframe";
     private const string NotifyTradesKey = "abstock.notify.trades";
     private const string NotifyNewsKey = "abstock.notify.news";
     private const string NotifySystemKey = "abstock.notify.system";
     private const string OperatorNameKey = "abstock.operator.name";
+
+    public const string DarkTheme = "dark";
+    public const string LightTheme = "light";
+    public const string DefaultTheme = DarkTheme;
 
     public const string DefaultAccent = "graphite";
     public const string DefaultOperatorName = "Оператор";
@@ -99,9 +112,23 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
         new("copper", "Медь")
     ];
 
+    /// <summary>
+    /// Те же два ключа, что в загрузочном скрипте App.razor. Тёмная — по
+    /// умолчанию; белая — для проектора (раздел 19).
+    /// </summary>
+    public static readonly IReadOnlyList<ThemeOption> Themes =
+    [
+        new(DarkTheme, "Тёмная"),
+        new(LightTheme, "Белая")
+    ];
+
     private Task? loading;
 
     public bool IsLoaded { get; private set; }
+
+    public string Theme { get; private set; } = DefaultTheme;
+
+    public bool IsLightTheme => Theme == LightTheme;
 
     public string Accent { get; private set; } = DefaultAccent;
 
@@ -116,6 +143,11 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
     public string OperatorName { get; private set; } = DefaultOperatorName;
 
     public event Action? Changed;
+
+    public static string NormalizeTheme(string? theme) =>
+        Themes.Any(option => string.Equals(option.Key, theme, StringComparison.Ordinal))
+            ? theme!
+            : DefaultTheme;
 
     public static bool IsKnownAccent(string? accent) =>
         accent is not null && Accents.Any(preset => string.Equals(preset.Key, accent, StringComparison.Ordinal));
@@ -158,6 +190,7 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
         // проставлены полями, и с ними всё работает.
         try
         {
+            Theme = NormalizeTheme(await ReadAsync(ThemeKey));
             Accent = NormalizeAccent(await ReadAsync(AccentKey));
             DefaultTimeframe = Timeframes.Normalize(await ReadAsync(TimeframeKey));
             NotifyTrades = ReadFlag(await ReadAsync(NotifyTradesKey));
@@ -174,6 +207,23 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
         }
 
         IsLoaded = true;
+        Changed?.Invoke();
+    }
+
+    public async Task SetThemeAsync(string theme)
+    {
+        var value = NormalizeTheme(theme);
+
+        if (value == Theme && IsLoaded)
+        {
+            return;
+        }
+
+        Theme = value;
+
+        // Как с акцентом: вызов переставляет data-theme на корне документа
+        // и объявляет смену графикам — тема применяется без перезагрузки.
+        await InvokeAsync("window.abstockPrefs.setTheme", value);
         Changed?.Invoke();
     }
 
@@ -261,6 +311,10 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
         return string.IsNullOrEmpty(trimmed) ? DefaultOperatorName : trimmed;
     }
 }
+
+/// <param name="Key">Значение в хранилище; <c>light</c> — атрибут data-theme.</param>
+/// <param name="Label">Название темы по-русски.</param>
+public sealed record ThemeOption(string Key, string Label);
 
 /// <param name="Key">Значение атрибута data-accent и ключ в хранилище.</param>
 /// <param name="Label">Название пресета по-русски.</param>
