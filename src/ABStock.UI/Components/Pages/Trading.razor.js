@@ -23,8 +23,8 @@ const PRICE_LABEL_GUARD_PX = 14;
 // заставить библиотеку пересобрать подписи делений (refreshAxisLabels).
 const PRICE_SCALE_MARGINS = { top: 0.12, bottom: 0.12 };
 
-// Предел ширины свечи. Без него fitContent() растягивает несколько свечей
-// на треть панели, и график перестаёт читаться как свечной. При нехватке
+// Предел ширины свечи. Без него несколько свечей растягиваются на треть
+// панели, и график перестаёт читаться как свечной (applyInitialViewport). При нехватке
 // данных ряд прижимается вправо, слева остаётся пустота — так делают
 // реальные терминалы, и это не дефект (DESIGN.md 11).
 const MAX_BAR_SPACING_PX = 14;
@@ -309,16 +309,53 @@ function handleVisibleRangeChange(controller, range) {
     toggleLiveReset(controller);
 }
 
-// fitContent() подбирает barSpacing под весь диапазон и на малом числе баров
-// выдаёт огромные тела. Возвращаем ширину в предел, сохраняя правый край.
-function clampBarSpacing(controller) {
-    const timeScale = controller.chart.timeScale();
-    const current = timeScale.options().barSpacing;
-
-    if (typeof current === "number" && current > MAX_BAR_SPACING_PX) {
-        timeScale.applyOptions({ barSpacing: MAX_BAR_SPACING_PX });
-        controller.barSpacing = MAX_BAR_SPACING_PX;
+/**
+ * Ширина области свечей в пикселях. timeScale().width() известна после
+ * первой раскладки графика; до неё — ширина холста за вычетом ценовой
+ * шкалы. Ноль значит «ещё не знаем».
+ */
+function getPaneWidth(controller) {
+    const width = controller.chart.timeScale().width();
+    if (width > 0) {
+        return width;
     }
+
+    const axis = controller.chart.priceScale("right").width();
+    return Math.max(0, (controller.surface?.clientWidth ?? 0) - axis);
+}
+
+/**
+ * Первое окно после новых данных: смена таймфрейма, старт торгов, первая
+ * свеча. Ширина свечи выставляется сразу, а не через fitContent() с
+ * последующим ограничением.
+ *
+ * fitContent() библиотека применяет лениво, при следующей отрисовке: сразу
+ * после вызова options().barSpacing ещё прежний, и ограничение по
+ * MAX_BAR_SPACING_PX ничего не ограничивало. В следующем кадре одна-три
+ * свечи растягивались на всю панель (замер: barSpacing 13 → 199,5), и так
+ * оставалось до следующей полной перезагрузки данных.
+ *
+ * Теперь: ширина таймфрейма, не больше MAX_BAR_SPACING_PX. Если свечей
+ * больше, чем помещается, — сжатие до minBarSpacing, чтобы показать больше
+ * истории, но никогда не шире таймфрейма. Правый край — сразу, без
+ * анимации прокрутки. Всё — синхронно, до отрисовки.
+ */
+function applyInitialViewport(controller) {
+    const options = getTimeframeOptions(controller.currentTimeframe);
+    const count = controller.data.length;
+    const rightOffset = getDynamicRightOffset(count, options);
+    const standard = Math.min(options.barSpacing, MAX_BAR_SPACING_PX);
+    const minimum = Math.min(standard, Math.max(6, options.barSpacing - 3));
+    const width = getPaneWidth(controller);
+    const fitting = width > 0 ? width / (count + rightOffset) : standard;
+    const barSpacing = Math.max(minimum, Math.min(standard, fitting));
+
+    controller.barSpacing = barSpacing;
+    controller.chart.timeScale().applyOptions({ barSpacing, rightOffset });
+    // Не scrollToRealTime(): он плавно едет от прежней позиции, и после
+    // смены таймфрейма ряд секунду съезжал к правому краю. Позиция задаётся
+    // сразу, без анимации.
+    controller.chart.timeScale().scrollToPosition(rightOffset, false);
 }
 
 function toggleLiveReset(controller) {
@@ -353,13 +390,8 @@ function ensureViewport(controller, { forceScrollToRealtime = false, fitContent 
 
     if (fitContent || !controller.hasViewport) {
         controller.hasViewport = true;
-        timeScale.fitContent();
-        clampBarSpacing(controller);
-
-        if (forceScrollToRealtime || controller.followRealtime) {
-            requestAnimationFrame(() => timeScale.scrollToRealTime());
-        }
-
+        controller.followRealtime = true;
+        applyInitialViewport(controller);
         toggleLiveReset(controller);
         return;
     }
@@ -380,10 +412,11 @@ function replaceData(controller, data, forceScrollToRealtime, fitContent) {
     updateEmptyState(controller);
     refreshLegend(controller);
 
-    requestAnimationFrame(() => {
-        ensureViewport(controller, { forceScrollToRealtime, fitContent });
-        recomputeLabelGuard(controller);
-    });
+    // Окно выставляется синхронно, в том же такте, что и данные: библиотека
+    // рисует на следующем кадре и сразу с нужной шириной свечи. Отложенное
+    // на кадр, оно давало кадр со старым окном поверх новых данных.
+    ensureViewport(controller, { forceScrollToRealtime, fitContent });
+    requestAnimationFrame(() => recomputeLabelGuard(controller));
 }
 
 function upsertPoint(controller, point) {
@@ -480,10 +513,9 @@ function updateLatestPoint(controller, point, forceScrollToRealtime) {
     updateEmptyState(controller);
     refreshLegend(controller);
 
-    requestAnimationFrame(() => {
-        ensureViewport(controller, { forceScrollToRealtime });
-        recomputeLabelGuard(controller);
-    });
+    // Синхронно, как в replaceData: первая свеча сессии приходит сюда же.
+    ensureViewport(controller, { forceScrollToRealtime });
+    requestAnimationFrame(() => recomputeLabelGuard(controller));
 }
 
 export function register(root) {
