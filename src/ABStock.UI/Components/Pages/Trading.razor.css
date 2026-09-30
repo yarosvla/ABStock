@@ -521,8 +521,14 @@
     transition: width var(--d-fast) var(--e-out);
 }
 
-.book__bar--ask { background: var(--down-wash); }
-.book__bar--bid { background: var(--up-wash); }
+.book__bar--ask { background: var(--down-depth); }
+.book__bar--bid { background: var(--up-depth); }
+
+/* Цена стакана стоит на полосе глубины — цифра роли --*-depth-text
+   (раздел 19). Глобальный .tone-* проигрывает этому правилу по
+   специфичности. */
+.book__row .book__c-price.tone-up { color: var(--up-depth-text); }
+.book__row .book__c-price.tone-down { color: var(--down-depth-text); }
 
 .book__spread {
     display: flex;
