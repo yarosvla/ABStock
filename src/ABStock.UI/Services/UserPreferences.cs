@@ -72,7 +72,7 @@ public interface IUserPreferences
 ///
 /// Singleton здесь был бы прямой ошибкой: настройки принадлежат браузеру,
 /// а не серверу, и один общий экземпляр раздавал бы всем открытым вкладкам
-/// чужой акцент. Тем же и отличается от <see cref="ISessionNewsFeed"/> и
+/// чужой акцент. Тем же и отличается от <see cref="ISessionEvents"/> и
 /// <see cref="IAgentEquityHistory"/> — те singleton, потому что показывают
 /// прогон, а прогон один на сервер.
 /// </summary>

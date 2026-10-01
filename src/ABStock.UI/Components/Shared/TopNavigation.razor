@@ -100,7 +100,13 @@
                             <span class="notif__dot" aria-hidden="true"></span>
                             <div class="notif__body">
                                 <span class="notif__kind label">@KindLabel(notification.Kind)</span>
-                                <strong>@notification.Title</strong>
+                                <strong class="notif__title">
+                                    @notification.Title
+                                    @if (notification.Symbol is not null)
+                                    {
+                                        <Ticker Symbol="@notification.Symbol" />
+                                    }
+                                </strong>
                                 <p>@notification.Detail</p>
                             </div>
                             <time class="notif__time num-xs" datetime="@notification.At.ToString("O")">@notification.At.ToString("HH:mm:ss")</time>

@@ -52,11 +52,6 @@ builder.Services.AddScoped<INewsDesk, NewsDesk>();
 // раздавал бы всем открытым вкладкам чужой акцент, потому что настройки
 // принадлежат браузеру, а не серверу.
 builder.Services.AddScoped<IUserPreferences, UserPreferences>();
-// Хронология новостей сессии — одна на весь продукт (DESIGN.md 13):
-// её читают и «Новости», и левый рельс «Торгов». Singleton, как и сама
-// симуляция: лента живёт ровно столько же, сколько прогон, чьи события
-// показывает, и переживает перезагрузку страницы вместе с ним.
-builder.Services.AddSingleton<ISessionNewsFeed, SessionNewsFeed>();
 // Стоимость портфеля по типам агентов с начала прогона — тоже singleton и по
 // той же причине. Читает её страница «Агенты».
 builder.Services.AddSingleton<IAgentEquityHistory, AgentEquityHistory>();

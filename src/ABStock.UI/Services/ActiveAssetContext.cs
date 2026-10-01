@@ -24,7 +24,7 @@ public interface IActiveAssetContext
 /// <summary>
 /// Актив в сессии один (DESIGN.md 16), и живёт он ровно столько же, сколько
 /// торговый прогон, — то есть сколько singleton <see cref="ABStock.Application.Simulation.ISimulationRunner"/>.
-/// Отсюда singleton и здесь, тем же рассуждением, что у <see cref="ISessionNewsFeed"/>.
+/// Отсюда singleton и здесь, тем же рассуждением, что у <see cref="ISessionEvents"/>.
 ///
 /// Scoped переживал переходы по ссылкам между интерактивными страницами:
 /// enhanced navigation не перезагружает документ и не рвёт контур. Но не
