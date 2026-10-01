@@ -10,8 +10,7 @@
    ниже которых панели перестают быть читаемыми. */
 .trading-shell,
 .trading-page {
-    --h-workspace-min: 620px;  /* рабочая область не схлопывается на низком окне */
-    --h-chart-min: 360px;      /* график — главная панель экрана (раздел 7) */
+    --h-chart-min: 440px;      /* график — главная панель экрана (раздел 7); холст ≈ 370, как в артборде */
     --h-tape-min: 220px;       /* лента: восемь строк по --h-row-dense плюс шапка */
 }
 
@@ -41,21 +40,54 @@
 }
 
 /* ============================================================================
-   Рабочая область: левый рельс 280 · центр fluid (min 640) · правый рельс 340
+   Рабочая область (DESIGN.md 16.2): хронология · цена и график · стакан и
+   лента. Полоса связи — сразу под графиком, на ширину рельса и центра; под
+   ней агенты. Правый рельс тянется вдоль всех трёх рядов.
    ============================================================================ */
 .workspace {
-    flex: 1;
-    /* Пол рабочей области — содержимое центральной колонки (её пол ниже).
-       Рельсы в этот расчёт не входят (contain: size): их ленты длинные и
-       прокручиваются внутри, и иначе рабочая область росла бы по ним. */
-    min-height: min-content;
     display: grid;
-    grid-template-columns: var(--rail-left) minmax(var(--center-min), 1fr) var(--rail-right);
+    grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
+    grid-template-areas:
+        "events center right"
+        "causal causal right"
+        "agents agents right";
+    grid-template-rows: auto auto 1fr;
     gap: var(--gutter);
-    align-items: stretch;
+    align-items: start;
 }
 
-.rail {
+/* Хронология длиной в график: её высоту задаёт центр, список прокручивается
+   внутри панели (раздел 9.8). contain: size — чтобы длинная хронология не
+   растягивала ряд. */
+.workspace ::deep .events-panel {
+    grid-area: events;
+    align-self: stretch;
+    contain: size;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.workspace ::deep .events-panel .ui-panel__body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.center {
+    grid-area: center;
+    display: flex;
+    flex-direction: column;
+    gap: var(--gutter);
+    min-width: 0;
+}
+
+.workspace ::deep .causal-strip { grid-area: causal; }
+.workspace ::deep .strategies-panel { grid-area: agents; }
+
+.rail--right {
+    grid-area: right;
+    align-self: stretch;
     display: flex;
     flex-direction: column;
     gap: var(--gutter);
@@ -63,36 +95,24 @@
     contain: size;
 }
 
-.center {
-    display: flex;
-    flex-direction: column;
-    gap: var(--gutter);
-    min-width: 0;
-    min-height: var(--h-workspace-min);
-}
-
-/* Брейкпоинты. ВНИМАНИЕ: var() в условии @media невалиден по спецификации CSS,
-   поэтому здесь единственные литералы в файле. Значения обязаны совпадать
-   с --bp-md (1440) и --bp-sm (1280) из design-system.css. */
-
-/* < --bp-md: правый рельс --rail-right-md */
+/* Брейкпоинты. var() в условии @media невалиден по спецификации CSS,
+   поэтому здесь литералы. Значения обязаны совпадать с --bp-md (1440). */
 @media (max-width: 1439px) {
     .trading-page { padding: var(--s-5); }
     .workspace { grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right-md); }
 }
 
-/* < --bp-sm: правый рельс уходит под центр */
-@media (max-width: 1279px) {
-    .workspace { grid-template-columns: var(--rail-left) minmax(0, 1fr); }
-    .rail--right {
-        grid-column: 1 / -1;
-        display: grid;
-        grid-template-columns: var(--rail-right) minmax(0, 1fr);
-        align-items: start;
-        /* В своей строке рельс растягивать некому: высоту задаёт его
-           содержимое, и contain: size схлопнул бы его в ноль. */
-        contain: none;
-    }
+.trading-title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.trading-title h1 {
+    margin: 0;
+    font: var(--t-display);
+    letter-spacing: -0.015em;
+    color: var(--text-1);
 }
 
 /* ============================================================================
@@ -101,8 +121,6 @@
 .events {
     display: flex;
     flex-direction: column;
-    max-height: calc(var(--h-row-tall) * 6);
-    overflow-y: auto;
 }
 
 /* Строка события кликабельна: выбор задаёт, какую новость разбирает полоса
@@ -112,38 +130,6 @@
 .events__row { cursor: pointer; }
 .events__row:focus-visible { outline-offset: -2px; }
 
-.events__hint {
-    margin: 0;
-    padding: var(--s-3) var(--s-5);
-    font: var(--t-caption);
-    color: var(--text-quiet);
-    border-top: 1px solid var(--line-1);
-}
-
-/* ============================================================================
-   Левый рельс — список «ключ · значение»
-   ============================================================================ */
-
-.kv__row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--s-3);
-    height: var(--h-thead);
-    border-bottom: 1px solid var(--line-1);
-}
-
-.kv__row:last-child { border-bottom: 0; }
-
-/* Примечание под списком «ключ · значение» — относится ко всей панели, а не к
-   строке, поэтому стоит под списком, а не в ячейке (артборд 03). */
-.rail__note {
-    margin: var(--s-3) 0 0;
-    font: var(--t-caption);
-    color: var(--text-3);
-}
-.kv dt { font: var(--t-caption); color: var(--text-3); }
-.kv dd { margin: 0; color: var(--text-1); }
 .unit { color: var(--text-3); }
 
 /* ============================================================================
@@ -223,20 +209,17 @@
 /* ============================================================================
    График — главная панель экрана
    ============================================================================ */
-.center ::deep .chart-panel { flex: 1; min-height: var(--h-chart-min); }
+.center ::deep .chart-panel { flex: none; min-height: var(--h-chart-min); }
 
-/* Таблица агентов не ужимается. Раньше недостачу высоты забирал список, а
-   не график (раздел 7.2 держит график на полу), и на окне ниже ~1000px
-   липкие итоги накрывали последнюю строку: таблица выглядела обрезанной.
-   На «Торгах» в ней не больше четырёх строк — по строке на тип агента, —
-   прокручивать там нечего. Теперь панель всегда по содержимому, график
-   держит свой пол, а если окна не хватает на то и другое, прокручивается
-   страница (пол рабочей области — .center выше). */
-.center ::deep .agents-panel { flex: none; }
-.chart-panel__id { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
+/* Высота панели задана полом, а не содержимым, поэтому тело — флекс-колонка:
+   процентная высота от тела, растянутого флексом, не определена, и холст
+   графика схлопывался в ноль. */
+.center ::deep .chart-panel .ui-panel__body { display: flex; flex-direction: column; }
+
 
 .chart-body {
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     padding: var(--s-3) var(--s-4) var(--s-2);
@@ -333,155 +316,126 @@
 .chart-foot .num-xs { color: var(--text-quiet); }
 
 /* ============================================================================
-   Таблица агентов — строка 46px под две строки «действие + объяснение»
+   Агенты по стратегиям — 4 строки, объяснение в две строки (ревью Т-4)
    ============================================================================ */
-.agents-wrap {
-    /* Снизу отступа нет намеренно. Липкие итоги прилипают к нижнему краю
-       ПОЛЯ ПРОКРУТКИ, то есть выше отступа, и в этом отступе просвечивала
-       уехавшая под них строка. Итоги стоят вровень с нижним краем панели —
-       так их и читают: подвал таблицы, а не ещё одна её строка. */
-    padding: 0 var(--s-5) 0;
-    /* Список прокручивается внутри панели, а не страницей (раздел 9.8).
-       Порога по числу строк здесь нет намеренно: сколько строк помещается,
-       решает не их количество, а оставшаяся высота колонки — а она разная на
-       1280 и 1920 и меняется от того, показана ли полоса связи. Пока места
-       хватает, прокрутки не видно. */
-    overflow-y: auto;
-    /* height: 100%, а не min-height: 0. Обёртка — блочный потомок
-       .ui-panel__body, а тот сам по себе высоту детям не задаёт: без явной
-       высоты таблица не прокручивалась, а вылезала за панель, и ужатая
-       панель ничего не давала колонке. */
-    height: 100%;
+.strategies__title {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-3);
 }
 
-/* Шапка и итоги остаются на месте, едет только тело. Итоги липкие снизу не
-   для симметрии: сумма, уехавшая из виду, перестаёт быть итогом таблицы,
-   которую человек в этот момент читает. */
-.agents-wrap thead th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    /* Фон панели, а не вложенной поверхности: липкая строка стоит НА панели,
-       и --gph-800 читался бы чужой вставкой поверх таблицы. */
-    background: var(--gph-850);
+.strategies__title h2 {
+    margin: 0;
+    font: var(--t-h2);
+    letter-spacing: -0.015em;
+    color: var(--text-1);
 }
 
-.agents-wrap tfoot th,
-.agents-wrap tfoot td {
-    position: sticky;
-    bottom: 0;
-    z-index: 1;
-    background: var(--gph-850);
-    /* Линия сверху — граница между уехавшей под итоги строкой и самими
-       итогами. Без неё полоса итогов читается ещё одной строкой таблицы,
-       наехавшей на предыдущую. */
-    box-shadow: 0 -1px 0 var(--line-1);
-}
+.strategies { --w-strategy: 168px; --w-position: 152px; --w-share: 132px; --w-pnl: 120px; }
 
-.agents {
-    width: 100%;
-    /* separate, а не collapse. При collapse фон липкой ячейки не поднимается
-       над строками таблицы: полоса итогов просвечивала, и под ней читалась
-       уехавшая строка. Граница строки поэтому перенесена со <tr> на ячейки —
-       при separate на строке она не рисуется. */
-    border-collapse: separate;
-    border-spacing: 0;
-    table-layout: fixed;
-}
-
-.agents thead th {
-    height: var(--h-thead);
-    padding: 0;
-    text-align: left;
-    font-weight: inherit;
+.strategies__row {
+    display: grid;
+    grid-template-columns: var(--w-strategy) var(--w-position) var(--w-share) var(--w-pnl) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--s-3);
+    min-height: var(--h-row-tall);
+    padding: var(--s-2) var(--s-4);
     border-bottom: 1px solid var(--line-1);
 }
 
-.agents thead th.agents__c-num { text-align: right; }
+.strategies__row--head { min-height: var(--h-thead); padding-block: 0; }
 
-.agents tbody td,
-.agents tbody th { border-bottom: 1px solid var(--line-1); }
-.agents tbody tr:hover td,
-.agents tbody tr:hover th { background: var(--gph-750); }
-.agents td, .agents tbody th { height: var(--h-row-tall); padding: 0; vertical-align: middle; }
-
-/* Колонка объяснения не должна схлопываться: она — причина этой компоновки.
-   Ужимаются имя и числа, а не объяснение.
-
-   Порог — --bp-sm (1280), а не 1440. Прежние 200/130 не помещались уже на
-   1440: заголовку «Действие и объяснение» оставалось 134px, и он переносился
-   на три строки, разгоняя шапку с 28 до 42,5 (раздел 9.8 требует --h-thead).
-   Прежний литерал 1599 это скрывал — он и включал узкий набор на 1440. Теперь
-   узкий набор базовый, а ниже --bp-sm колонки ужимаются ещё раз. */
-.agents__c-name { width: 164px; }
-.agents__c-num { width: 92px; text-align: right; }
-.agents td.agents__c-why,
-.agents th.agents__c-why,
-.agents tfoot .agents__c-why { padding-left: var(--s-6); min-width: 0; }
-
-@media (max-width: 1279px) {
-    .agents__c-name { width: 140px; }
-    .agents__c-num { width: 84px; }
-    .agents td.agents__c-why,
-    .agents th.agents__c-why,
-    .agents tfoot .agents__c-why { padding-left: var(--s-4); }
+.strategies__row--foot {
+    min-height: var(--h-row);
+    border-bottom: 0;
+    font: var(--t-caption);
+    color: var(--text-3);
 }
 
-.agents tbody .agents__c-name { text-align: left; font-weight: inherit; }
-
-.agents__cell {
+.strategies__name {
     display: flex;
     align-items: center;
     gap: var(--s-2);
-    min-width: 0;
-}
-
-.agents__name { display: flex; flex-direction: column; min-width: 0; }
-.agents__why { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.agents__why-act { color: var(--text-1); white-space: nowrap; }
-
-/* Объяснение — ровно одна строка. Перенос менял бы высоту строки на каждом
-   тике, а это запрещённая разделом 12 анимация, двигающая layout.
-   Полный текст доступен по наведению. */
-.agents__why-reason {
-    font: var(--t-caption);
-    color: var(--text-3);
+    font: var(--t-body-sm);
+    color: var(--text-1);
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.agents__title,
-.agents__kind {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.agents__title { font: var(--t-h3); color: var(--text-1); }
-.agents__kind { font: var(--t-caption); color: var(--text-quiet); }
-.agents__c-num.num-sm { color: var(--text-2); }
-.agents__c-num.num { color: var(--text-1); }
-.agents__c-num.tone-up { color: var(--up-text); }
-.agents__c-num.tone-down { color: var(--down-text); }
-
-.agents tfoot th, .agents tfoot td { height: var(--h-row); padding: 0; font: var(--t-caption); color: var(--text-3); }
-.agents tfoot th { text-align: left; font-weight: inherit; }
-/* Число в итогах — моноширинным, как в строках. Правило подвала выше
-   ставит всей строке шрифт подписи, и без возврата --n-sm сумма набиралась
-   Golos: узкий неразрывный пробел между разрядами там почти нулевой, и
-   «465 000» читалось как «465000» под «110 000» строк. */
-.agents tfoot .num-sm, .agents tfoot .num { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-2); }
-
-.agents__skeleton { display: flex; flex-direction: column; padding: var(--s-3) var(--s-5); }
-
-.agents__skeleton-row {
+/* Хайрлайн перед колонкой P/L портфеля: она про весь портфель, а не про
+   актив, и это должно читаться без подписи (ревью Т-3). */
+.strategies__sep {
+    align-self: stretch;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--s-4);
-    height: var(--h-row-tall);
-    border-bottom: 1px solid var(--line-1);
+    justify-content: flex-end;
+    border-left: 1px solid var(--line-1);
+    padding-right: var(--s-3);
 }
+
+.strategies__share {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.strategies__track {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--zone-1);
+    overflow: hidden;
+}
+
+.strategies__fill {
+    display: block;
+    height: 100%;
+    background: var(--share-1);
+}
+
+.strategies__why {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding-left: var(--s-1);
+}
+
+.strategies__act { font: var(--t-body-sm); font-weight: 500; color: var(--text-1); }
+
+/* Объяснение — то, ради чего продукт существует: две строки, а не обрубок. */
+.strategies__reason {
+    font: var(--t-caption);
+    color: var(--text-3);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.strategies__more {
+    justify-self: end;
+    color: var(--text-2);
+    text-decoration: none;
+}
+
+.strategies__more:hover { color: var(--text-1); }
+
+.causal-agents {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.causal-link { color: var(--text-2); text-decoration: none; }
+.causal-link:hover { color: var(--text-1); }
+
+.caption { font: var(--t-caption); color: var(--text-3); }
+.num-md { font: var(--n-md); font-variant-numeric: tabular-nums; }
+.t1 { color: var(--text-1); }
+.t2 { color: var(--text-2); }
+.t3 { color: var(--text-3); }
+.nowrap { white-space: nowrap; }
+.right { text-align: right; justify-self: end; }
 
 /* ============================================================================
    Стакан — 7 асков · строка спреда · 7 бидов, строка 26px
@@ -558,7 +512,8 @@
 /* ============================================================================
    Лента сделок — строка 26px, новая строка входит сверху
    ============================================================================ */
-.rail--right ::deep .tape-panel { flex: 1; min-height: var(--h-tape-min); }
+.rail--right ::deep .tape-panel { flex: 1; min-height: var(--h-tape-min); display: flex; flex-direction: column; }
+.rail--right ::deep .tape-panel .ui-panel__body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
 .tape {
     height: 100%;
@@ -603,127 +558,4 @@
     padding-top: var(--s-3);
     margin-top: var(--s-1);
     border-top: 1px solid var(--line-1);
-}
-
-/* ============================================================================
-   Состав агентов перед запуском — артборд 03. Показывается, пока торги
-   остановлены: состав задаётся до старта сессии (раздел 16.1).
-   ============================================================================ */
-.compose-wrap { padding: 0 var(--s-5) var(--s-3); }
-
-.compose {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-
-.compose thead th {
-    height: var(--h-thead);
-    padding: 0;
-    text-align: left;
-    font-weight: inherit;
-    border-bottom: 1px solid var(--line-1);
-}
-
-.compose thead th.compose__c-count,
-.compose thead th.compose__c-cap,
-.compose thead th.compose__c-total { text-align: right; }
-
-/* Текстовая колонка — по левому краю, и заголовок вместе с ней (раздел 9.8). */
-.compose thead th.compose__c-why { text-align: left; }
-
-.compose tbody tr { border-bottom: 1px solid var(--line-1); }
-.compose td, .compose tbody th { height: var(--h-row-tall); padding: 0; vertical-align: middle; }
-.compose tbody th { text-align: left; font-weight: inherit; color: var(--text-1); }
-
-/* ноль агентов типа — допустимое состояние, строка остаётся, значения гаснут */
-.compose tbody tr.is-off td,
-.compose tbody tr.is-off th { color: var(--text-4); }
-.compose tbody tr.is-off .compose__c-total { color: var(--text-4); }
-
-/* Пять колонок по артборду 03. Раньше «Поведение» стояло второй строкой под
-   именем типа: колонка схлопывалась в ноль, потому что остаток ширины забирал
-   себе тип (width: auto), а не она. Теперь наоборот — фиксированы ТИП и три
-   числовые, остаток достаётся «Поведению». Пункт 35 docs/ui-backlog.md.
-
-   «Всего капитала» расширено со 108 до 120: на 11px в верхнем регистре с
-   трекингом +0.06em заголовок в 108 не помещался и переносился на вторую
-   строку, разгоняя шапку выше --h-thead (пункт 34). */
-.compose__c-type { width: 132px; }
-.compose__c-count { width: 88px; text-align: right; }
-.compose__c-cap { width: 152px; text-align: right; }
-.compose__c-total { width: 120px; text-align: right; }
-
-/* Остаток ширины и обрезка с многоточием: полный текст — по наведению.
-   Между последней числовой колонкой и текстовой — зазор не меньше --s-4
-   (раздел 9.8), иначе число упирается в текст. */
-/* width: auto в таблице с table-layout: fixed отдаёт колонке ОСТАТОК ширины —
-   этого достаточно. max-width: 0 здесь стоять не должен: в фиксированной
-   таблице он схлопывает колонку в ноль, и текст вываливается поверх соседней
-   вместо того, чтобы обрезаться. */
-.compose__c-why {
-    width: auto;
-    font: var(--t-caption);
-    color: var(--text-3);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* Зазор до текстовой колонки задаётся селектором с ЯЧЕЙКОЙ, иначе не
-   применяется: базовое `.compose td { padding: 0 }` даёт (0,2,1), а правило
-   колонки — (0,1,1), и колонка проигрывает. Ровно так же не работали
-   выравнивание и рыночный цвет на «Агентах» (пункты 73 и 98). */
-.compose td.compose__c-why,
-.compose th.compose__c-why { padding-left: var(--s-4); }
-
-.compose__cell { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
-.compose__c-total { color: var(--text-1); }
-
-.compose__type-name { color: var(--text-1); white-space: nowrap; }
-
-.compose__note {
-    margin: 0;
-    padding-top: var(--s-2);
-    font: var(--t-caption);
-    color: var(--text-3);
-}
-
-.compose tfoot th, .compose tfoot td {
-    height: var(--h-row);
-    padding: 0;
-    font: var(--t-caption);
-    color: var(--text-3);
-}
-
-.compose tfoot th { text-align: left; font-weight: inherit; }
-.compose tfoot .num-sm { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-2); }
-
-.compose__warn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s-2);
-    color: var(--warn-500);
-}
-
-/* степпер количества — две иконки-кнопки 26 и моно-значение между ними */
-/* Степпер приехал в кит (Components/Ui/NumberStepper) — здесь остаётся
-   только выравнивание внутри числовой колонки таблицы. */
-.compose__c-count ::deep .compose__stepper { display: flex; justify-content: flex-end; }
-
-/* Капитал: степпер занимает ячейку целиком, поле забирает остаток от кнопок. */
-.compose__c-cap ::deep .compose__capital { width: 100%; }
-.compose__c-cap.is-error ::deep .ui-stepper__input { border-color: var(--down-500); }
-
-/* Само поле ввода приехало в кит вместе со степпером — здесь осталась
-   только строка ошибки под ним (раздел 9.3). */
-.field__error {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--s-1);
-    margin-top: var(--s-1);
-    font: var(--t-caption);
-    color: var(--down-text);
-    text-align: right;
 }

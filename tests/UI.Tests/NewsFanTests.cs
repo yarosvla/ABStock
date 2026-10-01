@@ -49,6 +49,19 @@ public sealed class NewsFanTests
     }
 
     [Fact]
+    public void Сила_влияния_со_знаком_самый_задетый_по_модулю()
+    {
+        // Позитивная новость задела негативный фактор BLTR: сила −0,90 —
+        // толкает цену вниз, и задет BLTR сильнее, чем GLEN с +0,38.
+        var fan = Fan(("GLEN", Signal(0.38m)), ("BLTR", Signal(-0.90m)));
+
+        Assert.Equal("BLTR", fan.Lead?.Symbol);
+        Assert.Equal(0.90m, fan.MaxImpact);
+        Assert.Equal(-1, fan.For("BLTR")!.Direction);
+        Assert.Equal(0.90m, fan.For("BLTR")!.Strength);
+    }
+
+    [Fact]
     public void Новость_никого_не_задевшая_не_имеет_лидера() =>
         Assert.Null(Fan(("GLEN", Signal(0.2m, match: 0m))).Lead);
 

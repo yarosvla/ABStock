@@ -4,7 +4,7 @@
    при необходимости — одна поясняющая строка. Слово пишется целиком:
    сокращений вида «увер × чувств» здесь не бывает (раздел 17). *@
 
-<div class="ui-causality__step" style="flex:@FlexShare">
+<div class="ui-causality__step @(Break ? "is-break" : null)" style="flex:@FlexShare">
     <span class="label ui-causality__label">@Label</span>
 
     @if (ChildContent is not null)
@@ -38,6 +38,13 @@
     [Parameter] public double Weight { get; set; } = 1;
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Предыдущий шаг к этому не привёл: вместо стрелки — разрыв (раздел
+    /// 9.19). Стрелка между несвязанными шагами утверждала бы причинность,
+    /// которой не было.
+    /// </summary>
+    [Parameter] public bool Break { get; set; }
 
     /// <summary>Доля уезжает в CSS, поэтому форматируется InvariantCulture.</summary>
     private string FlexShare => Weight.ToString("0.###", CultureInfo.InvariantCulture);

@@ -24,10 +24,10 @@ public sealed record NewsFan(
     /// Самый задетый актив: на него, по предложению контракта, бьёт новостной
     /// агент. Null — новость не задела ни один актив.
     /// </summary>
-    public AssetSignal? Lead => Hit.MaxBy(asset => asset.Signal!.ImpactScore);
+    public AssetSignal? Lead => Hit.MaxBy(asset => asset.Strength);
 
     /// <summary>Наибольшая сила в веере — от неё считается толщина связей.</summary>
-    public decimal MaxImpact => Lead?.Signal?.ImpactScore ?? 0m;
+    public decimal MaxImpact => Lead?.Strength ?? 0m;
 
     public AssetSignal? For(string? symbol) =>
         Assets.FirstOrDefault(asset => string.Equals(asset.Symbol, symbol, StringComparison.OrdinalIgnoreCase));
@@ -71,5 +71,15 @@ public sealed record AssetSignal(string Symbol, NewsSignal? Signal)
     /// </summary>
     public bool IsHit => Signal is { MatchScore: > 0m };
 
+    /// <summary>
+    /// Сила влияния со знаком. Знак — направление для ЭТОГО профиля:
+    /// позитивная новость, задевшая негативный фактор, толкает цену вниз.
+    /// </summary>
     public decimal? Impact => IsHit ? Signal!.ImpactScore : null;
+
+    /// <summary>Сила без знака — то, что стоит на шкале (DESIGN.md 9.17).</summary>
+    public decimal? Strength => Impact is { } impact ? Math.Abs(impact) : null;
+
+    /// <summary>Куда новость толкает цену этого актива: вверх, вниз или никуда.</summary>
+    public int Direction => Impact is { } impact ? Math.Sign(impact) : 0;
 }
