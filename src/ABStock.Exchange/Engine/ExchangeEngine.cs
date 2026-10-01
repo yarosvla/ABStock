@@ -284,75 +284,12 @@ public sealed class ExchangeEngine : IExchangeEngine
         IReadOnlyList<Order> acceptedOrders,
         IReadOnlyList<Trade> trades)
     {
-        var openOrdersById = GetOpenOrders().ToDictionary(order => order.Id);
-
-        return acceptedOrders
-            .Select(order => BuildExecutionReport(order, trades, openOrdersById))
-            .ToArray();
-    }
-
-    private static OrderExecutionReport BuildExecutionReport(
-        Order order,
-        IReadOnlyList<Trade> trades,
-        IReadOnlyDictionary<Guid, Order> openOrdersById)
-    {
-        var orderTrades = trades
-            .Where(trade => trade.BuyOrderId == order.Id || trade.SellOrderId == order.Id)
-            .ToArray();
-
-        var filledQuantity = orderTrades.Sum(trade => trade.Quantity);
-        var openQuantity = openOrdersById.TryGetValue(order.Id, out var openOrder)
-            ? openOrder.Quantity
-            : 0m;
-        var remainingQuantity = openQuantity > 0m
-            ? openQuantity
-            : Math.Max(0m, order.Quantity - filledQuantity);
-        var averagePrice = filledQuantity > 0m
-            ? orderTrades.Sum(trade => trade.Price * trade.Quantity) / filledQuantity
-            : (decimal?)null;
-
-        return new OrderExecutionReport(
-            Order: order,
-            Status: GetExecutionStatus(order, filledQuantity, openQuantity),
-            RequestedQuantity: order.Quantity,
-            FilledQuantity: filledQuantity,
-            RemainingQuantity: remainingQuantity,
-            AveragePrice: averagePrice,
-            Message: null
-        );
-    }
-
-    private static OrderExecutionStatus GetExecutionStatus(Order order, decimal filledQuantity, decimal openQuantity)
-    {
-        if (filledQuantity >= order.Quantity)
-        {
-            return OrderExecutionStatus.Filled;
-        }
-
-        if (filledQuantity > 0m)
-        {
-            return OrderExecutionStatus.PartiallyFilled;
-        }
-
-        if (openQuantity > 0m)
-        {
-            return OrderExecutionStatus.Open;
-        }
-
-        return OrderExecutionStatus.Expired;
+        return OrderExecutionReportBuilder.Build(acceptedOrders, trades, GetOpenOrders());
     }
 
     private static OrderExecutionReport CreateRejectedReport(Order? order, string reason)
     {
-        return new OrderExecutionReport(
-            Order: order,
-            Status: OrderExecutionStatus.Rejected,
-            RequestedQuantity: order?.Quantity ?? 0m,
-            FilledQuantity: 0m,
-            RemainingQuantity: order?.Quantity ?? 0m,
-            AveragePrice: null,
-            Message: reason
-        );
+        return OrderExecutionReportBuilder.CreateRejected(order, reason);
     }
 
     private void TrimHistory()
