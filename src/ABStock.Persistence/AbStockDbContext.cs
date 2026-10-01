@@ -5,6 +5,12 @@ namespace ABStock.Persistence;
 
 public sealed class AbStockDbContext(DbContextOptions<AbStockDbContext> options) : DbContext(options)
 {
+    public DbSet<AssetEntity> Assets => Set<AssetEntity>();
+
+    public DbSet<TradingSessionEntity> TradingSessions => Set<TradingSessionEntity>();
+
+    public DbSet<SessionMarketEntity> SessionMarkets => Set<SessionMarketEntity>();
+
     public DbSet<SimulationRunEntity> SimulationRuns => Set<SimulationRunEntity>();
 
     public DbSet<MarketTickEntity> MarketTicks => Set<MarketTickEntity>();
@@ -13,6 +19,32 @@ public sealed class AbStockDbContext(DbContextOptions<AbStockDbContext> options)
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AssetEntity>(entity =>
+        {
+            entity.ToTable("Assets");
+            entity.HasKey(asset => asset.Id);
+        });
+
+        modelBuilder.Entity<TradingSessionEntity>(entity =>
+        {
+            entity.ToTable("TradingSessions");
+            entity.HasKey(session => session.Id);
+        });
+
+        modelBuilder.Entity<SessionMarketEntity>(entity =>
+        {
+            entity.ToTable("SessionMarkets");
+            entity.HasKey(market => market.RunId);
+            entity.HasIndex(market => new { market.SessionId, market.AssetId }).IsUnique();
+            entity.HasOne(market => market.Run).WithOne(run => run.Market)
+                .HasForeignKey<SessionMarketEntity>(market => market.RunId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(market => market.Session).WithMany(session => session.Markets)
+                .HasForeignKey(market => market.SessionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(market => market.Asset).WithMany(asset => asset.Markets)
+                .HasForeignKey(market => market.AssetId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<SimulationRunEntity>(entity =>
         {
             entity.ToTable("SimulationRuns");

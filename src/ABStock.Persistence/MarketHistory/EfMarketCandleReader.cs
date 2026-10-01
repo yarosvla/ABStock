@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ABStock.Persistence.MarketHistory;
 
-internal sealed class EfMarketCandleReader(IDbContextFactory<AbStockDbContext> contextFactory) : IMarketCandleReader
+internal sealed class EfMarketCandleReader(
+    IDbContextFactory<AbStockDbContext> contextFactory,
+    StorageInitializer initializer) : IMarketCandleReader
 {
     public IReadOnlyList<MarketCandle> GetCandles(Guid runId, TimeSpan interval, int limit)
     {
@@ -22,6 +24,7 @@ internal sealed class EfMarketCandleReader(IDbContextFactory<AbStockDbContext> c
             throw new ArgumentOutOfRangeException(nameof(limit), "Candle limit must be positive.");
         }
 
+        initializer.EnsureInitialized();
         using var db = contextFactory.CreateDbContext();
 
         var ticks = db.MarketTicks

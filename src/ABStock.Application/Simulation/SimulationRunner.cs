@@ -157,8 +157,19 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
         }
 
         var startedAt = DateTimeOffset.UtcNow;
-        var marketRuns = assets.Select(asset => new MarketRun(asset,
-            _marketHistoryStore.StartRun(CreateHistoryConfig(asset, interval, specs), startedAt))).ToArray();
+        _marketHistoryStore.StartSession(session.SessionId, interval, startedAt);
+        MarketRun[] marketRuns;
+        try
+        {
+            marketRuns = assets.Select(asset => new MarketRun(asset,
+                _marketHistoryStore.StartRun(
+                    CreateHistoryConfig(asset, session.SessionId, interval, specs), startedAt))).ToArray();
+        }
+        catch
+        {
+            _marketHistoryStore.EndSession(session.SessionId, DateTimeOffset.UtcNow);
+            throw;
+        }
 
         _session = session;
         _agents.AddRange(registeredAgents);
@@ -248,7 +259,7 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
 
             var asset = GetAsset(assetId);
             var runId = _marketHistoryStore.StartRun(
-                CreateHistoryConfig(asset, _tickInterval, _agentSpecs), DateTimeOffset.UtcNow);
+                CreateHistoryConfig(asset, session.SessionId, _tickInterval, _agentSpecs), DateTimeOffset.UtcNow);
             session.AddMarket(assetId);
             _markets.Add(assetId, new MarketRun(asset, runId));
             _marketOrder.Add(assetId);
@@ -458,26 +469,41 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
         }
         finally
         {
-            lock (_sync)
+            try
             {
-                if (_session?.SessionId == sessionId)
+                lock (_sync)
                 {
-                    _session = null;
-                    _runCts = null;
-                    _runTask = null;
-                    _agents.Clear();
-                    _markets.Clear();
-                    _marketOrder.Clear();
-                    _currentMarkets.Clear();
-                    _pendingNews.Clear();
-                    _agentSpecs = [];
-                    _primaryAssetId = Guid.Empty;
+                    try
+                    {
+                        if (_session?.SessionId == sessionId)
+                        {
+                            _marketHistoryStore.EndSession(sessionId, DateTimeOffset.UtcNow);
+                        }
+                    }
+                    finally
+                    {
+                        if (_session?.SessionId == sessionId)
+                        {
+                            _session = null;
+                            _runCts = null;
+                            _runTask = null;
+                            _agents.Clear();
+                            _markets.Clear();
+                            _marketOrder.Clear();
+                            _currentMarkets.Clear();
+                            _pendingNews.Clear();
+                            _agentSpecs = [];
+                            _primaryAssetId = Guid.Empty;
+                        }
+
+                        runCts.Dispose();
+                    }
                 }
-
-                runCts.Dispose();
             }
-
-            OnStateChanged?.Invoke();
+            finally
+            {
+                OnStateChanged?.Invoke();
+            }
         }
     }
 
@@ -593,10 +619,11 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
             account.PortfolioValue, account.InitialCash, account.InitialPortfolioValue);
 
     private static SimulationConfig CreateHistoryConfig(
-        Asset asset, TimeSpan interval, IReadOnlyList<AgentSpec> specs) =>
+        Asset asset, Guid sessionId, TimeSpan interval, IReadOnlyList<AgentSpec> specs) =>
         new(asset.Name, asset.Description, asset.AssetType, asset.StartPrice, interval, specs)
         {
-            AssetId = asset.AssetId
+            AssetId = asset.AssetId,
+            SessionId = sessionId
         };
 
     private static IReadOnlyList<AgentSpec> CopySpecs(IReadOnlyList<AgentSpec> specs)

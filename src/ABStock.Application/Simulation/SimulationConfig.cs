@@ -12,4 +12,6 @@ public record SimulationConfig(
 )
 {
     public Guid? AssetId { get; init; }
+
+    public Guid? SessionId { get; init; }
 }

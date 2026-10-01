@@ -16,7 +16,12 @@ public sealed record SimulationRunSummary(
     DateTimeOffset StartedAt,
     int TickCount,
     int TradeCount,
-    decimal LastPrice);
+    decimal LastPrice)
+{
+    public Guid? SessionId { get; init; }
+
+    public Guid? AssetId { get; init; }
+}
 
 public sealed record SimulationHistoryOverview(
     int RunCount,

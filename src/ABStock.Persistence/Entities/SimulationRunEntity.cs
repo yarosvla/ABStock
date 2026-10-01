@@ -10,6 +10,7 @@ public sealed class SimulationRunEntity
     public AssetType AssetType { get; set; }
     public decimal StartPrice { get; set; }
     public DateTimeOffset StartedAt { get; set; }
+    public SessionMarketEntity? Market { get; set; }
 
     public List<MarketTickEntity> MarketTicks { get; set; } = [];
     public List<TradeEntity> Trades { get; set; } = [];

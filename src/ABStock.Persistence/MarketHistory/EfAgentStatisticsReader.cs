@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ABStock.Persistence.MarketHistory;
 
-internal sealed class EfAgentStatisticsReader(IDbContextFactory<AbStockDbContext> contextFactory) : IAgentStatisticsReader
+internal sealed class EfAgentStatisticsReader(
+    IDbContextFactory<AbStockDbContext> contextFactory,
+    StorageInitializer initializer) : IAgentStatisticsReader
 {
     public AgentStatisticsReport? GetReport(Guid runId, string agentName)
     {
@@ -13,6 +15,7 @@ internal sealed class EfAgentStatisticsReader(IDbContextFactory<AbStockDbContext
             return null;
         }
 
+        initializer.EnsureInitialized();
         using var db = contextFactory.CreateDbContext();
 
         var tradeEntities = db.Trades
