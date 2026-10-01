@@ -1,0 +1,47 @@
+/* Спарклайн — раздел 9.25. */
+
+.ui-spark {
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+
+.ui-spark__svg {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+}
+
+.ui-spark__base {
+    fill: none;
+    stroke: var(--line-3);
+    stroke-width: 1;
+    stroke-dasharray: 2 3;
+}
+
+.ui-spark__line {
+    fill: none;
+    stroke-width: 1.5;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+.ui-spark__line--up   { stroke: var(--up-fill); }
+.ui-spark__line--down { stroke: var(--down-fill); }
+.ui-spark__line--flat { stroke: var(--text-3); }
+
+/* Точка последней цены сидит на правом краю линии; кольцо цвета панели
+   отделяет её от линии, не подсвечивая (свечения нет — раздел 2). */
+.ui-spark__dot {
+    position: absolute;
+    right: -3px;
+    width: 7px;
+    height: 7px;
+    margin-top: -3.5px;
+    border-radius: var(--r-pill);
+    box-shadow: 0 0 0 3px var(--gph-850);
+}
+
+.ui-spark__dot--up   { background: var(--up-fill); }
+.ui-spark__dot--down { background: var(--down-fill); }
+.ui-spark__dot--flat { background: var(--text-3); }

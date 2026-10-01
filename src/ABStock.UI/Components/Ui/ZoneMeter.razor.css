@@ -1,0 +1,71 @@
+/* Компактная шкала с зонами — раздел 9.17, форма для ячейки таблицы. */
+
+.ui-meter {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+}
+
+.ui-meter__head {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-1);
+    white-space: nowrap;
+    min-height: 20px;
+}
+
+.ui-meter__value {
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+}
+
+.ui-meter__zone,
+.ui-meter__missing {
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.ui-meter__track {
+    position: relative;
+    display: flex;
+    gap: 2px;
+    height: 6px;
+}
+
+.ui-meter__zone-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--zone-1);
+}
+
+.ui-meter__zone-bar:nth-child(2) { background: var(--zone-2); }
+.ui-meter__zone-bar:nth-child(3) { background: var(--zone-3); }
+.ui-meter__zone-bar:nth-child(4) { background: var(--zone-4); }
+
+/* «Не задет»: дорожка есть — актив проверяли, — но без заливки. Пунктир, а
+   не прозрачность: под проектором полупрозрачная дорожка исчезает (19). */
+.ui-meter__track--off .ui-meter__zone-bar {
+    background: transparent;
+    outline: 1px dashed var(--line-3);
+    outline-offset: -1px;
+}
+
+/* Маркер стоит на данных — --text-1, не акцент (раздел 3.1). */
+.ui-meter__mark {
+    position: absolute;
+    top: -4px;
+    bottom: -4px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--text-1);
+}
+
+.ui-meter__mark--below {
+    width: 6px;
+    margin-left: 0;
+    border-radius: 2px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--text-2);
+}

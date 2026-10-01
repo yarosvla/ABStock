@@ -7,6 +7,41 @@
    (состав агентов на «Торгах»). Editable=true — рядом с кнопками поле ввода
    для прямого набора: докликивать до 62 никто не станет. *@
 
+@if (Compact)
+{
+    @* Компактная форма для плотного списка (пульт «Активов»): кнопки внутри
+       одной рамки высотой --h-ctl-sm; без кнопок — просто поле числа. *@
+    <span class="ui-stepper-c @(ShowButtons ? null : "ui-stepper-c--field") @Class">
+        @if (ShowButtons)
+        {
+            <button class="ui-stepper-c__btn" type="button" disabled="@AtMin" aria-label="@DecrementLabel" @onclick="Decrement">
+                <Icon Name="minus" Size="14" />
+            </button>
+        }
+        @if (Editable)
+        {
+            <input @key="revision"
+                   class="ui-stepper-c__input"
+                   type="text" inputmode="numeric" autocomplete="off"
+                   placeholder="@Placeholder"
+                   aria-label="@Label"
+                   value="@Text"
+                   @onchange="HandleInput" />
+        }
+        else
+        {
+            <span class="ui-stepper-c__value" aria-label="@Label">@Text</span>
+        }
+        @if (ShowButtons)
+        {
+            <button class="ui-stepper-c__btn" type="button" disabled="@AtMax" aria-label="@IncrementLabel" @onclick="Increment">
+                <Icon Name="plus" Size="14" />
+            </button>
+        }
+    </span>
+}
+else
+{
 <div class="ui-stepper @(Fill ? "ui-stepper--fill" : null) @Class">
     <AppButton Variant="secondary" Size="26" Icon="minus"
                Class="ui-btn--icon"
@@ -40,6 +75,7 @@
                OnClick="Increment"
                aria-label="@IncrementLabel" />
 </div>
+}
 
 @code {
     [Parameter] public int? Value { get; set; }
@@ -66,6 +102,15 @@
     [Parameter] public string? IncrementLabel { get; set; }
 
     [Parameter] public string? Class { get; set; }
+
+    /// <summary>Компактная форма: одна рамка высотой --h-ctl-sm, кнопки внутри.</summary>
+    [Parameter] public bool Compact { get; set; }
+
+    /// <summary>
+    /// Только в компактной форме: false — без кнопок, одно поле числа (капитал
+    /// в пульте: докликивать до 150 000 никто не станет, а кнопки съели бы ширину).
+    /// </summary>
+    [Parameter] public bool ShowButtons { get; set; } = true;
 
     /// <summary>
     /// Тысячи разделяются узким пробелом (раздел 10): «110 000», а не «110000».

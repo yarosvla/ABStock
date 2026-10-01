@@ -1,0 +1,31 @@
+.ui-asset {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    min-width: 0;
+}
+
+.ui-asset__text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* Имя актива — 14/20 с весом 500, а не 15px вне шкалы (ревью О-2). */
+.ui-asset__name {
+    font: 500 var(--fs-body)/20px var(--font-ui);
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ui-asset__name--muted { color: var(--text-2); }
+
+.ui-asset__sub {
+    font: var(--t-caption);
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

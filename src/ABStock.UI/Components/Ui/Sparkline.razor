@@ -1,0 +1,91 @@
+@using System.Globalization
+@using System.Text
+
+@* Спарклайн «с открытия» — раздел 9.25. Линия 1,5px цвета по знаку
+   изменения, пунктир цены открытия, точка последней цены. Без заливки и
+   градиента (раздел 2). Шкала — общая для всех строк экрана: полудиапазон
+   в процентах приходит снаружи (SparklineScale), а не считается здесь. *@
+
+<span class="ui-spark" style="height:@Px(Height)">
+    <svg class="ui-spark__svg" width="100%" height="@Height" viewBox="0 0 @Width @Height"
+         preserveAspectRatio="none" role="img" aria-label="@AriaLabel">
+        <path class="ui-spark__base" d="M0 @F(Mid)H@(Width)" vector-effect="non-scaling-stroke" />
+        @if (Prices.Count > 1)
+        {
+            <path class="ui-spark__line ui-spark__line--@Tone" d="@Path" vector-effect="non-scaling-stroke" />
+        }
+    </svg>
+    @if (Prices.Count > 0)
+    {
+        <span class="ui-spark__dot ui-spark__dot--@Tone" style="top:@Px(Y(Prices[^1]))"></span>
+    }
+</span>
+
+@code {
+    /// <summary>Ширина координатной плоскости; на экране SVG растянут по ячейке.</summary>
+    private const int Width = 300;
+
+    /// <summary>Отступ линии от краёв по вертикали: крайняя точка не режется кромкой.</summary>
+    private const decimal Pad = 3m;
+
+    [Parameter, EditorRequired] public IReadOnlyList<decimal> Prices { get; set; } = [];
+
+    [Parameter, EditorRequired] public decimal Open { get; set; }
+
+    /// <summary>Полудиапазон общей шкалы в процентах (<see cref="Services.SparklineScale.HalfRange"/>).</summary>
+    [Parameter, EditorRequired] public decimal HalfRange { get; set; }
+
+    [Parameter] public int Height { get; set; } = 52;
+
+    private decimal Mid => Height / 2m;
+
+    private string Tone
+    {
+        get
+        {
+            if (Prices.Count == 0)
+            {
+                return "flat";
+            }
+
+            var last = Prices[^1];
+            return last > Open ? "up" : last < Open ? "down" : "flat";
+        }
+    }
+
+    private decimal Y(decimal price)
+    {
+        var half = HalfRange <= 0m ? Services.SparklineScale.MinHalfRange : HalfRange;
+        var deviation = Math.Clamp(Services.SparklineScale.DeviationPercent(price, Open), -half, half);
+        return Mid - deviation / half * (Mid - Pad);
+    }
+
+    private string Path
+    {
+        get
+        {
+            var path = new StringBuilder(Prices.Count * 14);
+            var step = (decimal)Width / (Prices.Count - 1);
+
+            for (var i = 0; i < Prices.Count; i++)
+            {
+                path.Append(i == 0 ? 'M' : 'L')
+                    .Append(F(i * step))
+                    .Append(' ')
+                    .Append(F(Y(Prices[i])));
+            }
+
+            return path.ToString();
+        }
+    }
+
+    /// <summary>Только InvariantCulture: число уезжает в SVG и CSS, где запятая — ошибка.</summary>
+    private static string F(decimal value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    private static string Px(decimal value) => F(value) + "px";
+
+    private string AriaLabel =>
+        Prices.Count == 0
+            ? "Цена с открытия: сделок ещё нет"
+            : $"Цена с открытия: {Open:F2} → {Prices[^1]:F2}, общая шкала ±{HalfRange:0.#} %";
+}

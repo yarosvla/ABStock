@@ -1,0 +1,27 @@
+@using System.Globalization
+@using ABStock.Shared
+@using ABStock.UI.Services
+
+@* Полоса капитала — раздел 9.28. Капитал по типам агентов, сегменты
+   пропорциональны «количество × капитал экземпляра». Сегменты окрашены
+   цветами агентов — сознательное исключение из 19.2: полоса стоит вплотную
+   над составом, где те же цвета стоят точками у имён, и заменяет легенду. *@
+
+<span class="ui-capbar @Class" role="img" aria-label="@AriaLabel">
+    @foreach (var row in Rows.Where(row => row.TotalCapital > 0m))
+    {
+        <span class="ui-capbar__part ui-capbar__part--@AgentDisplay.GetTypeTone(row.Type)"
+              style="flex:@row.TotalCapital.ToString("0", CultureInfo.InvariantCulture) 1 0"></span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<CompositionRow> Rows { get; set; } = [];
+
+    [Parameter] public string? Class { get; set; }
+
+    private string AriaLabel =>
+        "Капитал по типам агентов: " + string.Join(", ", Rows
+            .Where(row => row.TotalCapital > 0m)
+            .Select(row => $"{AgentDisplay.GetTypeLabel(row.Type)} {NumberFormat.Money0(row.TotalCapital)} ₽"));
+}
