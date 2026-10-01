@@ -60,7 +60,7 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
     }
 
     [Fact]
-    public async Task InitialScalarPosition_IsAssignedOnlyToPrimaryMarket()
+    public async Task InitialScalarPosition_IsAssignedToEveryMarketWithoutDuplicatingCash()
     {
         await using var fixture = new Fixture();
         var first = fixture.CreateAsset("First", 100m);
@@ -69,8 +69,10 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
 
         var account = Assert.Single(fixture.Runner.GetAgentAccounts());
         Assert.Equal(4m, account.Positions[first].Quantity);
-        Assert.Equal(0m, account.Positions[second].Quantity);
-        Assert.Equal(900m, account.InitialPortfolioValue);
+        Assert.Equal(4m, account.Positions[second].Quantity);
+        Assert.Equal(500m, account.Cash);
+        Assert.Equal(1_700m, account.InitialPortfolioValue);
+        Assert.Equal(account.InitialPortfolioValue, account.PortfolioValue);
     }
 
     [Fact]
@@ -98,6 +100,119 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
         var calls = Assert.Single(fixture.Factory.CreatedAgents).Calls.ToArray();
         Assert.Equal(150m, calls[0].AvailableCash);
         Assert.Equal(50m, calls[1].AvailableCash);
+    }
+
+    [Fact]
+    public async Task ExplicitPositionOverridesDefaultIncludingZeroAndDoesNotChangeFutureDefault()
+    {
+        await using var fixture = new Fixture();
+        var first = fixture.CreateAsset("First", 100m);
+        var second = fixture.CreateAsset("Second", 200m);
+        await fixture.StartAsync([first, second], [new AgentSpec(AgentType.MarketMaker, 500m, 4m)
+        {
+            InitialPositions = new Dictionary<Guid, decimal> { [first] = 0m }
+        }]);
+
+        var third = fixture.CreateAsset("Third", 300m);
+        var added = fixture.Runner.AddMarket(third);
+
+        var account = Assert.Single(added.Accounts);
+        Assert.Equal(0m, account.Positions[first].Quantity);
+        Assert.Equal(4m, account.Positions[second].Quantity);
+        Assert.Equal(4m, account.Positions[third].Quantity);
+        Assert.Equal(2_500m, account.InitialPortfolioValue);
+        Assert.Equal(500m, account.Cash);
+    }
+
+    [Fact]
+    public async Task NewMarketUsesConfiguredPositionNotRemainingPositionAfterTrades()
+    {
+        await using var fixture = new Fixture();
+        var first = fixture.CreateAsset("First", 100m);
+        await fixture.StartAsync([first],
+            [new(AgentType.MarketMaker, 0m, 5m), new(AgentType.TrendFollowing, 1_000m)]);
+        var sellerName = fixture.Runner.GetAgentAccounts()
+            .Single(account => account.AgentType == AgentType.MarketMaker).AgentName;
+        var buyerName = fixture.Runner.GetAgentAccounts()
+            .Single(account => account.AgentType == AgentType.TrendFollowing).AgentName;
+        fixture.Runner.SubmitMany(first,
+        [
+            Limit(sellerName, OrderSide.Sell, 100m) with { Quantity = 3m },
+            new(Guid.NewGuid(), buyerName, OrderSide.Buy, OrderType.Market, null, 3m, DateTimeOffset.UtcNow)
+        ]);
+        var second = fixture.CreateAsset("Second", 200m);
+
+        var added = fixture.Runner.AddMarket(second);
+
+        var seller = added.Accounts.Single(account => account.AgentName == sellerName);
+        Assert.Equal(300m, seller.Cash);
+        Assert.Equal(2m, seller.Positions[first].Quantity);
+        Assert.Equal(5m, seller.Positions[second].Quantity);
+        Assert.Equal(1_500m, seller.InitialPortfolioValue);
+        Assert.Equal(seller.InitialPortfolioValue, seller.PortfolioValue);
+        var buyer = added.Accounts.Single(account => account.AgentName == buyerName);
+        Assert.Equal(700m, buyer.Cash);
+        Assert.Equal(3m, buyer.Positions[first].Quantity);
+        Assert.Equal(0m, buyer.Positions[second].Quantity);
+        Assert.Equal(3m, fixture.Runner.GetCurrent(first)!.Snapshot.Volume);
+        Assert.Equal(0m, added.Snapshot.Volume);
+        Assert.Equal(1, fixture.Factory.CreateCalls);
+    }
+
+    [Fact]
+    public async Task RealAgentsCanTradeOnNewMarketUsingInitialInventoryAndAddressedNews()
+    {
+        await using var services = new ServiceCollection().AddABStockApplication().BuildServiceProvider();
+        var runner = services.GetRequiredService<IMultiAssetSimulationRunner>();
+        var catalog = services.GetRequiredService<IAssetCatalog>();
+        var first = catalog.Create(new(new AssetProfile("First", AssetType.Stock, "First asset.", [], 1m), 100m));
+        var second = catalog.Create(new(new AssetProfile("Second", AssetType.Stock, "Second asset.", [], 1m), 200m));
+        var quotes = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var trade = new TaskCompletionSource<SimulationTickResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+        runner.OnMarketTick += tick =>
+        {
+            if (tick.AssetId != second.AssetId)
+            {
+                return;
+            }
+
+            if (tick.Snapshot.BestAsk is not null)
+            {
+                quotes.TrySetResult();
+            }
+
+            if (tick.Submission?.Trades.Count > 0)
+            {
+                trade.TrySetResult(tick);
+            }
+        };
+
+        try
+        {
+            await runner.StartSessionAsync(new([], TimeSpan.FromMilliseconds(20),
+                [new(AgentType.MarketMaker, 10_000m, 10m), new(AgentType.NewsDriven, 10_000m)]));
+            runner.AddMarket(first.AssetId);
+            runner.AddMarket(second.AssetId);
+            await quotes.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            runner.SubmitNews(second.AssetId, new NewsSignal(SignalPolarity.Positive, 1m, 1m, "Second asset news."));
+            var tick = await trade.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            var executed = Assert.Single(tick.Submission!.Trades);
+            Assert.Equal("MarketMaker", executed.SellerAgentName);
+            Assert.Equal("NewsDriven", executed.BuyerAgentName);
+            Assert.Equal(1m, tick.Snapshot.Volume);
+            Assert.Equal(0m, runner.GetCurrent(first.AssetId)!.Snapshot.Volume);
+            Assert.Equal(2, tick.Accounts.Count);
+            var seller = tick.Accounts.Single(account => account.AgentType == AgentType.MarketMaker);
+            Assert.Equal(10m, seller.Positions[first.AssetId].Quantity);
+            Assert.Equal(9m, seller.Positions[second.AssetId].Quantity);
+            Assert.Equal(13_000m, seller.InitialPortfolioValue);
+        }
+        finally
+        {
+            await runner.StopAsync();
+        }
     }
 
     [Fact]
@@ -141,7 +256,7 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
     }
 
     [Fact]
-    public async Task AddMarket_DoesNotRestartAgentsResetBookOrDuplicateInitialInventory()
+    public async Task AddMarket_InitializesInventoryOnceWithoutRestartingAgentsOrResettingOtherMarkets()
     {
         await using var fixture = new Fixture();
         var first = fixture.CreateAsset("First", 100m);
@@ -165,9 +280,12 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
         Assert.Equal(500m, account.Cash);
         Assert.Equal(90m, account.ReservedCash);
         Assert.Equal(2m, account.Positions[first].Quantity);
-        Assert.Equal(0m, account.Positions[second].Quantity);
-        Assert.Equal(700m, account.InitialPortfolioValue);
+        Assert.Equal(2m, account.Positions[second].Quantity);
+        Assert.Equal(2m, account.Positions[second].InitialQuantity);
+        Assert.Equal(1_100m, account.InitialPortfolioValue);
+        Assert.Equal(account.InitialPortfolioValue, account.PortfolioValue);
         Assert.Same(added, fixture.Runner.AddMarket(second));
+        Assert.Equal(account, Assert.Single(fixture.Runner.GetCurrent(second)!.Accounts));
         Assert.Equal(2, fixture.History.Runs.Count);
         Assert.Equal(2, fixture.Runner.GetCurrentMarkets().Count);
     }
@@ -176,7 +294,7 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
     public async Task StartSession_CanStartAgentsBeforeAddingAnyMarkets()
     {
         await using var fixture = new Fixture();
-        await fixture.StartAsync([], [new(AgentType.NewsDriven, 500m)]);
+        await fixture.StartAsync([], [new(AgentType.NewsDriven, 500m, 3m)]);
         Assert.True(fixture.Runner.IsRunning);
         Assert.Equal(Guid.Empty, fixture.Runner.PrimaryAssetId);
         Assert.Null(fixture.Runner.Current);
@@ -191,7 +309,12 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
 
         Assert.Equal(assetId, fixture.Runner.PrimaryAssetId);
         Assert.Same(tick, fixture.Runner.Current);
-        Assert.Equal(0m, Assert.Single(tick.Accounts).Positions[assetId].Quantity);
+        var account = Assert.Single(tick.Accounts);
+        Assert.Equal(3m, account.Positions[assetId].Quantity);
+        Assert.Equal(3m, account.Positions[assetId].InitialQuantity);
+        Assert.Equal(500m, account.Cash);
+        Assert.Equal(800m, account.InitialPortfolioValue);
+        Assert.Equal(account.InitialPortfolioValue, account.PortfolioValue);
         Assert.Equal(1, fixture.Factory.CreateCalls);
     }
 
@@ -236,7 +359,7 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
         var debug = fixture.Services.GetRequiredService<SimulationRunner>();
         var agent = debug.AddAgent(new AgentSpec(AgentType.MarketMaker, 300m, 2m));
         Assert.Equal(2m, agent.Position);
-        Assert.Equal(500m, agent.PortfolioValue);
+        Assert.Equal(700m, agent.PortfolioValue);
         var request = new SimulationDebugOrderRequest(agent.Name, OrderSide.Buy, OrderType.Limit, 90m, 1m);
 
         Assert.Single(debug.SubmitOrder(request).AcceptedOrders);
@@ -309,6 +432,32 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
         Assert.Equal(2, secondarySignals.Length);
         Assert.Same(secondNews, secondarySignals[0].News);
         Assert.Same(laterNews, secondarySignals[1].News);
+    }
+
+    [Fact]
+    public async Task AgentAddedDuringSessionReceivesDefaultsOnExistingAndFutureMarkets()
+    {
+        await using var fixture = new Fixture();
+        var first = fixture.CreateAsset("First", 100m);
+        var second = fixture.CreateAsset("Second", 200m);
+        await fixture.StartAsync([first, second], []);
+
+        var added = fixture.Runner.AddSessionAgent(new AgentSpec(AgentType.MarketMaker, 300m, 3m)
+        {
+            InitialPositions = new Dictionary<Guid, decimal> { [first] = 1m }
+        });
+        var third = fixture.CreateAsset("Third", 300m);
+        var tick = fixture.Runner.AddMarket(third);
+
+        Assert.Equal(1m, added.Positions[first].Quantity);
+        Assert.Equal(3m, added.Positions[second].Quantity);
+        Assert.Equal(1_000m, added.InitialPortfolioValue);
+        var account = Assert.Single(tick.Accounts);
+        Assert.Equal(added.AgentName, account.AgentName);
+        Assert.Equal(3m, account.Positions[third].Quantity);
+        Assert.Equal(300m, account.Cash);
+        Assert.Equal(1_900m, account.InitialPortfolioValue);
+        Assert.Equal(2, fixture.Factory.CreateCalls);
     }
 
     [Fact]
@@ -461,7 +610,6 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
     [InlineData("negativeCash")]
     [InlineData("negativePosition")]
     [InlineData("unknownPosition")]
-    [InlineData("inventoryWithoutMarket")]
     public async Task InvalidConfig_DoesNotStartSessionOrHistory(string scenario)
     {
         await using var fixture = new Fixture();
@@ -480,10 +628,6 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
             case "negativePosition": spec = spec with { InitialPosition = -1m }; break;
             case "unknownPosition":
                 spec = spec with { InitialPositions = new Dictionary<Guid, decimal> { [Guid.NewGuid()] = 1m } };
-                break;
-            case "inventoryWithoutMarket":
-                assetIds = [];
-                spec = spec with { InitialPosition = 1m };
                 break;
         }
 

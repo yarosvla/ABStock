@@ -13,7 +13,8 @@ internal sealed class AgentAccount
     public AgentType AgentType { get; }
     public decimal Cash { get; private set; }
     public decimal InitialCash { get; }
-    public decimal InitialPortfolioValue { get; }
+    public decimal InitialPortfolioValue { get; private set; }
+    public decimal DefaultInitialPosition { get; }
     public decimal ReservedCash { get; private set; }
     public decimal AvailableCash => Cash - ReservedCash;
 
@@ -22,8 +23,10 @@ internal sealed class AgentAccount
         AgentName = spec.AgentName.Trim();
         AgentType = spec.AgentType;
         Cash = InitialCash = spec.InitialCash;
-        _positions = new Dictionary<Guid, decimal>(spec.InitialPositions);
-        _initialPositions = new Dictionary<Guid, decimal>(spec.InitialPositions);
+        DefaultInitialPosition = spec.InitialPosition;
+        _positions = markets.ToDictionary(market => market.AssetId,
+            market => spec.InitialPositions.GetValueOrDefault(market.AssetId, DefaultInitialPosition));
+        _initialPositions = new Dictionary<Guid, decimal>(_positions);
         InitialPortfolioValue = InitialCash + markets.Sum(market =>
             GetPosition(market.AssetId) * market.Snapshot.LastPrice);
     }
@@ -32,6 +35,15 @@ internal sealed class AgentAccount
 
     public decimal GetAvailablePosition(Guid assetId) =>
         GetPosition(assetId) - _reservedPositions.GetValueOrDefault(assetId);
+
+    public void InitializeMarket(Guid assetId, decimal startPrice)
+    {
+        // Starting inventory is contributed capital, not trading profit.
+        var baseline = InitialPortfolioValue + DefaultInitialPosition * startPrice;
+        _positions.Add(assetId, DefaultInitialPosition);
+        _initialPositions.Add(assetId, DefaultInitialPosition);
+        InitialPortfolioValue = baseline;
+    }
 
     public void ResetReservations()
     {

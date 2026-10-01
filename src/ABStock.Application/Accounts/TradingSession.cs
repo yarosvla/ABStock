@@ -30,6 +30,11 @@ internal sealed class TradingSession(IMarketSession markets) : ITradingSession
             }
 
             state = markets.AddMarket(assetId);
+            foreach (var account in _accounts.Values)
+            {
+                account.InitializeMarket(assetId, state.Snapshot.LastPrice);
+            }
+
             accounts = GetAgentAccountsLocked();
         }
 
@@ -43,9 +48,9 @@ internal sealed class TradingSession(IMarketSession markets) : ITradingSession
         ArgumentNullException.ThrowIfNull(spec);
         ArgumentException.ThrowIfNullOrWhiteSpace(spec.AgentName);
         ArgumentNullException.ThrowIfNull(spec.InitialPositions);
-        if (!Enum.IsDefined(spec.AgentType) || spec.InitialCash < 0m)
+        if (!Enum.IsDefined(spec.AgentType) || spec.InitialCash < 0m || spec.InitialPosition < 0m)
         {
-            throw new ArgumentException("Agent type must be valid and initial cash must be non-negative.", nameof(spec));
+            throw new ArgumentException("Agent type must be valid and initial cash and position must be non-negative.", nameof(spec));
         }
 
         var copiedSpec = spec with

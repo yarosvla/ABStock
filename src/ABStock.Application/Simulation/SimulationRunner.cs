@@ -152,7 +152,7 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
             agent.State.AgentName = GetUniqueAgentName(
                 registeredAgents.Select(item => item.Name), agent.State.AgentName);
             var spec = index < specs.Count ? specs[index] : null;
-            session.AddAgent(CreateAccountSpec(agent, spec, primaryAssetId));
+            session.AddAgent(CreateAccountSpec(agent, spec));
             registeredAgents.Add(new SessionAgent(agent.State.AgentName, agent));
         }
 
@@ -287,7 +287,7 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
             var copiedSpec = CopySpecs([spec])[0];
             var agent = _agentFactory.Create([copiedSpec]).Single();
             agent.State.AgentName = GetUniqueAgentName(_agents.Select(item => item.Name), agent.State.AgentName);
-            account = session.AddAgent(CreateAccountSpec(agent, copiedSpec, _primaryAssetId));
+            account = session.AddAgent(CreateAccountSpec(agent, copiedSpec));
             _agents.Add(new SessionAgent(account.AgentName, agent));
             _agentSpecs = Array.AsReadOnly(_agentSpecs.Append(copiedSpec).ToArray());
             ticks = CaptureTicksLocked();
@@ -593,23 +593,14 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
             ?? throw new KeyNotFoundException($"Asset '{assetId}' is not registered in the catalog.");
     }
 
-    private static AgentAccountSpec CreateAccountSpec(ITradeAgent agent, AgentSpec? spec, Guid primaryAssetId)
+    private static AgentAccountSpec CreateAccountSpec(ITradeAgent agent, AgentSpec? spec)
     {
         var positions = spec is null
             ? new Dictionary<Guid, decimal>()
             : new Dictionary<Guid, decimal>(spec.InitialPositions);
-        if (agent.State.Position != 0m && !positions.ContainsKey(primaryAssetId))
-        {
-            if (primaryAssetId == Guid.Empty)
-            {
-                throw new ArgumentException("An initial position requires an existing market.");
-            }
-
-            positions.Add(primaryAssetId, agent.State.Position);
-        }
-
         return new AgentAccountSpec(agent.State.AgentName, agent.State.AgentType, agent.State.Cash)
         {
+            InitialPosition = agent.State.Position,
             InitialPositions = positions
         };
     }

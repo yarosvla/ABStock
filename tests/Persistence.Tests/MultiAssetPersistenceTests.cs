@@ -379,12 +379,16 @@ public sealed class MultiAssetPersistenceTests
     {
         await using var fixture = new Fixture();
         var runner = fixture.Services.GetRequiredService<IMultiAssetSimulationRunner>();
-        await runner.StartSessionAsync(new([], TimeSpan.FromHours(1), [new(AgentType.NewsDriven, 500m)]));
+        await runner.StartSessionAsync(new([], TimeSpan.FromHours(1), [new(AgentType.NewsDriven, 500m, 3m)]));
         var sessionId = runner.CurrentSessionId;
         var reader = fixture.Services.GetRequiredService<ITradingSessionHistoryReader>();
         Assert.Empty(reader.GetSession(sessionId)!.Markets);
         var asset = fixture.CreateAsset("Later", 100m);
-        runner.AddMarket(asset.AssetId);
+        var tick = runner.AddMarket(asset.AssetId);
+        var account = Assert.Single(tick.Accounts);
+        Assert.Equal(3m, account.Positions[asset.AssetId].Quantity);
+        Assert.Equal(800m, account.InitialPortfolioValue);
+        Assert.Equal(500m, account.Cash);
         Assert.Equal(asset.AssetId, Assert.Single(reader.GetSession(sessionId)!.Markets).AssetId);
         await runner.StopAsync();
         Assert.NotNull(reader.GetSession(sessionId)!.EndedAt);

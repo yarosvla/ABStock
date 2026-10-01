@@ -6,6 +6,8 @@ public sealed record AgentAccountSpec(
     decimal InitialCash
 )
 {
+    public decimal InitialPosition { get; init; }
+
     public IReadOnlyDictionary<Guid, decimal> InitialPositions { get; init; } =
         new Dictionary<Guid, decimal>();
 }

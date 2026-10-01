@@ -48,6 +48,33 @@ public sealed class TradingSessionIntegrationTests
     }
 
     [Fact]
+    public void DefaultInitialPositionAppliesToAllMarketsAndExplicitPositionsOverrideIt()
+    {
+        var (session, catalog, first, second) = CreateTwoMarkets();
+        var positions = new Dictionary<Guid, decimal> { [first.AssetId] = 0m, [second.AssetId] = 2.5m };
+        var initial = session.AddAgent(new AgentAccountSpec("Seller", AgentType.MarketMaker, 150m)
+        {
+            InitialPosition = 1.5m,
+            InitialPositions = positions
+        });
+        positions[second.AssetId] = 99m;
+        var third = CreateAsset(catalog, "Third", 300m);
+
+        session.AddMarket(third.AssetId);
+
+        var account = session.GetAgentAccount("Seller");
+        Assert.Equal(0m, account.Positions[first.AssetId].Quantity);
+        Assert.Equal(2.5m, account.Positions[second.AssetId].Quantity);
+        Assert.Equal(1.5m, account.Positions[third.AssetId].Quantity);
+        Assert.Equal(1.5m, account.Positions[third.AssetId].InitialQuantity);
+        Assert.Equal(150m, account.Cash);
+        Assert.Equal(1_100m, account.InitialPortfolioValue);
+        Assert.Equal(account.InitialPortfolioValue, account.PortfolioValue);
+        Assert.Equal(650m, initial.InitialPortfolioValue);
+        Assert.Equal(2, initial.Positions.Count);
+    }
+
+    [Fact]
     public void SellCannotUsePositionOfAnotherAssetOrAlreadyReservedPosition()
     {
         var (session, _, first, second) = CreateTwoMarkets();
@@ -370,6 +397,40 @@ public sealed class TradingSessionIntegrationTests
     }
 
     [Fact]
+    public void AddingInventoryPreservesExistingProfitCashOrdersAndReservations()
+    {
+        var (session, catalog, first, second) = CreateTwoMarkets();
+        session.AddAgent(new AgentAccountSpec("Investor", AgentType.MarketMaker, 150m) { InitialPosition = 2m });
+        AddAgent(session, "Buyer", 200m);
+        AddAgent(session, "Seller", 0m, (first.AssetId, 1m));
+        session.SubmitMany(first.AssetId,
+            [LimitOrder("Buyer", OrderSide.Buy, 110m), LimitOrder("Seller", OrderSide.Sell, 100m)]);
+        var buy = LimitOrder("Investor", OrderSide.Buy, 100m);
+        var sell = LimitOrder("Investor", OrderSide.Sell, 200m);
+        session.Submit(first.AssetId, buy);
+        session.Submit(second.AssetId, sell);
+        var before = session.GetAgentAccount("Investor");
+        var third = CreateAsset(catalog, "Third", 300m);
+
+        session.AddMarket(third.AssetId);
+        session.AddMarket(third.AssetId);
+
+        var after = session.GetAgentAccount("Investor");
+        Assert.Equal(before.Cash, after.Cash);
+        Assert.Equal(before.ReservedCash, after.ReservedCash);
+        Assert.Equal(before.Positions[first.AssetId], after.Positions[first.AssetId]);
+        Assert.Equal(before.Positions[second.AssetId], after.Positions[second.AssetId]);
+        Assert.Equal(buy.Id, Assert.Single(session.GetOpenOrders(first.AssetId)).Id);
+        Assert.Equal(sell.Id, Assert.Single(session.GetOpenOrders(second.AssetId)).Id);
+        Assert.Equal(2m, after.Positions[third.AssetId].Quantity);
+        Assert.Equal(0m, after.Positions[third.AssetId].ReservedQuantity);
+        Assert.Equal(1_350m, after.InitialPortfolioValue);
+        Assert.Equal(10m, before.PortfolioValue - before.InitialPortfolioValue);
+        Assert.Equal(before.PortfolioValue - before.InitialPortfolioValue,
+            after.PortfolioValue - after.InitialPortfolioValue);
+    }
+
+    [Fact]
     public void UnknownAgentOrdersAreRejectedWithoutChangingMarkets()
     {
         var (session, _, first, _) = CreateTwoMarkets();
@@ -402,6 +463,8 @@ public sealed class TradingSessionIntegrationTests
         Assert.Throws<ArgumentNullException>(() => session.AddAgent(null!));
         Assert.ThrowsAny<ArgumentException>(() => AddAgent(session, " ", 100m));
         Assert.Throws<ArgumentException>(() => AddAgent(session, "Buyer", -1m));
+        Assert.Throws<ArgumentException>(() => session.AddAgent(
+            new AgentAccountSpec("Seller", AgentType.MarketMaker, 100m) { InitialPosition = -1m }));
         Assert.Throws<ArgumentException>(() => session.AddAgent(new AgentAccountSpec("Buyer", (AgentType)999, 100m)));
         Assert.Throws<ArgumentNullException>(() => session.AddAgent(
             new AgentAccountSpec("Buyer", AgentType.TrendFollowing, 100m) { InitialPositions = null! }));
@@ -463,6 +526,35 @@ public sealed class TradingSessionIntegrationTests
         Assert.Equal(200m, session.GetAgentAccount("Buyer").AvailableCash);
         Assert.Empty(session.GetOpenOrders(first.AssetId));
         Assert.Empty(session.GetOpenOrders(second.AssetId));
+    }
+
+    [Fact]
+    public void AgentRegisteredBeforeMarketsReceivesConfiguredInventoryOnlyOnce()
+    {
+        var catalog = new InMemoryAssetCatalog();
+        var session = CreateSession(catalog);
+        session.AddAgent(new AgentAccountSpec("Seller", AgentType.MarketMaker, 100m) { InitialPosition = 2m });
+        var asset = CreateAsset(catalog, "Later", 100m);
+        var events = new List<IReadOnlyList<AgentAccountSnapshot>>();
+        session.OnAccountsChanged += events.Add;
+
+        session.AddMarket(asset.AssetId);
+        var order = LimitOrder("Seller", OrderSide.Sell, 100m);
+        var submitted = session.Submit(asset.AssetId, order);
+        var beforeRepeat = session.GetAgentAccount("Seller");
+        session.AddMarket(asset.AssetId);
+
+        Assert.Single(submitted.Result.AcceptedOrders);
+        var afterRepeat = session.GetAgentAccount("Seller");
+        Assert.Equal(2m, afterRepeat.Positions[asset.AssetId].Quantity);
+        Assert.Equal(1m, afterRepeat.Positions[asset.AssetId].AvailableQuantity);
+        Assert.Equal(1m, afterRepeat.Positions[asset.AssetId].ReservedQuantity);
+        Assert.Equal(beforeRepeat.InitialPortfolioValue, afterRepeat.InitialPortfolioValue);
+        Assert.Equal(300m, afterRepeat.InitialPortfolioValue);
+        Assert.Equal(100m, afterRepeat.Cash);
+        Assert.Equal(2, events.Count);
+        Assert.Equal(2m, Assert.Single(events[0]).Positions[asset.AssetId].Quantity);
+        Assert.Equal(order.Id, Assert.Single(session.GetOpenOrders(asset.AssetId)).Id);
     }
 
     [Fact]
