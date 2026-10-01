@@ -14,7 +14,7 @@ public class BuildSymbolTests
     [InlineData("Газпром", "GAZP")]
     [InlineData("Северная Сталь", "SVST")]
     public void Строит_латинский_тикер_из_названия(string name, string expected) =>
-        Assert.Equal(expected, ActiveAssetDefaults.BuildSymbol(name));
+        Assert.Equal(expected, AssetSymbols.Build(name));
 
     [Theory]
     [InlineData("Гелиос Энерго")]
@@ -25,7 +25,7 @@ public class BuildSymbolTests
     [InlineData("Северо Западная Энергетическая Компания")]
     public void Тикер_только_латиница_и_цифры_uppercase(string name)
     {
-        var symbol = ActiveAssetDefaults.BuildSymbol(name);
+        var symbol = AssetSymbols.Build(name);
 
         Assert.All(symbol, character =>
             Assert.True(character is >= 'A' and <= 'Z' or >= '0' and <= '9', $"«{character}» не латиница"));
@@ -39,7 +39,7 @@ public class BuildSymbolTests
     [InlineData("Северо Западная Энергетическая Компания")]
     public void Тикер_длиной_три_или_четыре_знака(string name)
     {
-        var symbol = ActiveAssetDefaults.BuildSymbol(name);
+        var symbol = AssetSymbols.Build(name);
 
         Assert.InRange(symbol.Length, 3, 4);
     }
@@ -49,11 +49,11 @@ public class BuildSymbolTests
     [InlineData("   ")]
     [InlineData("!!!")]
     public void Без_названия_отдаёт_запасной_тикер(string name) =>
-        Assert.Equal("ABST", ActiveAssetDefaults.BuildSymbol(name));
+        Assert.Equal("ABST", AssetSymbols.Build(name));
 
     [Fact]
     public void Тикер_не_зависит_от_регистра_названия() =>
         Assert.Equal(
-            ActiveAssetDefaults.BuildSymbol("гелиос энерго"),
-            ActiveAssetDefaults.BuildSymbol("ГЕЛИОС ЭНЕРГО"));
+            AssetSymbols.Build("гелиос энерго"),
+            AssetSymbols.Build("ГЕЛИОС ЭНЕРГО"));
 }

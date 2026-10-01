@@ -31,6 +31,19 @@ builder.Services.AddABStockPersistence(
 // находили актива и перезапускали прогон демонстрационной заглушкой посреди
 // сессии, которая торгует настоящим активом.
 builder.Services.AddSingleton<IActiveAssetContext, ActiveAssetContext>();
+// Активы сессии — поверх каталога бэкенда, который их хранит. Singleton по
+// той же причине, что и контекст выше: активы принадлежат сессии, а не
+// вкладке. Тикеры и параметры формы бэкенд пока не хранит — их держит реестр.
+builder.Services.AddSingleton<IAssetRegistry, AssetRegistry>();
+// Выбранный актив — scoped: это свойство вкладки (адрес и localStorage), а
+// не сервера. Singleton переключал бы актив у всех открытых вкладок разом.
+builder.Services.AddScoped<ISelectedAsset, SelectedAsset>();
+// Рынки сессии и её хронология — singleton, как раннер, итог которого они
+// держат после остановки торгов.
+builder.Services.AddSingleton<ISessionMarkets, SessionMarkets>();
+builder.Services.AddSingleton<ISessionEvents, SessionEvents>();
+// Состав агентов — один на сессию и живёт в пульте «Активов».
+builder.Services.AddSingleton<IAgentComposition, AgentComposition>();
 // Настройки интерфейса — scoped, и это осознанно: источник истины лежит в
 // localStorage браузера, а сервис лишь кэш на время жизни контура. Singleton
 // раздавал бы всем открытым вкладкам чужой акцент, потому что настройки
@@ -62,6 +75,13 @@ _ = app.Services.GetRequiredService<IAgentEquityHistory>();
 // Лента уведомлений — по той же причине: запуск торгов и первые переходы
 // позиций через ноль случаются раньше, чем кто-нибудь откроет колокольчик.
 _ = app.Services.GetRequiredService<INotificationFeed>();
+
+// Рынки и хронология сессии — тоже до первого тика: иначе цена открытия,
+// ряд спарклайна и строка «Торги запущены» начинались бы с того момента,
+// когда кто-нибудь откроет «Активы».
+_ = app.Services.GetRequiredService<ISessionMarkets>();
+_ = app.Services.GetRequiredService<ISessionEvents>();
+_ = app.Services.GetRequiredService<IAgentComposition>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
