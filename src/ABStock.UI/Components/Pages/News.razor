@@ -111,7 +111,7 @@
                 {
                     <span class="strip__value num">@Fixed2(signal.MatchScore)</span>
                     <span class="ui-causality__note">
-                        вес <span class="num-sm">@MatchedCount</span> совпавших пунктов профиля из <span class="num-sm">@ProfileItemCount</span>
+                        средняя близость · задето <span class="num-sm">@MatchedCount</span> факторов профиля из <span class="num-sm">@ProfileItemCount</span>
                     </span>
                 }
             </CausalityStep>
@@ -128,7 +128,7 @@
                 else
                 {
                     <span class="strip__impact num-lg">@Fixed2(signal.ImpactScore)</span>
-                    <span class="ui-causality__note">уверенность × чувствительность актива × совпадение по теме</span>
+                    <span class="ui-causality__note">тональность × близость × вес фактора × чувствительность актива</span>
                 }
             </CausalityStep>
 
@@ -350,17 +350,16 @@
                             <text>типичное значение около <span class="num-sm">@Fixed2(TypicalImpact)</span></text>
                         </MetaContent>
                         <ChildContent>
-                            <ZoneScale Value="signal.ImpactScore"
+                            @* Шкала — модуль: знак говорит о направлении, а оно уже
+                               стоит бейджем тональности и числом в полосе связи. *@
+                            <ZoneScale Value="Math.Abs(signal.ImpactScore)"
                                        Min="ImpactMin" Max="ImpactMax"
                                        Zones="ImpactZones"
                                        Note="@ImpactNote" />
                         </ChildContent>
                     </Panel>
 
-                    @* Сработавшие факторы. Список формулировок и фрагментов
-                       совпадения анализатор пока не возвращает — из
-                       AspectMatchResult приходят только количества, поэтому
-                       здесь честная сводка, а не выдуманные строки. *@
+                    @* Сработавшие факторы — те, чья близость к новости выше порога. *@
                     <Panel Title="Сработавшие факторы профиля" Class="rise rise-5" Flush="true">
                         <MetaContent>
                             <text>профиль собран на «Создании актива»</text>
@@ -374,7 +373,7 @@
                                         <div class="factor">
                                             <span class="badge badge--@factor.Tone factor__kind">@factor.KindName</span>
                                             <span class="factor__text" title="@factor.Text">@factor.Text</span>
-                                            <span class="factor__excerpt">совпало с «@factor.Excerpt»</span>
+                                            <span class="factor__excerpt">близость <span class="num-sm">@Fixed2(factor.Similarity)</span> · вес <span class="num-sm">@Fixed2(factor.Importance)</span></span>
                                         </div>
                                     }
                                 </div>
@@ -382,15 +381,9 @@
                             else
                             {
                                 <div class="factors-summary">
-                                    <div class="factors-summary__counts">
-                                        <span class="factors-summary__count">позитивных <span class="num-sm">@signal.PositiveMatches</span></span>
-                                        <span class="factors-summary__count">негативных <span class="num-sm">@signal.NegativeMatches</span></span>
-                                        <span class="factors-summary__count">рисков <span class="num-sm">@signal.RiskMatches</span></span>
-                                    </div>
                                     <p class="factors-summary__note">
-                                        Какие именно формулировки профиля сработали и с каким фрагментом новости
-                                        они совпали, анализатор пока не сообщает — из разбора приходят только
-                                        количества.
+                                        Ни один фактор профиля не оказался близок к новости по смыслу — сила
+                                        влияния нулевая, цену двигает только тональность.
                                     </p>
                                 </div>
                             }
@@ -446,31 +439,12 @@
                                         <span class="profile__meta">затронуто <span class="num-sm">@TouchedFactorCount</span></span>
                                     }
                                 </div>
-                                <BalanceBar Positive="profile.PositiveFactors.Count"
-                                            Negative="profile.NegativeFactors.Count"
+                                <BalanceBar Positive="profile.PositiveFactors.Count()"
+                                            Negative="profile.NegativeFactors.Count()"
                                             PositiveLabel="позитивных"
                                             NegativeLabel="негативных"
                                             HighlightPositive="@(TouchedKind == NewsFactorKind.Positive)"
                                             HighlightNegative="@(TouchedKind == NewsFactorKind.Negative)" />
-
-                                @* Риск — не встречная величина, в полосу баланса он не входит.
-                                   Своя дорожка того же веса под полосой: геометрия общая,
-                                   заливки нет — видно, что это условие, а не факт. *@
-                                <div class="risks">
-                                    <span class="risks__count num-sm">@profile.Risks.Count</span>
-                                    <span class="risks__label">@RiskWord</span>
-                                    <span class="risks__hint">условия, а не факты</span>
-                                </div>
-                            </section>
-
-                            <section class="profile__block hairline-top">
-                                <span class="label">Ключевые слова</span>
-                                <div class="profile__chips">
-                                    @foreach (var keyword in profile.Keywords)
-                                    {
-                                        <span class="chip">@keyword</span>
-                                    }
-                                </div>
                             </section>
                         </div>
                     </ChildContent>
@@ -553,12 +527,9 @@
     private int AnalyzedLength => analyzedText?.Length ?? 0;
 
     private int MatchedCount =>
-        signal is null ? 0 : signal.PositiveMatches + signal.NegativeMatches + signal.RiskMatches;
+        signal is null ? 0 : signal.PositiveMatches + signal.NegativeMatches;
 
-    private int ProfileItemCount =>
-        CurrentAsset.Profile.PositiveFactors.Count +
-        CurrentAsset.Profile.NegativeFactors.Count +
-        CurrentAsset.Profile.Risks.Count;
+    private int ProfileItemCount => CurrentAsset.Profile.Factors.Count;
 
     private string PolarityName => signal?.Polarity switch
     {
@@ -590,13 +561,6 @@
                 : "высокая";
         }
     }
-
-    private string RiskWord => CurrentAsset.Profile.Risks.Count switch
-    {
-        1 => "риск",
-        >= 2 and <= 4 => "риска",
-        _ => "рисков"
-    };
 
     private AgentSnapshot? NewsAgent =>
         latestMarket?.Agents.FirstOrDefault(agent => agent.Type == AgentType.NewsDriven);
@@ -702,29 +666,15 @@
     /// пустым, потому что сопоставитель возвращал одни количества, и панель во
     /// всех состояниях показывала пустое состояние (пункт 67 бэклога).
     ///
-    /// Ключевые слова в этот список не идут: они говорят «новость про этот
-    /// актив», а не «новость его хвалит», и стоят отдельными чипами в правом
-    /// рельсе. Смешать их с факторами значило бы покрасить в тон то, что тона
-    /// не имеет (раздел 3).
     /// </summary>
     private IReadOnlyList<MatchedFactor> MatchedFactors =>
         signal?.Factors
-            .Where(factor => factor.Kind != NewsFactorKind.Keyword)
             .Select(factor => new MatchedFactor(
                 factor.Text,
-                factor.Kind switch
-                {
-                    NewsFactorKind.Positive => "up",
-                    NewsFactorKind.Negative => "down",
-                    _ => "warn"
-                },
-                factor.Kind switch
-                {
-                    NewsFactorKind.Positive => "позитивный",
-                    NewsFactorKind.Negative => "негативный",
-                    _ => "риск"
-                },
-                factor.Excerpt))
+                factor.Kind == NewsFactorKind.Positive ? "up" : "down",
+                factor.Kind == NewsFactorKind.Positive ? "позитивный" : "негативный",
+                factor.Similarity,
+                factor.Importance))
             .ToArray()
         ?? [];
 
@@ -811,9 +761,7 @@
 
         try
         {
-            await Task.Yield();
-
-            var result = NewsProcessingService.Analyze(new NewsAnalysisRequest
+            var result = await NewsProcessingService.AnalyzeAsync(new NewsAnalysisRequest
             {
                 NewsText = text,
                 Profile = CurrentAsset.Profile
@@ -877,6 +825,6 @@
 
     private static string Sign(decimal value) => value > 0m ? "+" : value < 0m ? "−" : string.Empty;
 
-    /// <param name="Kind">up · down · warn — бейдж сработавшего фактора окрашен (раздел 3).</param>
-    private sealed record MatchedFactor(string Text, string Tone, string KindName, string Excerpt);
+    /// <param name="Tone">up · down — бейдж сработавшего фактора окрашен (раздел 3).</param>
+    private sealed record MatchedFactor(string Text, string Tone, string KindName, decimal Similarity, decimal Importance);
 }

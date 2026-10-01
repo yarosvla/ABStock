@@ -68,11 +68,6 @@
                         </div>
                     </div>
 
-                    <div class="loading__chips">
-                        <Skeleton Width="96px" Height="22px" Radius="var(--r-pill)" />
-                        <Skeleton Width="124px" Height="22px" Radius="var(--r-pill)" />
-                        <Skeleton Width="88px" Height="22px" Radius="var(--r-pill)" />
-                    </div>
                 </div>
             }
             else
@@ -147,7 +142,7 @@
                                 {
                                     <span id="asset-description-error" class="field__error">
                                         <Icon Name="alert" Size="14" />
-                                        <span>Слишком коротко: нужно не меньше @MinDescriptionLength символов, чтобы собрать факторы и риски</span>
+                                        <span>Слишком коротко: нужно не меньше @MinDescriptionLength символов, чтобы собрать факторы</span>
                                     </span>
                                 }
                             </section>
@@ -318,7 +313,7 @@
                 </CausalityStep>
 
                 <CausalityStep Label="Сила влияния новости" Weight="1.15"
-                               Value="уверенность × чувствительность актива × совпадение по теме"
+                               Value="тональность × близость к фактору × вес фактора × чувствительность"
                                Note="чувствительность — постоянный множитель" />
 
                 <CausalityStep Label="Реакция рынка" Weight="1.15"
@@ -333,19 +328,19 @@
                             <span class="label">Баланс факторов</span>
                             <span class="balance__meta">из описания собрано <span class="num-sm">@TotalFactors</span> @FactorWord</span>
                         </div>
-                        <BalanceBar Positive="profile.PositiveFactors.Count" Negative="profile.NegativeFactors.Count" />
+                        <BalanceBar Positive="PositiveFactors.Count" Negative="NegativeFactors.Count" />
                     </section>
 
                     <div class="factors">
                         <Panel Title="Позитивные факторы" Class="factors__panel" Flush="true">
-                            <MetaContent><span class="num-sm">@profile.PositiveFactors.Count</span></MetaContent>
+                            <MetaContent><span class="num-sm">@PositiveFactors.Count</span></MetaContent>
                             <ChildContent>
-                                @if (profile.PositiveFactors.Count > 0)
+                                @if (PositiveFactors.Count > 0)
                                 {
                                     <ul class="factor-list">
-                                        @foreach (var factor in profile.PositiveFactors)
+                                        @foreach (var factor in PositiveFactors)
                                         {
-                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@factor">@factor</span></li>
+                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@FactorTitle(factor)">@factor.Name</span></li>
                                         }
                                     </ul>
                                 }
@@ -357,14 +352,14 @@
                         </Panel>
 
                         <Panel Title="Негативные факторы" Class="factors__panel" Flush="true">
-                            <MetaContent><span class="num-sm">@profile.NegativeFactors.Count</span></MetaContent>
+                            <MetaContent><span class="num-sm">@NegativeFactors.Count</span></MetaContent>
                             <ChildContent>
-                                @if (profile.NegativeFactors.Count > 0)
+                                @if (NegativeFactors.Count > 0)
                                 {
                                     <ul class="factor-list">
-                                        @foreach (var factor in profile.NegativeFactors)
+                                        @foreach (var factor in NegativeFactors)
                                         {
-                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@factor">@factor</span></li>
+                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@FactorTitle(factor)">@factor.Name</span></li>
                                         }
                                     </ul>
                                 }
@@ -375,46 +370,6 @@
                             </ChildContent>
                         </Panel>
                     </div>
-
-                    <section class="aside-row hairline-top">
-                        <div class="aside-row__head">
-                            <span class="label">Риски</span>
-                            <span class="aside-row__hint">условия, а не факты</span>
-                        </div>
-                        <div class="aside-row__body">
-                            @if (profile.Risks.Count > 0)
-                            {
-                                @foreach (var risk in profile.Risks)
-                                {
-                                    <span class="risk">@risk</span>
-                                }
-                            }
-                            else
-                            {
-                                <span class="risk nodata">—</span>
-                            }
-                        </div>
-                    </section>
-
-                    <section class="aside-row aside-row--center hairline-top">
-                        <div class="aside-row__head">
-                            <span class="label">Ключевые слова</span>
-                            <span class="aside-row__hint">сопоставление новости</span>
-                        </div>
-                        <div class="aside-row__body aside-row__body--chips">
-                            @if (profile.Keywords.Count > 0)
-                            {
-                                @foreach (var keyword in profile.Keywords)
-                                {
-                                    <span class="chip">@keyword</span>
-                                }
-                            }
-                            else
-                            {
-                                <span class="nodata">—</span>
-                            }
-                        </div>
-                    </section>
                 </div>
 
                 <Panel Title="Исходное описание" Class="source rise rise-3">
@@ -513,10 +468,9 @@
     // их: каждый пункт отрисовывается ниже из AssetProfile.
     private static readonly PromiseItem[] ProfilePromise =
     [
-        new("Позитивные и негативные факторы", "Что в описании работает на цену актива, а что против неё."),
-        new("Риски", "Условия, при которых оценка актива изменится."),
+        new("Позитивные и негативные факторы", "Что работает на цену актива, а что против неё. С ними по смыслу сопоставляется каждая новость."),
+        new("Вес факторов", "Насколько сильно каждый фактор влияет на цену: от 0 до 1."),
         new("Чувствительность к новостям", "Число от 0,45 до 0,95: насколько сильно новости двигают цену этого актива."),
-        new("Ключевые слова", "По ним новость сопоставляется с активом."),
         new("Тикер", "Система сгенерирует его из названия — вводить не нужно.")
     ];
 
@@ -638,7 +592,7 @@
     private string SourceBadge => IsFallbackProfile ? "Запасной алгоритм" : "Профиль построен AI";
 
     private string SourceNote => IsFallbackProfile
-        ? "Языковая модель была недоступна: профиль собран по ключевым словам описания и отрасли, текст не анализировался."
+        ? "Языковая модель была недоступна: профиль собран по типу актива и отрасли, текст описания не анализировался."
         : $"Профиль построен по описанию · тикер сгенерирован системой · {(ActiveAssetContext.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():d MMMM yyyy, HH:mm:ss}";
 
     /// <summary>
@@ -654,7 +608,13 @@
         ? "Описание можно проанализировать заново, когда модель ответит."
         : "Профиль сохранён. Актив в сессии один — торги пойдут по нему.";
 
-    private int TotalFactors => (profile?.PositiveFactors.Count ?? 0) + (profile?.NegativeFactors.Count ?? 0);
+    private IReadOnlyList<AssetFactor> PositiveFactors => profile?.PositiveFactors.ToArray() ?? [];
+
+    private IReadOnlyList<AssetFactor> NegativeFactors => profile?.NegativeFactors.ToArray() ?? [];
+
+    private int TotalFactors => profile?.Factors.Count ?? 0;
+
+    private static string FactorTitle(AssetFactor factor) => $"{factor.Name} · вес {factor.Importance:F2}";
 
     private string FactorWord => (TotalFactors % 100 is >= 11 and <= 14) switch
     {
@@ -820,8 +780,8 @@
     }
 
     /// <summary>
-    /// Состояние загрузки остаётся: разбор описания станет асинхронным, и
-    /// скелетон по форме будущего профиля работает и сейчас, и тогда.
+    /// Генерация профиля моделью идёт десятки секунд — всё это время на
+    /// экране скелетон по форме будущего профиля.
     /// </summary>
     private async Task GenerateProfileAsync()
     {
@@ -834,15 +794,10 @@
         isIndustryOpen = false;
         StateHasChanged();
 
-        // Уступаем поток, чтобы скелетон успел отрисоваться. Когда разбор
-        // описания станет асинхронным, здесь будет await настоящего вызова,
-        // и состояние загрузки заработает без правок разметки.
-        await Task.Yield();
-
         try
         {
             var draft = BuildDraft();
-            var generated = AssetProfileService.CreateProfile(new AssetProfileRequest
+            var generated = await AssetProfileService.CreateProfileAsync(new AssetProfileRequest
             {
                 AssetType = draft.AssetType,
                 Name = draft.Name,

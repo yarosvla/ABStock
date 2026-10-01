@@ -4,18 +4,18 @@ public record AssetProfile(
     string Name,
     AssetType AssetType,
     string Description,
-    IReadOnlyList<string> PositiveFactors,
-    IReadOnlyList<string> NegativeFactors,
-    IReadOnlyList<string> Risks,
-    decimal NewsSensitivity,
-    IReadOnlyList<string> Keywords
+    IReadOnlyList<AssetFactor> Factors,
+    decimal NewsSensitivity
 )
 {
     /// <summary>
-    /// Чем собран профиль. Значение по умолчанию — <see cref="ProfileSource.Ai"/>:
-    /// сегодня разбор описания единственный, а когда появится реальный вызов
-    /// модели, генератор будет выставлять <see cref="ProfileSource.Fallback"/>
-    /// при неудаче, и интерфейс покажет это без переделки.
+    /// Чем собран профиль. Модель недоступна (нет ключа, не отвечает
+    /// Python-сервис) — генератор ставит <see cref="ProfileSource.Fallback"/>,
+    /// и интерфейс показывает запасной профиль без переделки.
     /// </summary>
     public ProfileSource Source { get; init; } = ProfileSource.Ai;
+
+    public IEnumerable<AssetFactor> PositiveFactors => Factors.Where(factor => factor.IsPositive);
+
+    public IEnumerable<AssetFactor> NegativeFactors => Factors.Where(factor => !factor.IsPositive);
 }

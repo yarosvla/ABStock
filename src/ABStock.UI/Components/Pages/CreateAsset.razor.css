@@ -489,37 +489,6 @@
     text-wrap: pretty;
 }
 
-/* ---------- риски и ключевые слова: хайрлайн вместо коробки (7.2) ---------- */
-.aside-row {
-    display: flex;
-    gap: var(--s-5);
-    padding-top: var(--s-3);
-}
-
-.aside-row--center { align-items: center; }
-
-.aside-row__head {
-    flex: none;
-    width: 128px;
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-1);
-}
-
-.aside-row__hint { font: var(--t-caption); color: var(--text-quiet); }
-
-.aside-row__body {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-1);
-}
-
-.aside-row__body--chips { flex-direction: row; flex-wrap: wrap; }
-
-.risk { font: var(--t-body-sm); color: var(--text-2); text-wrap: pretty; }
-
 /* ---------- исходное описание ---------- */
 .source__text {
     margin: 0;
@@ -589,8 +558,6 @@
     padding: var(--s-4) var(--s-5);
 }
 
-.loading__chips { display: flex; gap: var(--s-2); }
-
 .sr-only {
     position: absolute;
     width: 1px;
@@ -658,5 +625,4 @@
     .layout { grid-template-columns: minmax(0, 1fr); }
     .params { grid-template-columns: 1fr 1fr; }
     .asset { gap: var(--s-3); }
-    .aside-row__head { width: 112px; }
 }

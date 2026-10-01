@@ -21,7 +21,7 @@ StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configurat
 
 // Add services to the container.
 builder.Services.AddABStockApplication();
-builder.Services.AddABStockAI();
+builder.Services.AddABStockAI(builder.Configuration);
 builder.Services.AddABStockPersistence(
     builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
 // Актив сессии — singleton, как и сама симуляция: актив в сессии один, и он
