@@ -1,0 +1,168 @@
+@using ABStock.UI.Services
+@using static ABStock.UI.Services.NumberFormat
+@implements IDisposable
+@inject IAssetRegistry Registry
+@inject ISessionMarkets Markets
+
+@* Свитчер актива — раздел 9.24. Имя актива в крошках открывает список
+   активов сессии. Поповер — стекло: под ним проезжает экран (раздел 6).
+   Esc и клик мимо закрывают, стрелки ходят по строкам. *@
+
+<span class="ui-switch">
+    <button class="ui-switch__trigger @(isOpen ? "is-open" : null)" type="button"
+            aria-haspopup="listbox" aria-expanded="@(isOpen ? "true" : "false")"
+            @onclick="Toggle">
+        <span class="ui-switch__ticker">@Current?.Symbol</span>
+        @(Current?.Name ?? CurrentSymbol)
+        <Icon Name="chevron-down" Size="14" />
+    </button>
+
+    @if (isOpen)
+    {
+        <span class="ui-switch__layer" @onclick="Close"></span>
+        <span class="ui-switch__popover glass" role="dialog" aria-label="Активы сессии" @onkeydown="HandleKey">
+            <span class="ui-switch__head">
+                <span class="label">Активы сессии</span>
+                <span class="ui-switch__summary">@Summary</span>
+            </span>
+            <span class="ui-switch__list" role="listbox">
+                @for (var i = 0; i < Rows.Count; i++)
+                {
+                    var row = Rows[i];
+                    var index = i;
+                    var selected = string.Equals(row.Asset.Symbol, CurrentSymbol, StringComparison.OrdinalIgnoreCase);
+
+                    <a class="ui-switch__row @(selected ? "is-current" : null)" role="option"
+                       aria-selected="@(selected ? "true" : "false")"
+                       href="@HrefFor(row)" @ref="rowRefs[index]" @onclick="Close">
+                        <Ticker Symbol="@row.Asset.Symbol" />
+                        <span class="ui-switch__name">
+                            <span class="ui-switch__title @(row.Market is null ? "is-muted" : null)">@row.Asset.Name</span>
+                            @if (row.Market is null)
+                            {
+                                <span class="ui-switch__sub">@(Markets.HasSession ? "не торговался" : "торги не запускались")</span>
+                            }
+                        </span>
+                        @if (row.Market is { } market)
+                        {
+                            <span class="ui-switch__price num-sm">@Price2(market.LastPrice)</span>
+                            <span class="ui-switch__delta num-xs @DeltaTone(market.Change)">@Sign(market.ChangePercent)@Percent2(Math.Abs(market.ChangePercent)) %</span>
+                        }
+                        else
+                        {
+                            <span class="ui-switch__price">
+                                <span class="num-sm ui-switch__start">@Price2(row.Asset.StartPrice)</span>
+                                <span class="ui-switch__sub">стартовая</span>
+                            </span>
+                            <span></span>
+                        }
+                        <span class="ui-switch__check">
+                            @if (selected)
+                            {
+                                <Icon Name="check" Size="14" />
+                            }
+                        </span>
+                    </a>
+                }
+            </span>
+            <span class="ui-switch__foot">
+                <a class="ui-switch__all" href="/assets" @onclick="Close">Все активы</a>
+                <AppButton Variant="secondary" Size="26" Icon="plus"
+                           Href="@(Registry.IsFull ? null : "/assets/new")" Disabled="Registry.IsFull"
+                           title="@(Registry.IsFull ? $"В сессии уже {IAssetRegistry.Limit} активов — это предел" : null)">
+                    Создать актив
+                </AppButton>
+            </span>
+        </span>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string CurrentSymbol { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Куда ведёт строка актива с рынком: «Торги» ведут на торги, профиль —
+    /// на профиль. Актив без рынка всегда ведёт на профиль — торговать им нечем.
+    /// </summary>
+    [Parameter] public string Target { get; set; } = "trading";
+
+    private bool isOpen;
+    private int focused = -1;
+    private readonly Dictionary<int, ElementReference> rowRefs = [];
+
+    private sealed record Row(SessionAsset Asset, AssetMarket? Market);
+
+    private SessionAsset? Current => Registry.Find(CurrentSymbol);
+
+    private IReadOnlyList<Row> Rows =>
+        Registry.Assets.Select(asset => new Row(asset, Markets.Market(asset.Id))).ToArray();
+
+    private string Summary
+    {
+        get
+        {
+            var total = Registry.Assets.Count;
+            var trading = Markets.IsRunning ? Markets.Markets.Count : 0;
+
+            return trading > 0
+                ? $"{trading} в торгах" + (total > trading ? $" · {total - trading} без рынка" : null)
+                : $"{total} {Plural(total, "актив", "актива", "активов")}";
+        }
+    }
+
+    private string HrefFor(Row row) =>
+        row.Market is not null && Target == "trading"
+            ? $"/trading/{row.Asset.Symbol}"
+            : $"/assets/{row.Asset.Symbol}";
+
+    protected override void OnInitialized()
+    {
+        Registry.Changed += HandleChanged;
+        Markets.Changed += HandleChanged;
+    }
+
+    private void HandleChanged()
+    {
+        if (isOpen)
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void Toggle()
+    {
+        isOpen = !isOpen;
+        focused = -1;
+    }
+
+    private void Close() => isOpen = false;
+
+    private async Task HandleKey(KeyboardEventArgs args)
+    {
+        switch (args.Key)
+        {
+            case "Escape":
+                Close();
+                return;
+            case "ArrowDown":
+                focused = Math.Min(focused + 1, Rows.Count - 1);
+                break;
+            case "ArrowUp":
+                focused = Math.Max(focused - 1, 0);
+                break;
+            default:
+                return;
+        }
+
+        if (rowRefs.TryGetValue(focused, out var element))
+        {
+            await element.FocusAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        Registry.Changed -= HandleChanged;
+        Markets.Changed -= HandleChanged;
+    }
+}
