@@ -8,4 +8,7 @@ public sealed record SimulationDebugOrderRequest(
     OrderType Type,
     decimal? Price,
     decimal Quantity
-);
+)
+{
+    public Guid? AssetId { get; init; }
+}

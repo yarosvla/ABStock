@@ -9,4 +9,7 @@ public record SimulationConfig(
     decimal StartPrice,
     TimeSpan TickInterval,
     IReadOnlyList<AgentSpec> Agents
-);
+)
+{
+    public Guid? AssetId { get; init; }
+}

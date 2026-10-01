@@ -22,6 +22,9 @@ public abstract class AgentBase : ITradeAgent
 
     public abstract AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal);
 
+    public virtual AgentDecision Decide(AgentMarketContext context, NewsSignal? newsSignal) =>
+        Decide(context.Snapshot, newsSignal);
+
     protected bool CanBuy(decimal price, decimal quantity) => State.AvailableCash >= price * quantity;
 
     protected bool CanSell(decimal quantity) => State.AvailablePosition >= quantity;

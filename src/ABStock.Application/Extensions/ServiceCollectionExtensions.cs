@@ -25,6 +25,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton<IAgentStatisticsReader, NullAgentStatisticsReader>();
         services.TryAddSingleton<SimulationRunner>();
         services.TryAddSingleton<ISimulationRunner>(provider => provider.GetRequiredService<SimulationRunner>());
+        services.TryAddSingleton<IMultiAssetSimulationRunner>(provider => provider.GetRequiredService<SimulationRunner>());
         return services;
     }
 }
