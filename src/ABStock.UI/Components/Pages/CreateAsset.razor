@@ -1,4 +1,5 @@
 @page "/create-asset"
+@page "/assets/new"
 @rendermode InteractiveServer
 @using ABStock.AI.Models
 @using ABStock.AI.Services
@@ -7,6 +8,7 @@
 @using ABStock.UI.Services
 @inject IAssetProfileService AssetProfileService
 @inject IActiveAssetContext ActiveAssetContext
+@inject IAssetRegistry Registry
 @inject INotificationFeed NotificationFeed
 @inject ISimulationRunner SimulationRunner
 
@@ -15,7 +17,7 @@
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
 <div class="create-shell">
-    <TopNavigation ActivePage="CreateAsset" ShowClock="true" />
+    <TopNavigation ActivePage="Assets" ShowClock="true" />
 
     <main class="create-page">
 
@@ -746,10 +748,10 @@
             return Task.CompletedTask;
         }
 
-        if (SimulationRunner.IsRunning)
+        // Подтверждения «новый актив прервёт торги» больше нет: актив
+        // вступает в идущие торги, ничего не прерывая.
+        if (Registry.IsFull)
         {
-            isConfirmOpen = true;
-            isConfirmFocused = false;
             return Task.CompletedTask;
         }
 
@@ -811,12 +813,21 @@
             profile = generated;
             ActiveAssetContext.SetProfile(draft, generated);
 
-            // У контекста актива нет события об изменении, поэтому подпиской
-            // создание актива не поймать: о нём сообщает страница, как
-            // «Новости» сообщают ленте о введённой новости.
-            NotificationFeed.NoteAssetCreated(
-                draft.Name,
-                ActiveAssetDefaults.BuildSymbol(draft.Name));
+            // Профиль уходит в каталог бэкенда: с этого момента актив есть
+            // у сессии, а если торги идут — сразу торгуется (DESIGN.md 16).
+            var created = Registry.Add(
+                new AssetDraft(draft.Name, draft.Description, draft.AssetType, draft.Industry,
+                    draft.IncludeGovernmentSupport, draft.GrowthPotential),
+                generated);
+
+            // Уведомление пишет страница: у реестра есть событие, но
+            // колокольчик — про то, что сделал человек, а не про любое
+            // изменение каталога.
+            NotificationFeed.NoteAssetCreated(draft.Name, created.Symbol);
+
+            // Актив отдан реестру: следующий заход на «Новый актив» — с
+            // чистого листа, а не с профилем только что созданного.
+            ActiveAssetContext.Clear();
         }
         finally
         {

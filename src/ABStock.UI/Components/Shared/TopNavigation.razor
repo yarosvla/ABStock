@@ -130,7 +130,7 @@
 }
 
 @code {
-    [Parameter] public string ActivePage { get; set; } = "CreateAsset";
+    [Parameter] public string ActivePage { get; set; } = "Assets";
     [Parameter] public bool ShowClock { get; set; } = false;
 
     /// <summary>
@@ -143,7 +143,9 @@
     // Ровно пять разделов — раздел 16.
     private static readonly NavSection[] Sections =
     [
-        new("CreateAsset", "/create-asset", "Создание актива"),
+        // «Создание актива» вложено в «Активы» (DESIGN.md 16): раздел — пульт
+        // сессии, создание — его действие.
+        new("Assets", "/assets", "Активы"),
         new("Trading", "/trading", "Торги"),
         new("News", "/news", "Новости"),
         new("Agents", "/agents", "Агенты"),

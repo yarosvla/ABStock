@@ -1,0 +1,486 @@
+@page "/assets"
+@rendermode InteractiveServer
+@using ABStock.Shared
+@using ABStock.UI.Services
+@using static ABStock.UI.Services.NumberFormat
+@implements IDisposable
+@inject IAssetRegistry Registry
+@inject ISessionMarkets Markets
+@inject ISessionEvents Events
+@inject IAgentComposition Composition
+@inject NavigationManager Navigation
+
+<PageTitle>Активы</PageTitle>
+
+@{
+    var assets = Registry.Assets;
+    var isRunning = Markets.IsRunning;
+    var hadSession = Markets.HasSession;
+    var isEmpty = assets.Count == 0;
+    var isIdle = !isEmpty && !hadSession;
+    var news = Events.News.FirstOrDefault();
+    var half = SparkHalfRange;
+}
+
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
+
+<div class="assets-shell">
+    <TopNavigation ActivePage="Assets" ShowClock="true" />
+
+    <main class="assets-page">
+
+        @* Чипа сессии здесь нет: время сессии показывает пульт справа (раздел 13). *@
+        <Breadcrumbs Items="@(new Crumb[] { new("Активы") })" />
+
+        <PageHead Title="Активы">
+            <Context>@PageContext</Context>
+            <Actions>
+                @if (!isEmpty)
+                {
+                    <AppButton Variant="secondary" Icon="plus" Href="@(Registry.IsFull ? null : "/assets/new")"
+                               Disabled="Registry.IsFull"
+                               title="@(Registry.IsFull ? $"В сессии уже {IAssetRegistry.Limit} активов — это предел" : null)">
+                        Создать актив
+                    </AppButton>
+                }
+            </Actions>
+        </PageHead>
+
+        <div class="assets-layout">
+            <div class="assets-main">
+                <Panel Title="Активы сессии" Flush="true" Class="rise rise-1">
+                    <MetaContent>
+                        @if (hadSession && !isEmpty)
+                        {
+                            <text>общая шкала ±<span class="num-xs">@half.ToString("0.0")</span> % · пунктир — открытие</text>
+                        }
+                        else if (isIdle)
+                        {
+                            <text>стартовую цену считает система</text>
+                        }
+                        else
+                        {
+                            <text>до <span class="num-xs">@IAssetRegistry.Limit</span> активов в сессии</text>
+                        }
+                    </MetaContent>
+                    <ChildContent>
+                        @if (isEmpty)
+                        {
+                            <div class="assets-empty">
+                                <EmptyState IconName="plus" Title="Активов пока нет"
+                                            Description="Опишите компанию своими словами — система соберёт профиль и придумает тикер. Агенты торгуют всеми активами сессии сразу.">
+                                    <Action>
+                                        <AppButton Variant="primary" Href="/assets/new">Создать актив</AppButton>
+                                    </Action>
+                                </EmptyState>
+                            </div>
+                        }
+                        else if (hadSession)
+                        {
+                            <div class="arows" role="table" aria-label="Активы сессии">
+                                <div class="arow arow--head arow--live" role="row">
+                                    <span class="label" role="columnheader">Актив</span>
+                                    <span class="label right" role="columnheader">Цена, ₽</span>
+                                    <span class="label" role="columnheader">С открытия</span>
+                                    <span class="label right" role="columnheader">Объём, шт</span>
+                                    <span class="label" role="columnheader">@(news is null ? "Новость" : $"Новость в {news.At:HH:mm}")</span>
+                                    <span role="columnheader"><span class="visually-hidden">Открыть</span></span>
+                                </div>
+
+                                @foreach (var asset in assets)
+                                {
+                                    var market = Markets.Market(asset.Id);
+                                    var signal = news?.Fan?.For(asset.Symbol);
+
+                                    <a class="arow arow--live" role="row" href="@RowHref(asset, market)">
+                                        <span role="cell"><AssetCell Symbol="@asset.Symbol" Name="@asset.Name" Sub="@AgentDisplay.GetAssetTypeLabel(asset.AssetType)" Muted="market is null" /></span>
+
+                                        @if (market is not null)
+                                        {
+                                            <span class="arow__price" role="cell">
+                                                <span class="num-lg @(isRunning ? null : "t2")">@Price2(market.LastPrice)</span>
+                                                <span class="nowrap">
+                                                    <span class="num-sm @DeltaTone(market.Change)">@Sign(market.ChangePercent)@Percent2(Math.Abs(market.ChangePercent)) %</span>
+                                                    <span class="num-xs quiet">@Sign(market.Change)@Price2(Math.Abs(market.Change))</span>
+                                                </span>
+                                            </span>
+                                            <span role="cell"><Sparkline Prices="market.Prices" Open="market.Open" HalfRange="half" Height="40" /></span>
+                                            <span class="arow__stat" role="cell">
+                                                <span class="num-md t1">@Count0(market.Volume)</span>
+                                                <span class="caption nowrap"><span class="num-xs">@Count0(market.TradeCount)</span> @Plural(market.TradeCount, "сделка", "сделки", "сделок")</span>
+                                            </span>
+                                            <span role="cell">
+                                                @if (signal is null)
+                                                {
+                                                    <span class="nodata">—</span>
+                                                }
+                                                else
+                                                {
+                                                    <ZoneMeter Value="signal.Impact" Min="ImpactScale.Min" Max="ImpactScale.Max"
+                                                               Zones="ImpactScale.Zones" MissingText="не задет" Subject="Сила влияния новости" />
+                                                }
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            @* Актив создан после остановки: в итоге сессии его нет,
+                                               и вместо хода с открытия — стартовая цена. *@
+                                            <span class="arow__price" role="cell">
+                                                <span class="num-lg t3">@Price2(asset.StartPrice)</span>
+                                                <span class="caption">стартовая</span>
+                                            </span>
+                                            <span role="cell"><Badge Tone="wait">не торговался</Badge></span>
+                                            <span class="nodata right" role="cell">—</span>
+                                            <span class="caption" role="cell">войдёт в новую сессию</span>
+                                        }
+
+                                        <span class="arow__go" role="cell" aria-hidden="true"><Icon Name="chevron-right" Size="16" /></span>
+                                    </a>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="arows" role="table" aria-label="Активы сессии">
+                                <div class="arow arow--head arow--idle" role="row">
+                                    <span class="label" role="columnheader">Актив</span>
+                                    <span class="label right" role="columnheader">Старт, ₽</span>
+                                    <span class="label" role="columnheader">Чувствительность</span>
+                                    <span class="label" role="columnheader" title="Условия, а не факты: что может толкнуть цену актива">Факторы профиля</span>
+                                    <span role="columnheader"><span class="visually-hidden">Открыть</span></span>
+                                </div>
+
+                                @foreach (var asset in assets)
+                                {
+                                    var profile = asset.Profile;
+                                    var positive = profile.PositiveFactors.Count();
+                                    var negative = profile.NegativeFactors.Count();
+
+                                    <a class="arow arow--idle" role="row" href="@($"/assets/{asset.Symbol}")">
+                                        <span role="cell"><AssetCell Symbol="@asset.Symbol" Name="@asset.Name" Sub="@AgentDisplay.GetAssetTypeLabel(asset.AssetType)" /></span>
+                                        <span class="num-lg right" role="cell">@Price2(asset.StartPrice)</span>
+                                        <span role="cell">
+                                            <ZoneMeter Value="profile.NewsSensitivity" Min="SensitivityScale.Min" Max="SensitivityScale.Max"
+                                                       Zones="SensitivityScale.Zones" Subject="Чувствительность к новостям" />
+                                        </span>
+                                        <span role="cell">
+                                            <BalanceBar Positive="positive" Negative="negative" Class="arow__balance" />
+                                        </span>
+                                        <span class="arow__go" role="cell" aria-hidden="true"><Icon Name="chevron-right" Size="16" /></span>
+                                    </a>
+                                }
+                            </div>
+                        }
+                    </ChildContent>
+                </Panel>
+
+                @* Последняя новость: текст и что сделали агенты. Силу по активам
+                   показывает колонка таблицы — второго веера здесь нет. *@
+                @if (hadSession && news?.Fan is { } fan)
+                {
+                    var reaction = Events.ReactionTo(news);
+                    var lead = fan.Lead;
+
+                    <Panel Class="rise rise-2" Flush="true">
+                        <Head>
+                            <span class="assets-news__title">
+                                <h2>Последняя новость</h2>
+                                <Badge Tone="@Badge.ForPolarity(fan.Polarity)">@Badge.LabelOf(fan.Polarity)</Badge>
+                            </span>
+                            <a class="ui-panel__meta assets-news__link" href="/news">разбор и все новости →</a>
+                        </Head>
+                        <ChildContent>
+                            <div class="assets-news">
+                                <div class="assets-news__text">
+                                    <span class="caption">
+                                        <span class="num-xs t2">@news.At.ToString("HH:mm")</span> ·
+                                        уверенность модели <span class="num-xs t2">@fan.Confidence.ToString("F2")</span> ·
+                                        задела @fan.Hit.Count() @Plural(fan.Hit.Count(), "актив", "актива", "активов") из @fan.Assets.Count(row => row.WasAnalyzed)
+                                    </span>
+                                    <p class="assets-news__body" title="@news.Text">@news.Text</p>
+                                </div>
+                                <span class="assets-news__rule" aria-hidden="true"></span>
+                                <div class="assets-news__text">
+                                    <span class="caption">Что сделали агенты</span>
+                                    @if (reaction is not null)
+                                    {
+                                        <span class="assets-news__agents">
+                                            <StatusDot Tone="agent-news" />
+                                            Новостные @(reaction.Action == TradeAction.Buy ? "купили" : "продали") @reaction.Symbol@(reaction.Symbol == lead?.Symbol ? " — задет сильнее всего" : null)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="assets-news__agents t3">Новостные агенты на неё пока не ответили</span>
+                                    }
+                                    @if (lead is not null && LeadMove(news, lead.Symbol) is { } move)
+                                    {
+                                        <span class="caption">
+                                            @lead.Symbol после новости
+                                            <span class="num-xs @DeltaTone(move.To - move.From)">@Price2(move.From) → @Price2(move.To)</span>
+                                        </span>
+                                    }
+                                    else if (lead is null)
+                                    {
+                                        <span class="caption">Новость не задела ни один актив</span>
+                                    }
+                                </div>
+                            </div>
+                        </ChildContent>
+                    </Panel>
+                }
+            </div>
+
+            @* Правый рельс — пульт сессии: состояние на сейчас (раздел 13). *@
+            <Panel Title="Сессия" Flush="true" Class="assets-console rise rise-2">
+                <MetaContent>@ConsoleMeta</MetaContent>
+                <ChildContent>
+                    @if (hadSession)
+                    {
+                        <div class="console__hero">
+                            <span class="console__timer">@(SessionClock.Format(Markets) ?? "—")</span>
+                            <span class="caption">
+                                @(isRunning ? null : "длилась · ")сделок <span class="num-xs">@Count0(Markets.Markets.Sum(market => market.TradeCount))</span>
+                                · новостей <span class="num-xs">@Events.News.Count</span>
+                            </span>
+                        </div>
+                    }
+                    else if (isIdle)
+                    {
+                        <div class="console__hero">
+                            <span class="console__title">Готово к запуску</span>
+                            <span class="caption">
+                                <span class="num-xs">@assets.Count</span> @Plural(assets.Count, "актив", "актива", "активов") ·
+                                <span class="num-xs">@Composition.TotalCount</span> @Plural(Composition.TotalCount, "агент", "агента", "агентов")
+                            </span>
+                        </div>
+                    }
+
+                    <div class="console__section @(isEmpty ? "console__section--first" : null)">
+                        <span class="label">Состав агентов</span>
+                        <span class="caption">
+                            <span class="num-xs t1">@Composition.TotalCount</span> @Plural(Composition.TotalCount, "агент", "агента", "агентов") ·
+                            <span class="num-xs t1">@Money0(Composition.TotalCapital)</span> ₽
+                        </span>
+                    </div>
+                    <CapitalBar Rows="Composition.Rows" Class="console__capbar" />
+
+                    <div class="console__roster console__roster--head" role="row">
+                        <span class="label">Тип</span>
+                        <span class="label center">Кол-во</span>
+                        <span class="label right">Капитал, ₽</span>
+                    </div>
+                    @foreach (var row in Composition.Rows)
+                    {
+                        var label = AgentDisplay.GetTypeLabel(row.Type);
+
+                        <div class="console__roster @(row.Count == 0 ? "is-off" : null)">
+                            <span class="console__type"><StatusDot Tone="@AgentDisplay.GetTypeTone(row.Type)" />@label</span>
+                            @if (isRunning)
+                            {
+                                <span class="num-sm t2 center">×@row.Count</span>
+                                <span class="num-sm t1 right">@Money0(row.Capital)</span>
+                            }
+                            else
+                            {
+                                <NumberStepper Value="row.Count"
+                                               ValueChanged="@(value => Composition.SetCount(row.Type, value ?? row.Count))"
+                                               Min="0" Max="IAgentComposition.MaxPerType"
+                                               Compact="true"
+                                               Label="@($"Количество агентов: {label}")"
+                                               DecrementLabel="@($"Убрать агента: {label}")"
+                                               IncrementLabel="@($"Добавить агента: {label}")" />
+                                <span class="@(row.HasCapitalError ? "is-error" : null)">
+                                    <NumberStepper Value="@((int)row.Capital)"
+                                                   ValueChanged="@(value => Composition.SetCapital(row.Type, value ?? 0))"
+                                                   Min="0" Max="null" Step="10000"
+                                                   Editable="true" Compact="true" ShowButtons="false"
+                                                   Label="@($"Капитал агента: {label}")"
+                                                   DecrementLabel="@($"Уменьшить капитал: {label}")"
+                                                   IncrementLabel="@($"Увеличить капитал: {label}")" />
+                                </span>
+                            }
+                        </div>
+                    }
+                    <p class="console__note caption">
+                        Капитал — на один экземпляр. На старте у каждого агента — деньги и по
+                        <span class="num-xs t2">@Count0(IAgentComposition.InitialPosition)</span> шт каждого актива в торгах.
+                    </p>
+
+                    <div class="console__foot">
+                        @if (isRunning)
+                        {
+                            <AppButton Variant="primary" Size="40" Icon="square" Class="console__action" OnClick="StopAsync" Loading="isBusy">
+                                Остановить торги
+                            </AppButton>
+                            <p class="caption">Состав меняется после остановки торгов.</p>
+                        }
+                        else
+                        {
+                            <AppButton Variant="primary" Size="40" Icon="play" Class="console__action" OnClick="StartAsync"
+                                       Disabled="@(isEmpty || !Composition.IsValid)" Loading="isBusy"
+                                       title="@(isEmpty ? "Нужен хотя бы один актив" : null)">
+                                Запустить торги
+                            </AppButton>
+                            @if (isEmpty)
+                            {
+                                <p class="caption">Запуск станет доступен, когда появится хотя бы один актив.</p>
+                            }
+                            else if (!Composition.IsValid)
+                            {
+                                <p class="caption console__warn"><Icon Name="alert" Size="14" />@CompositionProblem</p>
+                            }
+                            else if (hadSession)
+                            {
+                                <p class="caption">Новая сессия начнётся с этим составом и всеми @Count0(assets.Count) @Plural(assets.Count, "активом", "активами", "активами").</p>
+                            }
+                        }
+                    </div>
+                </ChildContent>
+            </Panel>
+        </div>
+    </main>
+</div>
+
+@code {
+    private bool isBusy;
+    private PeriodicTimer? clock;
+    private CancellationTokenSource? clockCts;
+
+    protected override void OnInitialized()
+    {
+        Registry.Changed += HandleChanged;
+        Markets.Changed += HandleChanged;
+        Events.Changed += HandleChanged;
+        Composition.Changed += HandleChanged;
+
+        // Таймер пульта тикает раз в секунду, даже когда шаг рынка опоздал:
+        // часы, застывшие на полсекунды, читаются как зависшие торги.
+        clockCts = new CancellationTokenSource();
+        clock = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        _ = TickClockAsync(clockCts.Token);
+    }
+
+    private async Task TickClockAsync(CancellationToken ct)
+    {
+        try
+        {
+            while (clock is not null && await clock.WaitForNextTickAsync(ct))
+            {
+                if (Markets.IsRunning)
+                {
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void HandleChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private string PageContext
+    {
+        get
+        {
+            var assets = Registry.Assets.Count;
+
+            if (Markets.IsRunning)
+            {
+                var trading = Markets.Markets.Count;
+                return $"В торгах {trading} {Plural(trading, "актив", "актива", "активов")}"
+                    + (assets >= IAssetRegistry.Limit ? $" · {assets} из {IAssetRegistry.Limit} — предел сессии" : null);
+            }
+
+            if (Markets.HasSession && Markets.StartedAt is { } started)
+            {
+                var ended = Markets.EndedAt ?? started;
+                return $"Торги остановлены · итоги сессии {started:HH:mm}–{ended:HH:mm}";
+            }
+
+            return "Торги не запущены";
+        }
+    }
+
+    private string? ConsoleMeta =>
+        Markets.IsRunning && Markets.StartedAt is { } started ? $"открыта в {started:HH:mm}"
+        : Markets.HasSession && Markets.EndedAt is { } ended ? $"закрыта в {ended:HH:mm}"
+        : Registry.Assets.Count > 0 ? "не запускалась"
+        : null;
+
+    /// <summary>Общая шкала спарклайнов — по всем рынкам экрана (DESIGN.md 9.25).</summary>
+    private decimal SparkHalfRange =>
+        SparklineScale.HalfRange(Markets.Markets.Select(market => (market.Open, market.Prices)));
+
+    private string CompositionProblem =>
+        Composition.TotalCount < IAgentComposition.MinTotal ? "Нужен хотя бы один агент"
+        : Composition.TotalCount > IAgentComposition.MaxTotal ? $"Не больше {IAgentComposition.MaxTotal} агентов в сессии"
+        : "Капитал агента должен быть больше нуля";
+
+    /// <summary>
+    /// Актив с рынком — на его торги; без рынка — на профиль: торговать им
+    /// нечем, а профиль объясняет, когда он войдёт в торги.
+    /// </summary>
+    private static string RowHref(SessionAsset asset, AssetMarket? market) =>
+        market is null ? $"/assets/{asset.Symbol}" : $"/trading/{asset.Symbol}";
+
+    private (decimal From, decimal To)? LeadMove(SessionEvent news, string symbol)
+    {
+        var asset = Registry.Find(symbol);
+        var market = asset is null ? null : Markets.Market(asset.Id);
+
+        return market is not null && news.PricesAtNews?.TryGetValue(symbol, out var from) == true
+            ? (from, market.LastPrice)
+            : null;
+    }
+
+    private async Task StartAsync()
+    {
+        if (isBusy || Registry.Assets.Count == 0 || !Composition.IsValid)
+        {
+            return;
+        }
+
+        isBusy = true;
+
+        try
+        {
+            await Markets.StartAsync(Composition.ToSpecs());
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        isBusy = true;
+
+        try
+        {
+            await Markets.StopAsync();
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        Registry.Changed -= HandleChanged;
+        Markets.Changed -= HandleChanged;
+        Events.Changed -= HandleChanged;
+        Composition.Changed -= HandleChanged;
+        clockCts?.Cancel();
+        clock?.Dispose();
+        clockCts?.Dispose();
+    }
+}
