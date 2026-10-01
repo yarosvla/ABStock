@@ -44,6 +44,9 @@ builder.Services.AddSingleton<ISessionMarkets, SessionMarkets>();
 builder.Services.AddSingleton<ISessionEvents, SessionEvents>();
 // Состав агентов — один на сессию и живёт в пульте «Активов».
 builder.Services.AddSingleton<IAgentComposition, AgentComposition>();
+// Ввод новости — scoped: состояния у него нет, а анализатор новостей
+// зарегистрирован модулем AI со своим временем жизни.
+builder.Services.AddScoped<INewsDesk, NewsDesk>();
 // Настройки интерфейса — scoped, и это осознанно: источник истины лежит в
 // localStorage браузера, а сервис лишь кэш на время жизни контура. Singleton
 // раздавал бы всем открытым вкладкам чужой акцент, потому что настройки

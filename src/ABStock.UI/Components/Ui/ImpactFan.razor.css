@@ -1,0 +1,207 @@
+/* Веер силы влияния — раздел 9.26. */
+
+.ui-fan {
+    --w-fan-card: 264px;
+    --w-fan-links: 96px;
+    --w-fan-asset: 216px;
+    --w-fan-after: 112px;
+    --h-fan-row: 80px;
+
+    display: grid;
+    grid-template-columns: var(--w-fan-card) var(--w-fan-links) minmax(0, 1fr);
+    padding: var(--s-3) var(--s-5) var(--s-2);
+}
+
+.ui-fan__rowhead,
+.ui-fan__row {
+    display: grid;
+    grid-template-columns: var(--w-fan-asset) minmax(0, 1fr) var(--w-fan-after);
+    column-gap: var(--s-6);
+    align-items: center;
+    padding: 0 var(--s-4);
+}
+
+.ui-fan__rowhead { height: var(--h-thead); }
+.ui-fan__rowhead--foot { height: 22px; align-items: start; }
+
+.ui-fan__names {
+    display: flex;
+    gap: 2px;
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.ui-fan__name { text-align: center; white-space: nowrap; }
+
+/* Карточка новости — вложенная поверхность (раздел 7), по центру веера. */
+.ui-fan__card {
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    padding: var(--s-4);
+    background: var(--gph-800);
+    border: 1px solid var(--line-1);
+    border-radius: var(--r-md);
+}
+
+.ui-fan__card-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.ui-fan__text {
+    margin: 0;
+    font: var(--t-body);
+    color: var(--text-1);
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.ui-fan__links {
+    align-self: start;
+    width: var(--w-fan-links);
+    overflow: visible;
+}
+
+.ui-fan__link { fill: none; stroke: var(--text-3); stroke-linecap: round; }
+.ui-fan__link--lead { stroke: var(--text-1); }
+.ui-fan__link--miss { stroke: var(--line-3); stroke-dasharray: 3 4; }
+.ui-fan__link--off  { stroke: var(--line-2); stroke-dasharray: 2 5; }
+
+.ui-fan__rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.ui-fan__row {
+    height: var(--h-fan-row);
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: background-color var(--d-fast) var(--e-out);
+}
+
+.ui-fan__row:hover { background: var(--gph-750); }
+
+/* Выбранная строка — как строка таблицы (9.8): подложка и полоса слева.
+   Зоны шкалы в ней на ступень плотнее, иначе первая слилась бы с фоном. */
+.ui-fan__row.is-selected {
+    background: var(--gph-700);
+    box-shadow: inset 2px 0 0 var(--acc-line);
+}
+
+.ui-fan__row.is-selected .ui-fan__zone:nth-child(1) { background: var(--zone-2); }
+.ui-fan__row.is-selected .ui-fan__zone:nth-child(2) { background: var(--zone-3); }
+.ui-fan__row.is-selected .ui-fan__zone:nth-child(3) { background: var(--zone-4); }
+
+.ui-fan__row.is-muted { opacity: 0.55; }
+
+.ui-fan__scale {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+}
+
+.ui-fan__head {
+    position: relative;
+    height: var(--s-6);
+}
+
+/* Значение подписано у маркера (9.17) и уходит от него вправо; у правого
+   края — влево, чтобы не вылезти за дорожку. */
+.ui-fan__value {
+    position: absolute;
+    bottom: 2px;
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-2);
+    white-space: nowrap;
+}
+
+.ui-fan__value--end { transform: translateX(-100%); }
+
+.ui-fan__track {
+    position: relative;
+    display: flex;
+    gap: 2px;
+    height: var(--s-3);
+}
+
+.ui-fan__zone { height: 100%; border-radius: 3px; background: var(--zone-1); }
+.ui-fan__zone:nth-child(2) { background: var(--zone-2); }
+.ui-fan__zone:nth-child(3) { background: var(--zone-3); }
+
+.ui-fan__track--off .ui-fan__zone {
+    background: transparent;
+    outline: 1px dashed var(--line-3);
+    outline-offset: -1px;
+}
+
+.ui-fan__mark {
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--text-1);
+}
+
+.ui-fan__mark--below {
+    width: 6px;
+    margin-left: 0;
+    border-radius: 2px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--text-2);
+}
+
+.ui-fan__factors {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ui-fan__after {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    text-align: right;
+}
+
+.ui-fan__ticks {
+    position: relative;
+    height: var(--s-4);
+    font: var(--n-xs);
+    color: var(--text-quiet);
+    font-variant-numeric: tabular-nums;
+}
+
+.ui-fan__tick { position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+.ui-fan__tick--first { left: 0; transform: none; }
+.ui-fan__tick--last  { right: 0; transform: none; }
+
+.caption { font: var(--t-caption); color: var(--text-3); }
+.t1 { color: var(--text-1); }
+.quiet { color: var(--text-quiet); }
+.right { text-align: right; justify-self: end; }
+
+/* Узкий экран (< --bp-md): карточка и связи уже, шкале остаётся не меньше
+   250px (ревью Н-1). */
+@media (max-width: 1439px) {
+    .ui-fan {
+        --w-fan-card: 216px;
+        --w-fan-links: 56px;
+        --w-fan-asset: 188px;
+        --w-fan-after: 96px;
+
+        padding-inline: var(--s-4);
+    }
+
+    .ui-fan__rowhead,
+    .ui-fan__row { column-gap: var(--s-4); padding: 0 var(--s-3); }
+}
