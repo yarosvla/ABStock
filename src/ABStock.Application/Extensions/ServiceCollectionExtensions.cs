@@ -1,3 +1,4 @@
+using ABStock.Application.Assets;
 using ABStock.Application.Simulation;
 using ABStock.Application.MarketHistory;
 using ABStock.Agents;
@@ -12,6 +13,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddABStockApplication(this IServiceCollection services)
     {
         services.AddABStockExchange();
+        services.TryAddSingleton<IAssetCatalog, InMemoryAssetCatalog>();
         services.TryAddSingleton<IAgentFactory, AgentFactory>();
         services.TryAddSingleton<IMarketHistoryStore, NullMarketHistoryStore>();
         services.TryAddSingleton<IMarketCandleReader, NullMarketCandleReader>();
