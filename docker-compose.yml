@@ -1,0 +1,17 @@
+services:
+  abstock:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:5062:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__ABStock: "Data Source=/app/data/abstock.db"
+    volumes:
+      - abstock-data:/app/data
+      - abstock-keys:/home/app/.aspnet/DataProtection-Keys
+
+volumes:
+  abstock-data:
+  abstock-keys:

@@ -279,8 +279,8 @@
    базовой линии: герой-число P/L над таблицей #3FA37A, P/L строки #F0F1F2.
    Пункт 98 docs/ui-backlog.md. Тот же приём уже стоит на «Торгах»
    (.agents__c-num.tone-up) и на детальной (.price__ohlc .num-sm.tone-up). */
-.roster__table .num-sm.tone-up { color: var(--up-500); }
-.roster__table .num-sm.tone-down { color: var(--down-500); }
+.roster__table .num-sm.tone-up { color: var(--up-text); }
+.roster__table .num-sm.tone-down { color: var(--down-text); }
 .roster__table .num-sm.tone-flat { color: var(--text-2); }
 
 /* ---------- строка группы ---------- */

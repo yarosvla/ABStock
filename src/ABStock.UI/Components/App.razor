@@ -7,6 +7,10 @@
     <base href="/" />
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["design-system.css"]" />
+    @* Белая тема (раздел 19) — только переопределение значений под
+       :root[data-theme="light"]. После design-system.css, чтобы при равной
+       специфичности всё равно выигрывала белая. *@
+    <link rel="stylesheet" href="@Assets["design-system-light.css"]" />
     <link rel="stylesheet" href="@Assets["ABStock.UI.styles.css"]" />
     <ImportMap />
     @* Иконка вкладки — раздел 9.22: знак на графитовой подложке, а не знак
@@ -31,6 +35,7 @@
     <script>
         (function () {
             var KEYS = {
+                theme: 'abstock.theme',
                 accent: 'abstock.accent',
                 timeframe: 'abstock.timeframe',
                 notifyTrades: 'abstock.notify.trades',
@@ -40,22 +45,61 @@
             };
             var ACCENTS = ['graphite', 'steel', 'ultramarine', 'azure', 'turquoise',
                            'lavender', 'amethyst', 'orchid', 'brass', 'copper'];
+            var THEMES = ['dark', 'light'];
 
             function read(key) {
                 try { return window.localStorage.getItem(key); } catch (e) { return null; }
             }
 
-            function applyAccent(value) {
-                // Графит — это отсутствие атрибута: :root уже содержит его
-                // значения, и лишний атрибут только даёт второй источник истины.
-                if (value && value !== 'graphite' && ACCENTS.indexOf(value) >= 0) {
-                    document.documentElement.dataset.accent = value;
-                } else {
-                    delete document.documentElement.dataset.accent;
+            // Что ДОЛЖНО стоять на <html>. Атрибут — отражение этого
+            // состояния, а не его источник: см. наблюдатель ниже.
+            var wanted = { theme: null, accent: null };
+
+            function sync(name, value) {
+                var root = document.documentElement;
+                if (value) {
+                    if (root.dataset[name] !== value) { root.dataset[name] = value; }
+                } else if (name in root.dataset) {
+                    delete root.dataset[name];
                 }
             }
 
+            function applyAccent(value) {
+                // Графит — это отсутствие атрибута: :root уже содержит его
+                // значения, и лишний атрибут только даёт второй источник истины.
+                wanted.accent = value && value !== 'graphite' && ACCENTS.indexOf(value) >= 0 ? value : null;
+                sync('accent', wanted.accent);
+            }
+
+            // Тема — раздел 19. Тот же приём, что у акцента: тёмная — это
+            // отсутствие атрибута, белая — data-theme="light" на <html>.
+            // Графики рисуют на холсте и CSS не видят, поэтому смену темы
+            // объявляем событием: скрипты графиков перечитывают токены и
+            // перекрашиваются без перезагрузки. При загрузке события нет —
+            // графиков ещё не существует, и они сразу прочтут нужную тему.
+            function applyTheme(value) {
+                wanted.theme = value && value !== 'dark' && THEMES.indexOf(value) >= 0 ? value : null;
+                sync('theme', wanted.theme);
+            }
+
+            applyTheme(read(KEYS.theme));
             applyAccent(read(KEYS.accent));
+
+            // Переход между разделами — улучшенная навигация Blazor: документ
+            // не перезагружается, а сверяется с ответом сервера, и атрибуты
+            // <html> приводятся к серверным. Сервер темы и акцента не знает
+            // (они в localStorage), поэтому data-theme и data-accent снимались,
+            // а этот скрипт повторно не выполняется — тема сбрасывалась в
+            // тёмную на каждом переходе. Наблюдатель возвращает атрибуты сразу:
+            // его колбэк — микрозадача, она выполняется до отрисовки, и
+            // вспышки графита нет.
+            new MutationObserver(function () {
+                sync('theme', wanted.theme);
+                sync('accent', wanted.accent);
+            }).observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['data-theme', 'data-accent']
+            });
 
             window.abstockPrefs = {
                 get: function (key) { return read(key); },
@@ -65,6 +109,11 @@
                 setAccent: function (value) {
                     applyAccent(value);
                     window.abstockPrefs.set(KEYS.accent, value);
+                },
+                setTheme: function (value) {
+                    applyTheme(value);
+                    window.abstockPrefs.set(KEYS.theme, value);
+                    window.dispatchEvent(new CustomEvent('abstock:themechange'));
                 }
             };
         })();

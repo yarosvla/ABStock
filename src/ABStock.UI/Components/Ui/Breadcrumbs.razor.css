@@ -34,7 +34,7 @@
 .ui-crumbs a:hover { color: var(--text-2); }
 
 /* Icon — дочерний компонент, до него скоуп страницы не достаёт без ::deep. */
-.ui-crumbs ::deep .ui-icon { color: var(--text-4); }
+.ui-crumbs ::deep .ui-icon { color: var(--text-quiet); }
 
 /* Имя актива и его статус — ОДИН элемент пути. Зазор внутри него меньше, чем
    зазор между элементами пути: --s-1 против --s-2 у .ui-crumbs.
@@ -58,7 +58,10 @@
     height: var(--h-chip);
     padding: 0 var(--s-2);
     border-radius: var(--r-pill);
-    background: var(--fill-soft);
+    /* Чип стоит на фоне страницы, не в панели. Кромка — inset-тенью, а не
+       border: размер чипа не меняется, в графите она прозрачная. */
+    background: var(--chip-on-page);
+    box-shadow: inset 0 0 0 1px var(--chip-on-page-edge);
     font: var(--t-caption);
     color: var(--text-2);
 }

@@ -39,7 +39,7 @@
     left: calc(-1 * var(--s-5));
     transform: translateX(-50%);
     font: var(--t-body);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 /* Лейбл переносится по ПРОБЕЛАМ, а не где придётся: на 1280 шесть шагов узкие,

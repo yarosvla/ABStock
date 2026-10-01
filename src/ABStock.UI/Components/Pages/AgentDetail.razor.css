@@ -40,13 +40,12 @@
     --marker-size: 9px;   /* точка легенды под маркер на графике, макет 02 */
 }
 
-/* Цвет маркеров — цвет типа этого агента. Пара «обычный и приглушённый»
-   объявляется один раз на странице и дальше берётся легендой и js-модулем
-   из тех же токенов. */
-.detail-page.agent-trend   { --marker-tone: var(--agent-trend);   --marker-tone-dim: var(--agent-trend-dim); }
-.detail-page.agent-counter { --marker-tone: var(--agent-counter); --marker-tone-dim: var(--agent-counter-dim); }
-.detail-page.agent-mm      { --marker-tone: var(--agent-mm);      --marker-tone-dim: var(--agent-mm-dim); }
-.detail-page.agent-news    { --marker-tone: var(--agent-news);    --marker-tone-dim: var(--agent-news-dim); }
+/* Цвет маркеров — цвет типа этого агента. Объявляется один раз на странице
+   и дальше берётся легендой; js-модуль читает те же токены агента. */
+.detail-page.agent-trend   { --marker-tone: var(--agent-trend);   --marker-sell: var(--agent-trend-mark); }
+.detail-page.agent-counter { --marker-tone: var(--agent-counter); --marker-sell: var(--agent-counter-mark); }
+.detail-page.agent-mm      { --marker-tone: var(--agent-mm);      --marker-sell: var(--agent-mm-mark); }
+.detail-page.agent-news    { --marker-tone: var(--agent-news);    --marker-sell: var(--agent-news-mark); }
 
 /* ============================================================================
    Заголовок: имя экземпляра, чип стратегии, чип состояния
@@ -223,8 +222,8 @@
 
 .price__ohlc small { margin-right: var(--s-2); color: var(--text-3); }
 .price__ohlc .num-sm { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-1); }
-.price__ohlc .num-sm.tone-up { color: var(--up-500); }
-.price__ohlc .num-sm.tone-down { color: var(--down-500); }
+.price__ohlc .num-sm.tone-up { color: var(--up-text); }
+.price__ohlc .num-sm.tone-down { color: var(--down-text); }
 
 .price__stage { height: var(--h-price); }
 
@@ -252,7 +251,14 @@
 }
 
 .marker--buy { background: var(--marker-tone, var(--agent-trend)); }
-.marker--sell { background: var(--marker-tone-dim, var(--agent-trend-dim)); }
+/* Цвет маркера продажи под --sell-marker-opacity, а не -dim: в графите
+   это цвет агента под теми же 30 % (пиксель в пиксель), а белая тема ставит
+   1, квадрат и --agent-*-mark — как маркер на графике (раздел 19). */
+.marker--sell {
+    background: var(--marker-sell, var(--agent-trend-mark));
+    opacity: var(--sell-marker-opacity);
+    border-radius: var(--sell-marker-radius);
+}
 .marker--current { background: var(--text-1); }
 
 .price__note,
@@ -324,6 +330,6 @@
     background: var(--gph-800);
 }
 
-.balance__buy { background: var(--line-3); }
-.balance__sell { flex: 1; background: var(--line-1); }
+.balance__buy { background: var(--split-strong); }
+.balance__sell { flex: 1; background: var(--split-weak); }
 

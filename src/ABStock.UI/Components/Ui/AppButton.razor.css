@@ -45,7 +45,7 @@
 
 .ui-btn--danger {
     border-color: var(--down-500);
-    color: var(--down-500);
+    color: var(--down-text);
 }
 .ui-btn--danger:hover { background: var(--down-soft); }
 

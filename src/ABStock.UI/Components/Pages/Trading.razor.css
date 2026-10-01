@@ -13,11 +13,6 @@
     --h-workspace-min: 620px;  /* рабочая область не схлопывается на низком окне */
     --h-chart-min: 360px;      /* график — главная панель экрана (раздел 7) */
     --h-tape-min: 220px;       /* лента: восемь строк по --h-row-dense плюс шапка */
-
-    /* Пол таблицы агентов: шапка панели 47 + шапка таблицы 28 + две строки по
-       --h-row-tall 46 + итоги 32. Ниже этого панель не ужимается — список из
-       одной строки перестаёт быть списком (пункт 108 docs/ui-backlog.md). */
-    --h-agents-min: 199px;
 }
 
 .trading-shell {
@@ -33,7 +28,9 @@
 
 .trading-page {
     flex: 1;
-    min-height: 0;
+    /* Не ужимается ниже содержимого: когда рабочей области не хватает окна,
+       страница прокручивается в оболочке целиком, вместе с нижним отступом. */
+    min-height: min-content;
     width: 100%;
     max-width: var(--page-max);
     margin-inline: auto;
@@ -48,7 +45,10 @@
    ============================================================================ */
 .workspace {
     flex: 1;
-    min-height: var(--h-workspace-min);
+    /* Пол рабочей области — содержимое центральной колонки (её пол ниже).
+       Рельсы в этот расчёт не входят (contain: size): их ленты длинные и
+       прокручиваются внутри, и иначе рабочая область росла бы по ним. */
+    min-height: min-content;
     display: grid;
     grid-template-columns: var(--rail-left) minmax(var(--center-min), 1fr) var(--rail-right);
     gap: var(--gutter);
@@ -60,6 +60,7 @@
     flex-direction: column;
     gap: var(--gutter);
     min-height: 0;
+    contain: size;
 }
 
 .center {
@@ -67,7 +68,7 @@
     flex-direction: column;
     gap: var(--gutter);
     min-width: 0;
-    min-height: 0;
+    min-height: var(--h-workspace-min);
 }
 
 /* Брейкпоинты. ВНИМАНИЕ: var() в условии @media невалиден по спецификации CSS,
@@ -88,6 +89,9 @@
         display: grid;
         grid-template-columns: var(--rail-right) minmax(0, 1fr);
         align-items: start;
+        /* В своей строке рельс растягивать некому: высоту задаёт его
+           содержимое, и contain: size схлопнул бы его в ноль. */
+        contain: none;
     }
 }
 
@@ -112,7 +116,7 @@
     margin: 0;
     padding: var(--s-3) var(--s-5);
     font: var(--t-caption);
-    color: var(--text-4);
+    color: var(--text-quiet);
     border-top: 1px solid var(--line-1);
 }
 
@@ -189,8 +193,8 @@
 .strip__item { display: flex; align-items: baseline; gap: var(--s-2); }
 .strip__label { font: var(--t-caption); color: var(--text-3); }
 .strip__item .num-sm { color: var(--text-1); }
-.strip__item .num-sm.tone-up { color: var(--up-500); }
-.strip__item .num-sm.tone-down { color: var(--down-500); }
+.strip__item .num-sm.tone-up { color: var(--up-text); }
+.strip__item .num-sm.tone-down { color: var(--down-text); }
 .strip__sep { width: 1px; flex: none; height: var(--s-3); background: var(--line-2); }
 .strip__item { flex: none; }
 
@@ -221,18 +225,14 @@
    ============================================================================ */
 .center ::deep .chart-panel { flex: 1; min-height: var(--h-chart-min); }
 
-/* Таблица агентов отдаёт высоту первой. Раздел 7.2 называет график визуальным
-   объектом страницы, и он держится за свой пол; раздел 9.8 разрешает списку
-   прокручиваться внутри панели. Значит, когда колонке не хватает высоты —
-   а с появлением полосы связи её не хватает на 1280 и 1440, — недостачу
-   забирает список, а не график.
-
-   flex: 0 1 auto, а не 1: панель берёт высоту по содержимому и только
-   ужимается, но не растягивается на пустое место. */
-.center ::deep .agents-panel {
-    flex: 0 1 auto;
-    min-height: var(--h-agents-min);
-}
+/* Таблица агентов не ужимается. Раньше недостачу высоты забирал список, а
+   не график (раздел 7.2 держит график на полу), и на окне ниже ~1000px
+   липкие итоги накрывали последнюю строку: таблица выглядела обрезанной.
+   На «Торгах» в ней не больше четырёх строк — по строке на тип агента, —
+   прокручивать там нечего. Теперь панель всегда по содержимому, график
+   держит свой пол, а если окна не хватает на то и другое, прокручивается
+   страница (пол рабочей области — .center выше). */
+.center ::deep .agents-panel { flex: none; }
 .chart-panel__id { display: flex; align-items: center; gap: var(--s-3); min-width: 0; }
 
 .chart-body {
@@ -311,7 +311,7 @@
     align-items: center;
     justify-content: center;
     font: var(--t-caption);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
 .chart-empty-state[hidden] { display: none; }
@@ -325,12 +325,12 @@
     margin-top: var(--s-3);
     padding-top: var(--s-2);
     border-top: 1px solid var(--line-1);
-    color: var(--text-4);
+    color: var(--text-quiet);
 }
 
-.chart-foot__credit { font: var(--t-caption); color: var(--text-4); text-decoration: none; }
+.chart-foot__credit { font: var(--t-caption); color: var(--text-quiet); text-decoration: none; }
 .chart-foot__credit:hover { color: var(--text-3); }
-.chart-foot .num-xs { color: var(--text-4); }
+.chart-foot .num-xs { color: var(--text-quiet); }
 
 /* ============================================================================
    Таблица агентов — строка 46px под две строки «действие + объяснение»
@@ -458,15 +458,19 @@
 }
 
 .agents__title { font: var(--t-h3); color: var(--text-1); }
-.agents__kind { font: var(--t-caption); color: var(--text-4); }
+.agents__kind { font: var(--t-caption); color: var(--text-quiet); }
 .agents__c-num.num-sm { color: var(--text-2); }
 .agents__c-num.num { color: var(--text-1); }
-.agents__c-num.tone-up { color: var(--up-500); }
-.agents__c-num.tone-down { color: var(--down-500); }
+.agents__c-num.tone-up { color: var(--up-text); }
+.agents__c-num.tone-down { color: var(--down-text); }
 
 .agents tfoot th, .agents tfoot td { height: var(--h-row); padding: 0; font: var(--t-caption); color: var(--text-3); }
 .agents tfoot th { text-align: left; font-weight: inherit; }
-.agents tfoot .num-sm, .agents tfoot .num { color: var(--text-2); }
+/* Число в итогах — моноширинным, как в строках. Правило подвала выше
+   ставит всей строке шрифт подписи, и без возврата --n-sm сумма набиралась
+   Golos: узкий неразрывный пробел между разрядами там почти нулевой, и
+   «465 000» читалось как «465000» под «110 000» строк. */
+.agents tfoot .num-sm, .agents tfoot .num { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-2); }
 
 .agents__skeleton { display: flex; flex-direction: column; padding: var(--s-3) var(--s-5); }
 
@@ -517,8 +521,14 @@
     transition: width var(--d-fast) var(--e-out);
 }
 
-.book__bar--ask { background: var(--down-bar); }
-.book__bar--bid { background: var(--up-bar); }
+.book__bar--ask { background: var(--down-depth); }
+.book__bar--bid { background: var(--up-depth); }
+
+/* Цена стакана стоит на полосе глубины — цифра роли --*-depth-text
+   (раздел 19). Глобальный .tone-* проигрывает этому правилу по
+   специфичности. */
+.book__row .book__c-price.tone-up { color: var(--up-depth-text); }
+.book__row .book__c-price.tone-down { color: var(--down-depth-text); }
 
 .book__spread {
     display: flex;
@@ -571,7 +581,14 @@
 .tape__time { color: var(--text-3); }
 .tape__qty { margin-left: auto; color: var(--text-2); }
 .tape__pair { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-1); width: 52px; }
-.tape__arrow { color: var(--text-4); }
+.tape__arrow { color: var(--text-quiet); }
+
+/* Торги остановлены (раздел 19): лента — история, а не рынок. В белой теме
+   цены без up/down-цвета (стрелка направления остаётся) и точки агентов
+   серые; в графите токены не заданы, и лента выглядит как раньше. */
+.trading-page.is-stopped .tape__price.tone-up { color: var(--stopped-price, var(--up-text)); }
+.trading-page.is-stopped .tape__price.tone-down { color: var(--stopped-price, var(--down-text)); }
+.trading-page.is-stopped .tape__pair { --status-dot-override: var(--stopped-dot); }
 
 @keyframes tape-in {
     from { opacity: 0; transform: translateY(-4px); }
@@ -680,7 +697,7 @@
 }
 
 .compose tfoot th { text-align: left; font-weight: inherit; }
-.compose tfoot .num-sm { color: var(--text-2); }
+.compose tfoot .num-sm { font: var(--n-sm); font-variant-numeric: tabular-nums; color: var(--text-2); }
 
 .compose__warn {
     display: inline-flex;
@@ -707,6 +724,6 @@
     gap: var(--s-1);
     margin-top: var(--s-1);
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
     text-align: right;
 }

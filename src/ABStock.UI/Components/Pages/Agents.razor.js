@@ -4,6 +4,7 @@ import {
     LineStyle,
     createChart
 } from "/lib/lightweight-charts/lightweight-charts.standalone.production.mjs";
+import { onThemeChange, readChartTheme } from "/js/chart-theme.js";
 
 const charts = new WeakMap();
 
@@ -33,21 +34,28 @@ function toLocalChartTime(utcSeconds) {
 /**
  * Цвета типов берём готовыми парами из design-system.css: обычный и
  * приглушённый. Подсветка становится подстановкой строки — ни разбора hex,
- * ни вычисления прозрачности на стороне графика.
+ * ни вычисления прозрачности на стороне графика. Палитра перечитывается при
+ * смене темы (раздел 19): прочитанная один раз, она оставляла график в
+ * цветах той темы, в которой он был создан.
  */
 function readPalette() {
-    const root = getComputedStyle(document.documentElement);
-    const token = name => root.getPropertyValue(name).trim();
+    const theme = readChartTheme();
 
     return {
-        trend: { on: token("--agent-trend"), off: token("--agent-trend-dim") },
-        counter: { on: token("--agent-counter"), off: token("--agent-counter-dim") },
-        mm: { on: token("--agent-mm"), off: token("--agent-mm-dim") },
-        news: { on: token("--agent-news"), off: token("--agent-news-dim") },
-        grid: token("--line-1"),
-        baseline: token("--line-2"),
-        axisText: token("--text-3")
+        ...theme.agent,
+        grid: theme.line1,
+        baseline: theme.line2,
+        axisText: theme.text3
     };
+}
+
+function applyPalette(bundle) {
+    bundle.chart.applyOptions({
+        layout: { textColor: bundle.palette.axisText },
+        grid: { horzLines: { color: bundle.palette.grid } }
+    });
+    bundle.baseline.applyOptions({ color: bundle.palette.baseline });
+    applyHighlight(bundle, bundle.highlight);
 }
 
 function getCanvasSize(element) {
@@ -136,7 +144,7 @@ function createBundle(element) {
     // Уровень 100 % — тонкая линия цветом --line-2. Подписи у неё нет:
     // значение 100,00 на оси говорит то же самое, а текст рядом налезал бы
     // на него.
-    series.trend.createPriceLine({
+    const baseline = series.trend.createPriceLine({
         price: 100,
         color: palette.baseline,
         lineWidth: 1,
@@ -157,7 +165,14 @@ function createBundle(element) {
     });
     resizeObserver.observe(element);
 
-    return { chart, series, palette, resizeObserver, highlight: null };
+    const bundle = { chart, series, baseline, palette, resizeObserver, highlight: null };
+
+    bundle.themeUnsubscribe = onThemeChange(() => {
+        bundle.palette = readPalette();
+        applyPalette(bundle);
+    });
+
+    return bundle;
 }
 
 export function render(element, payload) {
@@ -244,6 +259,7 @@ export function dispose(element) {
     }
 
     bundle.resizeObserver?.disconnect();
+    bundle.themeUnsubscribe?.();
     bundle.chart.remove();
     charts.delete(element);
 }

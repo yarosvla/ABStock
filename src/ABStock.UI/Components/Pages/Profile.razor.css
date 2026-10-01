@@ -108,7 +108,7 @@
 }
 
 .operator__edit ::deep .ui-field { width: var(--w-name-field); }
-.operator__hint { font: var(--t-caption); color: var(--text-4); }
+.operator__hint { font: var(--t-caption); color: var(--text-quiet); }
 
 /* Валидация — охра. Красный означает падение цены и ничего больше (раздел 3).
    На артборде 06 это нарисовано красным; здесь прав раздел 3. */
@@ -119,7 +119,7 @@
     width: 100%;
     margin: 0;
     font: var(--t-caption);
-    color: var(--down-500);
+    color: var(--down-text);
 }
 
 .operator__error ::deep .ui-icon { flex: none; }
@@ -237,6 +237,14 @@
 }
 
 .swatch.is-chosen .swatch__name { color: var(--text-1); }
+
+/* Белая тема: пресет не применяется (раздел 19) — вместо палитры одна
+   строка. */
+.accent__inked {
+    margin: 0;
+    font: var(--t-body-sm);
+    color: var(--text-2);
+}
 
 /* Обещание, которое доказывает колонка «Не меняется никогда» справа. */
 .accent__promise {

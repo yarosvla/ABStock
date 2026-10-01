@@ -80,7 +80,7 @@
 <div class="trading-shell">
     <TopNavigation ActivePage="Trading" ShowClock="true" />
 
-    <main class="trading-page">
+    <main class="trading-page @(isRunning ? null : "is-stopped")">
 
         @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
         <Breadcrumbs Items="@(new Crumb[]
@@ -753,7 +753,7 @@
                                 {
                                     <div class="tape__row" title="@trade.Buyer ← @trade.Seller">
                                         <span class="num-xs tape__time">@trade.Time</span>
-                                        <span class="num-sm @(trade.SideClass == "buy" ? "tone-up" : "tone-down")">
+                                        <span class="num-sm tape__price @(trade.SideClass == "buy" ? "tone-up" : "tone-down")">
                                             @(trade.SideClass == "buy" ? "↗" : "↘") @trade.Price
                                         </span>
                                         <span class="num-sm tape__qty">@trade.Volume</span>
@@ -857,22 +857,36 @@
         ? Math.Round(summary.TradeCount * 60m / summary.TickCount, 0, MidpointRounding.AwayFromZero)
         : null;
 
-    /// <summary>Шаг агрегации уровней стакана — разница соседних отображаемых цен.</summary>
+    /// <summary>
+    /// Шаг агрегации уровней стакана — разница соседних ОТОБРАЖАЕМЫХ цен.
+    /// Раньше шаг считался по сырым ценам заявок: разница между ними бывает
+    /// меньше копейки, и шапка показывала «шаг 0,00» над стаканом, где
+    /// соседние уровни отстоят на 0,04. Уровни берутся после той же
+    /// агрегации, что и строки стакана, каждая сторона отдельно: зазор между
+    /// лучшим бидом и лучшим аском — спред, а не шаг.
+    /// </summary>
     private decimal? BookStep
     {
         get
         {
-            var prices = latestTick?.OrderBook.Asks
-                .Select(level => level.Price)
-                .OrderBy(price => price)
-                .ToArray() ?? [];
-
-            if (prices.Length < 2)
+            if (latestTick is null)
             {
                 return null;
             }
 
-            var steps = prices.Zip(prices.Skip(1), (a, b) => b - a).Where(step => step > 0m).ToArray();
+            var steps = new[]
+                {
+                    GetVisibleOrderBookLevels(latestTick.OrderBook.Asks, reverse: false, isAsk: true),
+                    GetVisibleOrderBookLevels(latestTick.OrderBook.Bids, reverse: false, isAsk: false)
+                }
+                .SelectMany(levels =>
+                {
+                    var prices = levels.Select(level => level.Price).Distinct().OrderBy(price => price).ToArray();
+                    return prices.Zip(prices.Skip(1), (a, b) => b - a);
+                })
+                .Where(step => step > 0m)
+                .ToArray();
+
             return steps.Length == 0 ? null : steps.Min();
         }
     }
@@ -1007,6 +1021,8 @@
             var payload = pendingChartSync;
             await tradingChartModule.InvokeVoidAsync("sync", chartViewport, payload);
             pendingChartSync = null;
+
+            await SyncChartSessionStateAsync();
         }
         catch (JSDisconnectedException)
         {
@@ -1027,6 +1043,38 @@
         if (pendingChartSync is not null)
         {
             await TrySyncChartAsync();
+        }
+        else
+        {
+            await SyncChartSessionStateAsync();
+        }
+    }
+
+    private bool? chartSessionActive;
+
+    /// <summary>
+    /// Остановленные торги гасят свечи (раздел 19: в белой теме до 58 %, в
+    /// графите токен равен 1 и вид не меняется). Отдельным вызовом, а не полем
+    /// данных: после остановки тиков нет, и синхронизации данных не будет.
+    /// Кнопка «Остановить торги» перерисовывает страницу, так что сюда
+    /// попадаем после каждой смены состояния.
+    /// </summary>
+    private async Task SyncChartSessionStateAsync()
+    {
+        var active = SimulationRunner.IsRunning;
+
+        if (!isChartRegistered || tradingChartModule is null || chartSessionActive == active)
+        {
+            return;
+        }
+
+        try
+        {
+            await tradingChartModule.InvokeVoidAsync("setSessionActive", chartViewport, active);
+            chartSessionActive = active;
+        }
+        catch (JSDisconnectedException)
+        {
         }
     }
 
@@ -1587,7 +1635,7 @@
                 slot.ToUnixTimeSeconds(),
                 "aboveBar",
                 "arrowDown",
-                "rgba(240, 241, 243, 0.42)",
+                "--chart-news-marker",
                 Fixed2(entry.ImpactScore)));
         }
 
@@ -1610,7 +1658,7 @@
                 slot.ToUnixTimeSeconds(),
                 "belowBar",
                 "circle",
-                "#C08E63",
+                "--agent-news",
                 string.Empty));
         }
 
@@ -2144,6 +2192,10 @@
 
     /// <param name="Position">`aboveBar` или `belowBar` — сторона свечи.</param>
     /// <param name="Shape">Форма значка библиотеки: `circle`, `arrowDown`.</param>
+    /// <param name="Color">
+    /// Имя токена (`--agent-news`), а не цвет: скрипт графика берёт значение
+    /// из текущей темы и перекрашивает маркер при её смене (раздел 19).
+    /// </param>
     private sealed record ChartMarker(
         long Time,
         string Position,
