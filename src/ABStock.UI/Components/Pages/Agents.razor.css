@@ -151,10 +151,13 @@
     text-overflow: ellipsis;
 }
 
-/* ---------- матрица «Кто чем владеет» (раздел 9.27) ---------- */
+/* ---------- матрица «Кто чем владеет» (раздел 9.27) ----------
+   Имя стратегии по своей ширине, ячейки делят остальное: с резиновой
+   колонкой имени на широком экране между именем и ячейками зияла пустота. */
 .matrix {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) repeat(var(--matrix-cols), minmax(0, 72px)) 72px;
+    grid-template-columns: max-content repeat(var(--matrix-cols), minmax(0, 1fr)) 72px;
+    gap: var(--s-1);
     align-items: center;
     gap: var(--s-1);
 }
@@ -173,6 +176,7 @@
 
 .matrix__name {
     display: flex;
+    padding-right: var(--s-3);
     align-items: center;
     gap: var(--s-2);
     min-width: 0;
