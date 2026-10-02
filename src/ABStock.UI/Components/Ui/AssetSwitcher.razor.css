@@ -3,6 +3,12 @@
 .ui-switch {
     position: relative;
     display: inline-flex;
+
+    /* Размеры поповера: ширина и колонки цены и изменения. Не системные
+       величины, но объявлены один раз здесь (раздел 8). */
+    --w-switch: 420px;
+    --w-switch-price: 72px;
+    --w-switch-delta: 64px;
 }
 
 /* Кнопка в крошках: 13px --text-1, тикер 11px --text-2, высота --h-crumbs.
@@ -47,7 +53,7 @@
     z-index: calc(var(--z-dropdown) + 1);
     display: flex;
     flex-direction: column;
-    width: 420px;
+    width: var(--w-switch);
     border-radius: var(--r-lg);
     animation: ui-switch-in var(--d-base) var(--e-enter) both;
 }
@@ -80,7 +86,7 @@
 
 .ui-switch__row {
     display: grid;
-    grid-template-columns: var(--w-ticker) minmax(0, 1fr) 72px 64px var(--s-4);
+    grid-template-columns: var(--w-ticker) minmax(0, 1fr) var(--w-switch-price) var(--w-switch-delta) var(--s-4);
     align-items: center;
     column-gap: var(--s-3);
     min-height: var(--s-10);

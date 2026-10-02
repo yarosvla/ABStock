@@ -22,7 +22,7 @@
 }
 
 .ui-fan__rowhead { height: var(--h-thead); }
-.ui-fan__rowhead--foot { height: 22px; align-items: start; }
+.ui-fan__rowhead--foot { height: var(--h-chip); align-items: start; }
 
 .ui-fan__names {
     display: flex;
