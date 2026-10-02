@@ -37,6 +37,8 @@
     --h-equity: 150px;
     --w-tape-price: 72px;
     --w-tape-qty: 64px;
+    --w-tape-sym: 44px;
+    --w-tape-time: 64px;
     --marker-size: 9px;   /* точка легенды под маркер на графике, макет 02 */
 }
 
@@ -138,8 +140,8 @@
 
 .tape__head { height: var(--h-thead); }
 
-.tape__c-time { flex: 1; min-width: 0; text-align: left; }
-.tape__c-price { width: var(--w-tape-price); text-align: right; }
+.tape__c-time { width: var(--w-tape-time); text-align: left; }
+.tape__c-price { flex: 1; min-width: var(--w-tape-price); text-align: right; }
 .tape__c-qty { width: var(--w-tape-qty); text-align: right; }
 
 .tape__list { display: flex; flex-direction: column; }
@@ -333,3 +335,87 @@
 .balance__buy { background: var(--split-strong); }
 .balance__sell { flex: 1; background: var(--split-weak); }
 
+/* ============================================================================
+   Много активов: тикер в ленте, выбранный актив графика, P/L по активам
+   ============================================================================ */
+.tape__c-sym { width: var(--w-tape-sym); color: var(--text-3); }
+.tape__row.is-chart .tape__c-sym { color: var(--text-1); }
+
+.tape__foot {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--s-2) var(--s-4);
+    border-top: 1px solid var(--line-1);
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.price__body { padding: var(--s-3) var(--s-2) var(--s-1) var(--s-4); }
+.price ::deep .ui-panel__body { padding: 0; }
+.price__legend { padding: var(--s-2) var(--s-4); }
+
+/* «Почему GLEN»: активы по ходу с открытия, выбранный — светлее (DESIGN.md 16.4). */
+.trendpick {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.trendpick__row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    padding: 2px var(--s-1);
+    border-radius: var(--r-xs);
+    color: var(--text-2);
+}
+
+.trendpick__row.is-picked { background: var(--gph-700); color: var(--text-1); }
+
+.pl { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3) var(--s-4); }
+
+/* Полоса P/L растёт от оси посередине: вправо прибыль, влево убыток. */
+.plbar {
+    display: grid;
+    grid-template-columns: var(--w-ticker) minmax(0, 1fr) var(--w-tape-price);
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.plbar__track {
+    position: relative;
+    height: var(--s-2);
+    border-radius: 2px;
+    background: var(--zone-1);
+}
+
+.plbar__axis {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    left: 50%;
+    width: 1px;
+    background: var(--line-3);
+}
+
+.plbar__fill { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+.plbar__fill--up   { background: var(--up-fill); }
+.plbar__fill--down { background: var(--down-fill); }
+
+.pl__note {
+    margin: 0;
+    padding: var(--s-3) var(--s-4);
+    border-top: 1px solid var(--line-1);
+    font: var(--t-caption);
+    color: var(--text-3);
+    text-wrap: pretty;
+}
+
+.holding { display: flex; align-items: center; gap: var(--s-2); }
+
+.caption { font: var(--t-caption); color: var(--text-3); }
+.num-md { font: var(--n-md); font-variant-numeric: tabular-nums; }
+.t1 { color: var(--text-1); }
+.t2 { color: var(--text-2); }
+.nowrap { white-space: nowrap; }
+.right { text-align: right; justify-self: end; }
