@@ -1,5 +1,7 @@
 import os
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from openai import OpenAI
@@ -7,6 +9,11 @@ from openai import OpenAI
 import json
 
 from transformers import pipeline
+
+from dotenv import load_dotenv
+
+ROOT_DIR = Path(__file__).resolve().parents[3]
+load_dotenv(ROOT_DIR / ".env")
 
 app = FastAPI()
 
