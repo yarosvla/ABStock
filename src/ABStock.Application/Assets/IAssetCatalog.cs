@@ -8,5 +8,9 @@ public interface IAssetCatalog
 
     Asset? Get(Guid assetId);
 
-    IReadOnlyList<Asset> GetAll();
+    IReadOnlyList<Asset> GetAll(bool includeArchived = false);
+
+    Asset Update(Guid assetId, UpdateAssetRequest request);
+
+    Asset Archive(Guid assetId);
 }

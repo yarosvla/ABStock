@@ -23,6 +23,9 @@ public sealed class AbStockDbContext(DbContextOptions<AbStockDbContext> options)
         {
             entity.ToTable("Assets");
             entity.HasKey(asset => asset.Id);
+            entity.Property(asset => asset.Ticker).HasMaxLength(24).UseCollation("NOCASE");
+            entity.Property(asset => asset.Industry).HasMaxLength(160);
+            entity.HasIndex(asset => asset.Ticker).IsUnique();
         });
 
         modelBuilder.Entity<TradingSessionEntity>(entity =>

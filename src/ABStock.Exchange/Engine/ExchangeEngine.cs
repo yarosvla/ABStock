@@ -15,6 +15,7 @@ public sealed class ExchangeEngine : IExchangeEngine
     private readonly int _maxRecentTrades;
     private decimal _lastPrice;
     private decimal _totalVolume;
+    private long _totalTradeCount;
 
     public ExchangeEngine(
         decimal startPrice = 100m,
@@ -155,7 +156,10 @@ public sealed class ExchangeEngine : IExchangeEngine
             Volume: _totalVolume,
             RecentPrices: _prices.ToArray(),
             RecentTrades: _trades.ToArray()
-        );
+        )
+        {
+            TotalTradeCount = _totalTradeCount
+        };
     }
 
     public OrderBookSnapshot GetOrderBookSnapshot(int depth = 5)
@@ -273,6 +277,7 @@ public sealed class ExchangeEngine : IExchangeEngine
 
         _trades.Add(trade);
         _totalVolume += quantity;
+        _totalTradeCount++;
         _lastPrice = price;
         _prices.Add(price);
         TrimHistory();

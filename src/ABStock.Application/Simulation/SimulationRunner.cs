@@ -449,7 +449,10 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
                             var account = _session.GetAgentAccount(registered.Name);
                             AgentAccountProjection.Apply(registered.Agent, account, assetId);
                             decisions.Add(registered.Agent.Decide(
-                                new AgentMarketContext(sessionId, assetId, snapshot, account), news));
+                                new AgentMarketContext(sessionId, assetId, snapshot, account)
+                                {
+                                    Asset = AssetFactory.Copy(_markets[assetId].Asset)
+                                }, news));
                         }
 
                         decisionsByAsset.Add(assetId, decisions.AsReadOnly());
@@ -589,8 +592,11 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
             throw new ArgumentException("Asset id must not be empty.", nameof(assetId));
         }
 
-        return _assetCatalog.Get(assetId)
+        var asset = _assetCatalog.Get(assetId)
             ?? throw new KeyNotFoundException($"Asset '{assetId}' is not registered in the catalog.");
+        return asset.IsArchived
+            ? throw new InvalidOperationException("An archived asset cannot start a new market.")
+            : asset;
     }
 
     private static AgentAccountSpec CreateAccountSpec(ITradeAgent agent, AgentSpec? spec)

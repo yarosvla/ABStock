@@ -11,4 +11,5 @@ public sealed class MarketTickEntity
     public decimal? BestBid { get; set; }
     public decimal? BestAsk { get; set; }
     public decimal TotalVolume { get; set; }
+    public long? TotalTradeCount { get; set; }
 }

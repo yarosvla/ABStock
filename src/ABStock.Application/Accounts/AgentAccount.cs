@@ -7,6 +7,8 @@ internal sealed class AgentAccount
 {
     private readonly Dictionary<Guid, decimal> _positions;
     private readonly Dictionary<Guid, decimal> _initialPositions;
+    private readonly Dictionary<Guid, decimal> _costBases;
+    private readonly Dictionary<Guid, decimal> _realizedPnls = new();
     private readonly Dictionary<Guid, decimal> _reservedPositions = new();
 
     public string AgentName { get; }
@@ -27,8 +29,9 @@ internal sealed class AgentAccount
         _positions = markets.ToDictionary(market => market.AssetId,
             market => spec.InitialPositions.GetValueOrDefault(market.AssetId, DefaultInitialPosition));
         _initialPositions = new Dictionary<Guid, decimal>(_positions);
-        InitialPortfolioValue = InitialCash + markets.Sum(market =>
-            GetPosition(market.AssetId) * market.Snapshot.LastPrice);
+        _costBases = markets.ToDictionary(market => market.AssetId,
+            market => GetPosition(market.AssetId) * market.Snapshot.LastPrice);
+        InitialPortfolioValue = InitialCash + _costBases.Values.Sum();
     }
 
     public decimal GetPosition(Guid assetId) => _positions.GetValueOrDefault(assetId);
@@ -39,9 +42,11 @@ internal sealed class AgentAccount
     public void InitializeMarket(Guid assetId, decimal startPrice)
     {
         // Starting inventory is contributed capital, not trading profit.
-        var baseline = InitialPortfolioValue + DefaultInitialPosition * startPrice;
+        var costBasis = DefaultInitialPosition * startPrice;
+        var baseline = InitialPortfolioValue + costBasis;
         _positions.Add(assetId, DefaultInitialPosition);
         _initialPositions.Add(assetId, DefaultInitialPosition);
+        _costBases.Add(assetId, costBasis);
         InitialPortfolioValue = baseline;
     }
 
@@ -71,19 +76,30 @@ internal sealed class AgentAccount
             throw new InvalidOperationException("Trade exceeds account cash.");
         }
 
+        var costBasis = _costBases.GetValueOrDefault(assetId) + cost;
+        var position = GetPosition(assetId) + quantity;
         Cash -= cost;
-        _positions[assetId] = GetPosition(assetId) + quantity;
+        _positions[assetId] = position;
+        _costBases[assetId] = costBasis;
     }
 
     public void Sell(Guid assetId, decimal price, decimal quantity)
     {
-        if (quantity > GetPosition(assetId))
+        var position = GetPosition(assetId);
+        if (quantity > position)
         {
             throw new InvalidOperationException("Trade exceeds account position.");
         }
 
-        Cash += price * quantity;
-        _positions[assetId] = GetPosition(assetId) - quantity;
+        var costBasis = _costBases.GetValueOrDefault(assetId);
+        // Full liquidation removes the entire basis, avoiding a rounding residue.
+        var soldCost = quantity == position ? costBasis : costBasis * (quantity / position);
+        var proceeds = price * quantity;
+        var realizedPnl = _realizedPnls.GetValueOrDefault(assetId) + proceeds - soldCost;
+        Cash += proceeds;
+        _positions[assetId] = position - quantity;
+        _costBases[assetId] = costBasis - soldCost;
+        _realizedPnls[assetId] = realizedPnl;
     }
 
     public AgentAccountSnapshot GetSnapshot(IReadOnlyList<MarketState> markets)
@@ -95,7 +111,11 @@ internal sealed class AgentAccount
                 GetPosition(market.AssetId),
                 _reservedPositions.GetValueOrDefault(market.AssetId),
                 _initialPositions.GetValueOrDefault(market.AssetId),
-                market.Snapshot.LastPrice));
+                market.Snapshot.LastPrice)
+            {
+                CostBasis = _costBases.GetValueOrDefault(market.AssetId),
+                RealizedPnl = _realizedPnls.GetValueOrDefault(market.AssetId)
+            });
 
         return new AgentAccountSnapshot(
             AgentName, AgentType, Cash, ReservedCash, InitialCash,

@@ -1,4 +1,5 @@
 using System.Data.Common;
+using ABStock.Application.Assets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -6,7 +7,7 @@ namespace ABStock.Persistence;
 
 internal sealed class StorageInitializer(IDbContextFactory<AbStockDbContext> contextFactory)
 {
-    private const int CurrentVersion = 1;
+    private const int CurrentVersion = 2;
     private readonly object _sync = new();
     private bool _initialized;
 
@@ -72,16 +73,84 @@ internal sealed class StorageInitializer(IDbContextFactory<AbStockDbContext> con
                     """);
                 db.Database.ExecuteSqlInterpolated($"""
                     INSERT INTO "StorageSchemaVersions" ("Version", "AppliedAt")
-                    VALUES ({CurrentVersion}, {DateTimeOffset.UtcNow});
+                    VALUES ({1}, {DateTimeOffset.UtcNow});
                     """);
+                version = 1;
             }
             else if (!new[] { "Assets", "TradingSessions", "SessionMarkets" }.All(tables.Contains))
             {
                 throw new InvalidOperationException("The ABStock database schema is incomplete.");
             }
 
+            if (version < 2)
+            {
+                AddColumnIfMissing(db, "Assets", "Ticker", "TEXT COLLATE NOCASE NOT NULL DEFAULT ''");
+                AddColumnIfMissing(db, "Assets", "Industry", "TEXT NOT NULL DEFAULT ''");
+                AddColumnIfMissing(db, "Assets", "IncludeGovernmentSupport", "INTEGER NOT NULL DEFAULT 0");
+                AddColumnIfMissing(db, "Assets", "GrowthPotential", "INTEGER NULL");
+                AddColumnIfMissing(db, "Assets", "UpdatedAt", "TEXT NULL");
+                AddColumnIfMissing(db, "Assets", "ArchivedAt", "TEXT NULL");
+                AddColumnIfMissing(db, "MarketTicks", "TotalTradeCount", "INTEGER NULL");
+                FillMissingTickers(db);
+                db.Database.ExecuteSqlRaw("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS "IX_Assets_Ticker" ON "Assets" ("Ticker" COLLATE NOCASE);
+                    """);
+                db.Database.ExecuteSqlInterpolated($"""
+                    INSERT INTO "StorageSchemaVersions" ("Version", "AppliedAt") VALUES ({2}, {DateTimeOffset.UtcNow});
+                    """);
+            }
+
+            var assetColumns = ReadColumns(db, "Assets");
+            if (!new[] { "Ticker", "Industry", "IncludeGovernmentSupport", "GrowthPotential", "UpdatedAt", "ArchivedAt" }
+                    .All(assetColumns.Contains) || !ReadColumns(db, "MarketTicks").Contains("TotalTradeCount"))
+            {
+                throw new InvalidOperationException("The ABStock asset and market metric schema is incomplete.");
+            }
+
             transaction.Commit();
             _initialized = true;
+        }
+    }
+
+    private static void AddColumnIfMissing(AbStockDbContext db, string table, string column, string definition)
+    {
+        if (!ReadColumns(db, table).Contains(column))
+        {
+            // These identifiers and definitions are migration constants, not user input.
+            using var command = CreateCommand(db, $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {definition};");
+            command.ExecuteNonQuery();
+        }
+    }
+
+    private static HashSet<string> ReadColumns(AbStockDbContext db, string table)
+    {
+        using var command = CreateCommand(db, $"PRAGMA table_info(\"{table}\");");
+        using var reader = command.ExecuteReader();
+        var columns = new HashSet<string>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            columns.Add(reader.GetString(1));
+        }
+
+        return columns;
+    }
+
+    private static void FillMissingTickers(AbStockDbContext db)
+    {
+        var assetIds = new List<string>();
+        using (var command = CreateCommand(db, "SELECT \"Id\" FROM \"Assets\" WHERE \"Ticker\" = '';"))
+        using (var reader = command.ExecuteReader())
+        {
+            while (reader.Read())
+            {
+                assetIds.Add(reader.GetString(0));
+            }
+        }
+
+        foreach (var assetId in assetIds)
+        {
+            var ticker = AssetFactory.GenerateTicker(Guid.Parse(assetId));
+            db.Database.ExecuteSqlInterpolated($"UPDATE \"Assets\" SET \"Ticker\" = {ticker} WHERE \"Id\" = {assetId};");
         }
     }
 

@@ -31,6 +31,11 @@ internal sealed class MarketSession(
 
             var asset = assetCatalog.Get(assetId)
                 ?? throw new KeyNotFoundException($"Asset '{assetId}' is not in the catalog.");
+            if (asset.IsArchived)
+            {
+                throw new InvalidOperationException("An archived asset cannot start a new market.");
+            }
+
             var exchange = exchangeEngineFactory.Create(asset.StartPrice);
             _exchanges.Add(assetId, exchange);
             state = CreateState(assetId, exchange);

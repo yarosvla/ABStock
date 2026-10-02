@@ -6,5 +6,11 @@ public sealed class AssetEntity
     public string ProfileJson { get; set; } = string.Empty;
     public decimal StartPrice { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public string Ticker { get; set; } = string.Empty;
+    public string Industry { get; set; } = string.Empty;
+    public bool IncludeGovernmentSupport { get; set; }
+    public int? GrowthPotential { get; set; }
+    public DateTimeOffset? UpdatedAt { get; set; }
+    public DateTimeOffset? ArchivedAt { get; set; }
     public List<SessionMarketEntity> Markets { get; set; } = [];
 }

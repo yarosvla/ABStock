@@ -39,6 +39,8 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
         var agent = Assert.Single(fixture.Factory.CreatedAgents);
         Assert.Equal(new[] { first, second }, agent.Calls.Select(call => call.Context.AssetId));
         Assert.Equal(new[] { 2m, 3m }, agent.Calls.Select(call => call.Position));
+        Assert.Equal(new[] { "First", "Second" }, agent.Calls.Select(call => call.Context.Asset!.Name));
+        Assert.Equal(new[] { 100m, 200m }, agent.Calls.Select(call => call.Context.Asset!.StartPrice));
         Assert.All(agent.Calls, call => Assert.Equal(fixture.Runner.CurrentSessionId, call.Context.SessionId));
         Assert.Equal(2, ticks.Count);
         Assert.All(ticks, tick => Assert.Equal(1, tick.Tick));
@@ -656,8 +658,64 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
     private static Order Limit(string name, OrderSide side, decimal price) =>
         new(Guid.NewGuid(), name, side, OrderType.Limit, price, 1m, DateTimeOffset.UtcNow);
 
+    [Fact]
+    public async Task EditingAndArchivingCatalogAssetDoesNotResetRunningBookOrRecordedIdentity()
+    {
+        await using var fixture = new Fixture();
+        var first = fixture.CreateAsset("First", 100m);
+        await fixture.StartAsync([first], [new(AgentType.MarketMaker, 500m, 2m)]);
+        var before = fixture.Runner.GetCurrent(first)!;
+        var asset = fixture.Catalog.Get(first)!;
+        var name = Assert.Single(before.Accounts).AgentName;
+        var order = Limit(name, OrderSide.Buy, 90m);
+        fixture.Runner.SubmitMany(first, [order]);
+
+        fixture.Catalog.Update(first, new(asset.Profile with { Name = "Renamed" }, "GLEN", "Energy", true, 90));
+        fixture.Catalog.Archive(first);
+
+        Assert.Equal(before.RunId, fixture.Runner.GetRunId(first));
+        Assert.Equal(before.SessionId, fixture.Runner.CurrentSessionId);
+        Assert.Equal(100m, fixture.Runner.GetCurrent(first)!.Snapshot.LastPrice);
+        Assert.Equal("First", fixture.Runner.CurrentAssetName);
+        Assert.Equal(order.Id, Assert.Single(fixture.Runner.GetOpenOrders(first)).Id);
+        Assert.Single(fixture.Runner.SubmitMany(first, [Limit(name, OrderSide.Buy, 80m)]).Result.AcceptedOrders);
+        var other = fixture.CreateAsset("Archived", 200m);
+        fixture.Catalog.Archive(other);
+        Assert.Throws<InvalidOperationException>(() => fixture.Runner.AddMarket(other));
+        Assert.Single(fixture.History.Runs);
+        await fixture.Runner.StopAsync();
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            fixture.Runner.StartSessionAsync(new([first], TimeSpan.FromHours(1), [])));
+        Assert.False(fixture.Runner.IsRunning);
+    }
+
     private static AgentDecision Decision(ProbeAgent agent, params Order[] orders) =>
         new(agent.State.AgentName, TradeAction.Hold, "Test decision.", orders);
+
+    [Fact]
+    public async Task ContextContainsIsolatedAssetParametersWithoutExposingMutableRunProfile()
+    {
+        var observed = new ConcurrentQueue<float>();
+        await using var fixture = new Fixture((agent, context, _) =>
+        {
+            Assert.Equal("GLEN", context.Asset!.Ticker);
+            Assert.Equal("Energy", context.Asset.Industry);
+            Assert.Equal(50, context.Asset.GrowthPotential);
+            observed.Enqueue(context.Asset.Profile.Factors[0].Embedding[0]);
+            context.Asset.Profile.Factors[0].Embedding[0] = 999f;
+            return Decision(agent);
+        });
+        var asset = fixture.Catalog.Create(new(new AssetProfile("Asset", AssetType.Stock, "Description",
+            [new("Demand", true, 1m, [0.1f])], 1m), 100m)
+        {
+            Ticker = "GLEN", Industry = "Energy", GrowthPotential = 50
+        });
+
+        await fixture.StartAsync([asset.AssetId], [new(AgentType.TrendFollowing, 500m), new(AgentType.CounterTrend, 500m)]);
+
+        Assert.Equal(new[] { 0.1f, 0.1f }, observed.ToArray());
+        Assert.Equal(0.1f, fixture.Catalog.Get(asset.AssetId)!.Profile.Factors[0].Embedding[0]);
+    }
 
     private sealed class Fixture : IAsyncDisposable
     {

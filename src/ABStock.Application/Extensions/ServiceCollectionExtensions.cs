@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddABStockApplication(this IServiceCollection services)
     {
         services.AddABStockExchange();
+        services.TryAddSingleton<IAssetStartPricePolicy, AssetStartPricePolicy>();
         services.TryAddSingleton<IAssetCatalog, InMemoryAssetCatalog>();
         services.TryAddSingleton<IMarketSessionFactory, MarketSessionFactory>();
         services.TryAddSingleton<ITradingSessionFactory, TradingSessionFactory>();

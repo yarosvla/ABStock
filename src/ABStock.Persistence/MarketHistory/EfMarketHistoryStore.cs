@@ -91,6 +91,11 @@ internal sealed class EfMarketHistoryStore(
                 return existing.RunId;
             }
 
+            if (asset.ArchivedAt is not null)
+            {
+                throw new InvalidOperationException("An archived asset cannot start a new market.");
+            }
+
             var catalogAsset = EfAssetCatalog.ToAsset(asset);
             runConfig = config with
             {
@@ -153,7 +158,8 @@ internal sealed class EfMarketHistoryStore(
             LastPrice = tickResult.Snapshot.LastPrice,
             BestBid = tickResult.Snapshot.BestBid,
             BestAsk = tickResult.Snapshot.BestAsk,
-            TotalVolume = tickResult.Snapshot.Volume
+            TotalVolume = tickResult.Snapshot.Volume,
+            TotalTradeCount = tickResult.Snapshot.TotalTradeCount
         });
 
         AddMissingTrades(db, runId, tickResult);

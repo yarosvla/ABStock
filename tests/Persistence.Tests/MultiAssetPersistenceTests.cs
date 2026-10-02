@@ -443,7 +443,7 @@ public sealed class MultiAssetPersistenceTests
         Assert.Equal(trade.Id, Assert.Single(db.Trades).Id);
         Assert.Empty(db.SessionMarkets);
         Assert.Empty(db.TradingSessions);
-        Assert.Equal(1L, fixture.ExecuteScalar("SELECT COUNT(*) FROM StorageSchemaVersions;"));
+        Assert.Equal(2L, fixture.ExecuteScalar("SELECT COUNT(*) FROM StorageSchemaVersions;"));
     }
 
     [Fact]
@@ -462,12 +462,12 @@ public sealed class MultiAssetPersistenceTests
     {
         await using var fixture = new Fixture();
         fixture.CreateAsset("First", 100m);
-        fixture.ExecuteSql("UPDATE StorageSchemaVersions SET Version = 2;");
+        fixture.ExecuteSql("INSERT INTO StorageSchemaVersions (Version, AppliedAt) VALUES (99, '2026-01-01');");
         var newerProvider = fixture.NewProvider();
         Assert.Throws<InvalidOperationException>(() =>
             newerProvider.GetRequiredService<IAssetCatalog>().GetAll());
         Assert.Equal(1L, fixture.ExecuteScalar("SELECT COUNT(*) FROM Assets;"));
-        Assert.Equal(2L, fixture.ExecuteScalar("SELECT Version FROM StorageSchemaVersions;"));
+        Assert.Equal(99L, fixture.ExecuteScalar("SELECT MAX(Version) FROM StorageSchemaVersions;"));
     }
 
     private static SimulationConfig Config(Asset asset, Guid sessionId) =>
@@ -476,6 +476,160 @@ public sealed class MultiAssetPersistenceTests
             SessionId = sessionId,
             AssetId = asset.AssetId
         };
+
+    [Fact]
+    public async Task CatalogPersistsFormParametersUpdatesAndArchiveAcrossRestarts()
+    {
+        await using var fixture = new Fixture();
+        var catalog = fixture.Services.GetRequiredService<IAssetCatalog>();
+        var profile = new AssetProfile("First", AssetType.Stock, "Description", [new("Demand", true, 1m, [0.1f])], 1m);
+        var created = catalog.Create(new(profile)
+        {
+            Ticker = " glen ", Industry = "Energy", IncludeGovernmentSupport = true, GrowthPotential = 50
+        });
+        var restoredCatalog = fixture.NewProvider().GetRequiredService<IAssetCatalog>();
+        var restored = restoredCatalog.Get(created.AssetId)!;
+        Assert.Equal("GLEN", restored.Ticker);
+        Assert.Equal("Energy", restored.Industry);
+        Assert.True(restored.IncludeGovernmentSupport);
+        Assert.Equal(50, restored.GrowthPotential);
+        Assert.Equal(131m, restored.StartPrice);
+        var updated = restoredCatalog.Update(created.AssetId,
+            new(profile with { Name = "Renamed" }, "NEW", "Technology", false, null));
+        var changed = fixture.NewProvider().GetRequiredService<IAssetCatalog>().Get(created.AssetId)!;
+        Assert.Equal("Renamed", changed.Name);
+        Assert.Equal("NEW", changed.Ticker);
+        Assert.Equal("Technology", changed.Industry);
+        Assert.False(changed.IncludeGovernmentSupport);
+        Assert.Null(changed.GrowthPotential);
+        Assert.Equal(created.StartPrice, changed.StartPrice);
+        Assert.Equal(created.CreatedAt, changed.CreatedAt);
+        Assert.Equal(updated.UpdatedAt, changed.UpdatedAt);
+        var archived = catalog.Archive(created.AssetId);
+        Assert.Equal(archived.ArchivedAt, restoredCatalog.Archive(created.AssetId).ArchivedAt);
+        var lastCatalog = fixture.NewProvider().GetRequiredService<IAssetCatalog>();
+        Assert.Empty(lastCatalog.GetAll());
+        Assert.True(Assert.Single(lastCatalog.GetAll(includeArchived: true)).IsArchived);
+        Assert.Equal(archived.ArchivedAt, lastCatalog.Get(created.AssetId)!.ArchivedAt);
+        Assert.Throws<InvalidOperationException>(() => lastCatalog.Update(created.AssetId,
+            new(profile, "NEW", "", false, null)));
+    }
+
+    [Fact]
+    public async Task DuplicateTickersAreRejectedForCreateAndUpdateIncludingArchivedAssets()
+    {
+        await using var fixture = new Fixture();
+        var catalog = fixture.Services.GetRequiredService<IAssetCatalog>();
+        var profile = new AssetProfile("First", AssetType.Stock, "Description", [], 1m);
+        var first = catalog.Create(new(profile) { Ticker = "ONE" });
+        var second = catalog.Create(new(profile with { Name = "Second" }) { Ticker = "TWO" });
+        var otherCatalog = fixture.NewProvider().GetRequiredService<IAssetCatalog>();
+        Assert.Throws<ArgumentException>(() => otherCatalog.Create(new(profile) { Ticker = " one " }));
+        Assert.Throws<ArgumentException>(() => otherCatalog.Update(second.AssetId, new(profile, "ONE", "", false, null)));
+        Assert.Equal("TWO", catalog.Get(second.AssetId)!.Ticker);
+        catalog.Archive(first.AssetId);
+        Assert.Throws<ArgumentException>(() => otherCatalog.Create(new(profile) { Ticker = "one" }));
+        Assert.Equal(2, otherCatalog.GetAll(includeArchived: true).Count);
+        Assert.Throws<KeyNotFoundException>(() => catalog.Archive(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public async Task VersionOneUpgradePreservesCatalogLinksAndHistoryAndAssignsStableTickers()
+    {
+        await using var fixture = new Fixture();
+        var asset = fixture.CreateAsset("Old asset", 100m);
+        var store = fixture.Services.GetRequiredService<IMarketHistoryStore>();
+        var sessionId = Guid.NewGuid();
+        store.StartSession(sessionId, TimeSpan.FromSeconds(1), DateTimeOffset.UnixEpoch);
+        var runId = store.StartRun(Config(asset, sessionId), DateTimeOffset.UnixEpoch);
+        store.SaveTick(runId, Tick(runId, sessionId, asset.AssetId, 1, 105m,
+            [Trade(105m, 2m, DateTimeOffset.UnixEpoch)]), DateTimeOffset.UnixEpoch);
+        fixture.ExecuteSql("""
+            DROP INDEX IX_Assets_Ticker;
+            ALTER TABLE Assets DROP COLUMN Ticker;
+            ALTER TABLE Assets DROP COLUMN Industry;
+            ALTER TABLE Assets DROP COLUMN IncludeGovernmentSupport;
+            ALTER TABLE Assets DROP COLUMN GrowthPotential;
+            ALTER TABLE Assets DROP COLUMN UpdatedAt;
+            ALTER TABLE Assets DROP COLUMN ArchivedAt;
+            ALTER TABLE MarketTicks DROP COLUMN TotalTradeCount;
+            DELETE FROM StorageSchemaVersions WHERE Version = 2;
+            """);
+
+        var upgraded = fixture.NewProvider();
+        var restored = upgraded.GetRequiredService<IAssetCatalog>().Get(asset.AssetId)!;
+
+        Assert.Equal(asset.AssetId, restored.AssetId);
+        Assert.Equal(asset.Profile.Name, restored.Profile.Name);
+        Assert.Equal(asset.StartPrice, restored.StartPrice);
+        Assert.Equal(asset.CreatedAt, restored.CreatedAt);
+        Assert.NotEmpty(restored.Ticker);
+        Assert.Equal("", restored.Industry);
+        Assert.False(restored.IncludeGovernmentSupport);
+        Assert.Null(restored.GrowthPotential);
+        Assert.Null(restored.ArchivedAt);
+        Assert.Equal(restored.Ticker, fixture.NewProvider().GetRequiredService<IAssetCatalog>().Get(asset.AssetId)!.Ticker);
+        var session = upgraded.GetRequiredService<ITradingSessionHistoryReader>().GetSession(sessionId)!;
+        Assert.Equal(runId, Assert.Single(session.Markets).RunId);
+        Assert.Equal(1, session.Markets[0].TradeCount);
+        Assert.Equal(2m, Assert.Single(upgraded.GetRequiredService<IMarketCandleReader>()
+            .GetCandles(runId, TimeSpan.FromSeconds(10), 10)).Volume);
+        Assert.Equal(2L, fixture.ExecuteScalar("SELECT MAX(Version) FROM StorageSchemaVersions;"));
+        using var db = fixture.CreateContext();
+        Assert.Null(Assert.Single(db.MarketTicks).TotalTradeCount);
+    }
+
+    [Fact]
+    public async Task ArchivedAssetsKeepHistoryAndCannotStartNewRuns()
+    {
+        await using var fixture = new Fixture();
+        var asset = fixture.CreateAsset("First", 100m);
+        var store = fixture.Services.GetRequiredService<IMarketHistoryStore>();
+        var session = Guid.NewGuid();
+        store.StartSession(session, TimeSpan.FromSeconds(1), DateTimeOffset.UnixEpoch);
+        var run = store.StartRun(Config(asset, session), DateTimeOffset.UnixEpoch);
+        fixture.Services.GetRequiredService<IAssetCatalog>().Archive(asset.AssetId);
+        Assert.Equal(run, store.StartRun(Config(asset, session), DateTimeOffset.UnixEpoch));
+        store.SaveTick(run, Tick(run, session, asset.AssetId, 1, 100m), DateTimeOffset.UnixEpoch);
+        var anotherSession = Guid.NewGuid();
+        store.StartSession(anotherSession, TimeSpan.FromSeconds(1), DateTimeOffset.UnixEpoch);
+        Assert.Throws<InvalidOperationException>(() => store.StartRun(Config(asset, anotherSession), DateTimeOffset.UnixEpoch));
+        Assert.Single(fixture.Services.GetRequiredService<ITradingSessionHistoryReader>().GetAssetRuns(asset.AssetId));
+        Assert.Single(fixture.Services.GetRequiredService<IMarketCandleReader>().GetCandles(run, TimeSpan.FromSeconds(10), 10));
+        using var db = fixture.CreateContext();
+        Assert.Single(db.SimulationRuns);
+    }
+
+    [Fact]
+    public async Task RunnerPersistsExactTradeCountBeyondRecentTradeWindow()
+    {
+        await using var fixture = new Fixture();
+        var asset = fixture.CreateAsset("First", 100m);
+        var runner = fixture.Services.GetRequiredService<IMultiAssetSimulationRunner>();
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        runner.OnMarketTick += _ => ready.TrySetResult();
+        await runner.StartSessionAsync(new([asset.AssetId], TimeSpan.FromHours(1), []));
+        await ready.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var runId = runner.GetRunId(asset.AssetId);
+        var seller = runner.AddSessionAgent(new(AgentType.CounterTrend, 0m, 70m));
+        var buyer = runner.AddSessionAgent(new(AgentType.TrendFollowing, 10_000m));
+        runner.SubmitMany(asset.AssetId,
+            [new(Guid.NewGuid(), seller.AgentName, OrderSide.Sell, OrderType.Limit, 100m, 65m, DateTimeOffset.UtcNow)]);
+
+        var result = runner.SubmitMany(asset.AssetId, Enumerable.Range(0, 65)
+            .Select(_ => new Order(Guid.NewGuid(), buyer.AgentName, OrderSide.Buy, OrderType.Market, null, 1m, DateTimeOffset.UtcNow)));
+
+        Assert.Equal(65L, result.Result.Snapshot.TotalTradeCount);
+        Assert.Equal(50, result.Result.Snapshot.RecentTrades.Count);
+        Assert.Equal(65, result.Result.Trades.Count);
+        Assert.Equal(65L, runner.GetCurrent(asset.AssetId)!.Snapshot.TotalTradeCount);
+        await runner.StopAsync();
+        var restarted = fixture.NewProvider();
+        Assert.Equal(65, restarted.GetRequiredService<ISimulationHistoryReader>().GetRun(runId)!.TradeCount);
+        using var db = fixture.CreateContext();
+        Assert.Equal(65L, db.MarketTicks.OrderByDescending(tick => tick.Tick).First().TotalTradeCount);
+        Assert.Equal(65, db.Trades.Count());
+    }
 
     private static Trade Trade(decimal price, decimal quantity, DateTimeOffset time) =>
         new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Buyer", "Seller", price, quantity, time);

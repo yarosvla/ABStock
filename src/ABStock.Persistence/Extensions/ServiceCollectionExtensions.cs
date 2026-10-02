@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
             options.UseSqlite(connectionString));
 
         services.TryAddSingleton<StorageInitializer>();
+        services.TryAddSingleton<IAssetStartPricePolicy, AssetStartPricePolicy>();
         services.RemoveAll<IAssetCatalog>();
         services.RemoveAll<IMarketHistoryStore>();
         services.RemoveAll<IMarketCandleReader>();
