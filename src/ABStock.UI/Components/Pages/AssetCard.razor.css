@@ -1,0 +1,194 @@
+/* ============================================================================
+   Профиль актива — карточка актива (DESIGN.md 16.1.1). Раскладка и
+   оформление профиля переехали сюда с «Создания актива»: там теперь только
+   форма. Всё оформление — через var(--...) из design-system.css (18.3).
+   ============================================================================ */
+
+.profile-shell {
+    position: relative;
+    z-index: var(--z-content);
+    display: flex;
+    flex-direction: column;
+    /* Оболочка — ровно один экран, длинное прокручивается внутри неё
+       (раздел 13, «Модель оболочки»). */
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.profile-page {
+    flex: 1;
+    /* min-height: 0 — пара к height у оболочки. Без него флекс-элемент не даёт
+       себя сжать ниже содержимого, и ограничение оболочки не работает. */
+    min-height: 0;
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--page-pad);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-5);
+}
+
+/* Нарративная раскладка 8 + 4 колонки (раздел 8).
+   align-items: start — колонки выравниваются по верху, а не по низу: панель
+   не растягивается пустотой ради ровного нижнего края (раздел 7.1). */
+.layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: var(--gutter);
+    align-items: start;
+}
+
+/* ---------- крошки и шапка: чем эта страница отступает от кита ----------
+   Разметка живёт в <Breadcrumbs> и <PageHead>, канонические значения —
+   в их .razor.css. Ниже перечислено ровно то, чем «Создание актива»
+   отличалось от «Торгов» и «Новостей» на момент выноса. Расхождение это
+   не узаконивает, а делает видимым: когда решим свести страницы к одному
+   виду, правка будет удалением этого блока.
+
+   ::deep — потому что элементы принадлежат разметке компонентов кита,
+   и скоуп страницы до них сам не достаёт. */
+
+.profile-page ::deep .ui-crumbs__current { color: var(--text-1); }
+
+.profile-page ::deep .ui-page-head { gap: var(--s-6); }
+.profile-page ::deep .ui-page-head__title { gap: var(--s-2); min-width: 0; }
+.profile-page ::deep .ui-page-head__context { font: var(--t-body-sm); }
+.profile-page ::deep .ui-page-head__actions { flex: none; }
+
+.page-foot {
+    margin: 0;
+    padding-top: var(--s-3);
+    font: var(--t-body-sm);
+    color: var(--text-3);
+}
+
+/* ---------- имя актива и тикер ---------- */
+.asset {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--s-4);
+    min-width: 0;
+}
+
+.asset__rule {
+    align-self: center;
+    width: 1px;
+    height: var(--h-ctl-sm);
+    background: var(--line-3);
+}
+
+.asset__ticker {
+    font: var(--n-hero);
+    font-weight: 500;
+    color: var(--text-2);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* ---------- чипы и бейджи (9.6) ---------- */
+.unit { color: var(--text-3); }
+
+.chip {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: 22px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    background: var(--fill-soft);
+    font: var(--t-caption);
+    color: var(--text-2);
+}
+
+.chip .num-sm { color: var(--text-1); }
+
+.badge {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 var(--s-2);
+    border-radius: var(--r-pill);
+    font: var(--t-caption);
+    font-weight: 500;
+}
+
+.badge--warn { background: var(--warn-soft); color: var(--warn-500); }
+
+
+/* ============================================================================
+   Профиль
+   ============================================================================ */
+.profile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-4);
+    min-width: 0;
+}
+
+.balance { display: flex; flex-direction: column; gap: var(--s-2); }
+
+.balance__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
+.balance__meta { font: var(--t-caption); color: var(--text-3); }
+.balance__meta .num-sm { color: var(--text-1); }
+
+.factors {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gutter);
+    align-items: start;
+}
+
+/* ---------- исходное описание ---------- */
+.source__text {
+    margin: 0;
+    font: var(--t-body-sm);
+    color: var(--text-2);
+    text-wrap: pretty;
+}
+
+.source__spec {
+    margin: var(--s-4) 0 0;
+    padding-top: var(--s-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+}
+
+.source__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s-3);
+}
+
+.source__spec dt { font: var(--t-body-sm); color: var(--text-3); }
+.source__spec dd { margin: 0; font: var(--t-body-sm); color: var(--text-1); }
+
+
+.profile-title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    flex-wrap: wrap;
+}
+
+.profile-title h1 {
+    margin: 0;
+    font: var(--t-display);
+    letter-spacing: -0.015em;
+    color: var(--text-1);
+}
+
+.profile-strip__value { font: var(--t-body); color: var(--text-1); }
+
+.profile-empty { padding: var(--s-10) var(--s-6); }

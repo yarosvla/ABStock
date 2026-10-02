@@ -3,16 +3,16 @@
 @rendermode InteractiveServer
 @using ABStock.AI.Models
 @using ABStock.AI.Services
-@using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
 @inject IAssetProfileService AssetProfileService
-@inject IActiveAssetContext ActiveAssetContext
 @inject IAssetRegistry Registry
+@inject ISessionMarkets Markets
 @inject INotificationFeed NotificationFeed
-@inject ISimulationRunner SimulationRunner
+@inject NavigationManager Navigation
+@implements IDisposable
 
-<PageTitle>Создание актива</PageTitle>
+<PageTitle>@(editing is null ? "Новый актив" : $"Описание {editing.Symbol}")</PageTitle>
 
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
@@ -20,18 +20,17 @@
     <TopNavigation ActivePage="Assets" ShowClock="true" />
 
     <main class="create-page">
-
-        @* ── Крошки · Активы › Актив › Раздел (раздел 13) ─────────────────────
-             Статус актива — чипом рядом с именем, внутри одного элемента пути.
-             Между «›» он читался бы как ещё один раздел. *@
+        @* «Новый актив» вложен в «Активы» (DESIGN.md 16.1); правка описания —
+           в карточку актива. *@
         <Breadcrumbs Items="@BuildCrumbs()" />
 
-        @if (profile is null)
-        {
-            @* ══════════════ Форма и загрузка ══════════════ *@
-            <PageHead Title="Создание актива">
-                <Context>Опишите компанию словами — система соберёт профиль, по которому рынок будет реагировать на новости.</Context>
-            </PageHead>
+        <PageHead Title="@(editing is null ? "Новый актив" : "Изменить описание")">
+            <Context>
+                @(editing is null
+                    ? "Опишите компанию словами — система соберёт профиль, по которому рынок будет реагировать на новости."
+                    : "Профиль соберётся заново по новому описанию. Тикер останется прежним.")
+            </Context>
+        </PageHead>
 
             @if (isGenerating)
             {
@@ -116,6 +115,16 @@
                                            Invalid="NameInvalid"
                                            InvalidTone="down"
                                            DescribedBy="@(NameInvalid ? "asset-name-error" : null)" />
+                                @if (!string.IsNullOrWhiteSpace(assetName))
+                                {
+                                    @* Тикер система собирает сама; занятый заменяется вторым
+                                       вариантом, а не дублем (контракт 2.1). *@
+                                    <span class="ticker-preview">
+                                        <span class="field__hint">тикер</span>
+                                        <Ticker Symbol="@SuggestedSymbol" Large="true" />
+                                        <span class="field__hint">@(SuggestedSymbol == AssetSymbols.Build(assetName) ? "свободен" : $"{AssetSymbols.Build(assetName)} занят — выбран другой вариант")</span>
+                                    </span>
+                                }
                                 @if (NameInvalid)
                                 {
                                     <span id="asset-name-error" class="field__error">
@@ -229,211 +238,79 @@
                             </section>
 
                             <footer class="form__foot hairline-top">
-                                <p class="form__note">@SessionNote</p>
+                                <p class="form__note">
+                                    @if (Markets.IsRunning && editing is null)
+                                    {
+                                        <StatusDot Tone="up" />
+                                    }
+                                    @SessionNote
+                                </p>
                                 <div class="form__actions">
-                                    <AppButton Variant="ghost" OnClick="ClearForm">Очистить</AppButton>
-                                    <AppButton Variant="primary" Disabled="@(!IsValid)" OnClick="RequestProfile">Создать актив</AppButton>
+                                    @if (editing is not null)
+                                    {
+                                        <AppButton Variant="ghost" Href="@($"/assets/{editing.Symbol}")">Отмена</AppButton>
+                                    }
+                                    else
+                                    {
+                                        <AppButton Variant="ghost" OnClick="ClearForm">Очистить</AppButton>
+                                    }
+                                    <AppButton Variant="primary" Disabled="@(!CanSubmit)" OnClick="GenerateProfileAsync">@(editing is null ? "Создать актив" : "Собрать профиль заново")</AppButton>
                                 </div>
                             </footer>
 
                             @if (ShowErrors && !IsValid)
                             {
-                                <p class="form__verdict hairline-top">Профиль не построен — исправьте @(ErrorCount == 1 ? "одно поле" : "два поля").</p>
+                                <p class="form__verdict hairline-top">Актив не создан — исправьте @(ErrorCount == 1 ? "одно поле" : "два поля").</p>
                             }
                         </ChildContent>
                     </Panel>
 
-                    <Panel Title="Что получится" Class="promise rise rise-2">
-                        <MetaContent><text>профиль актива</text></MetaContent>
-                        <ChildContent>
-                            <dl class="promise__list">
-                                @foreach (var item in ProfilePromise)
-                                {
-                                    <div class="promise__row">
-                                        <dt>@item.Title</dt>
-                                        <dd>@item.Text</dd>
-                                    </div>
-                                }
-                            </dl>
-                            <p class="promise__foot hairline-top">Чувствительность и факторы участвуют в расчёте силы влияния новости на «Новостях» и определяют поведение новостного агента на «Торгах».</p>
-                        </ChildContent>
-                    </Panel>
+                    <div class="create-rail">
+                        <Panel Title="Что получится" Class="promise rise rise-2">
+                            <ChildContent>
+                                <dl class="promise__list">
+                                    @foreach (var item in ProfilePromise)
+                                    {
+                                        <div class="promise__row">
+                                            <dt>@item.Title</dt>
+                                            <dd>@item.Text</dd>
+                                        </div>
+                                    }
+                                </dl>
+                                <p class="promise__foot hairline-top">Новость разбирается сразу по всем активам сессии: профиль решает, заденет ли она этот актив и насколько.</p>
+                            </ChildContent>
+                        </Panel>
+
+                        <Panel Title="Активы сессии" Class="rise rise-3" Flush="true">
+                            <MetaContent><span class="num-sm">@Registry.Assets.Count</span> из <span class="num-sm">@IAssetRegistry.Limit</span></MetaContent>
+                            <ChildContent>
+                                <div class="slots">
+                                    @foreach (var asset in Registry.Assets)
+                                    {
+                                        <span class="slot @(asset.Symbol == editing?.Symbol ? "slot--new" : null)">
+                                            <Ticker Symbol="@asset.Symbol" />
+                                            <span class="slot__state">@(Markets.IsRunning && Markets.Trades(asset.Id) ? "в торгах" : "до запуска")</span>
+                                        </span>
+                                    }
+                                    @if (editing is null && !Registry.IsFull && !string.IsNullOrWhiteSpace(assetName))
+                                    {
+                                        <span class="slot slot--new">
+                                            <Ticker Symbol="@SuggestedSymbol" />
+                                            <span class="slot__state">новый</span>
+                                        </span>
+                                    }
+                                    @for (var i = Registry.Assets.Count + (editing is null && !string.IsNullOrWhiteSpace(assetName) ? 1 : 0); i < IAssetRegistry.Limit; i++)
+                                    {
+                                        <span class="slot slot--free" aria-hidden="true"></span>
+                                    }
+                                </div>
+                            </ChildContent>
+                        </Panel>
+                    </div>
                 </div>
             }
-        }
-        else
-        {
-            @* ══════════════ Профиль ══════════════ *@
-            <PageHead ContextClass="@(IsFallbackProfile ? "is-warn" : null)">
-                <TitleContent>
-                    <div class="asset">
-                        <h1>@profile.Name</h1>
-                        <span class="asset__rule" aria-hidden="true"></span>
-                        <span class="asset__ticker">@Symbol</span>
-                        <span class="chip">@AssetTypeName(profile.AssetType)</span>
-                        @if (!string.IsNullOrWhiteSpace(draftIndustry))
-                        {
-                            <span class="chip">@draftIndustry</span>
-                        }
-                        @if (includeGovernmentSupport)
-                        {
-                            <span class="chip">господдержка учтена</span>
-                        }
-                        @if (growthPotential is { } potential)
-                        {
-                            <span class="chip">потенциал роста <span class="num-sm">@potential</span></span>
-                        }
-                        @* Бейдж источника — только у запасного профиля. В обычном
-                           состоянии артборд 03 его не показывает: «Профиль построен AI»
-                           это спецификация из артборда 05, а не отметка на экране.
-                           Пункт 83 docs/ui-backlog.md. *@
-                        @if (IsFallbackProfile)
-                        {
-                            <span class="badge badge--warn">@SourceBadge</span>
-                        }
-                    </div>
-                </TitleContent>
-                <Context>@SourceNote</Context>
-                <Actions>
-                    <AppButton Variant="secondary" OnClick="SecondaryAction">@SecondaryActionLabel</AppButton>
-                    <AppButton Variant="primary" Href="/trading">Перейти к торгам</AppButton>
-                </Actions>
-            </PageHead>
-
-            @* Полоса связи — одна на экран (раздел 9.19) *@
-            <CausalityStrip Class="rise rise-1" Label="Как профиль связан с рынком">
-                <CausalityStep Label="Описание" Weight="1.1"
-                               Value="@DescriptionExcerpt" Truncate="true"
-                               Note="@($"{profile.Description.Length} символов")" />
-
-                <CausalityStep Label="Чувствительность к новостям" Weight="1.9">
-                    <ZoneScale Value="profile.NewsSensitivity"
-                               Min="SensitivityMin" Max="SensitivityMax"
-                               Zones="SensitivityZones"
-                               Note="@SensitivityNote"
-                               Tone="@(IsFallbackProfile ? "warn" : "acc")" />
-                </CausalityStep>
-
-                <CausalityStep Label="Сила влияния новости" Weight="1.15"
-                               Value="тональность × близость к фактору × вес фактора × чувствительность"
-                               Note="чувствительность — постоянный множитель" />
-
-                <CausalityStep Label="Реакция рынка" Weight="1.15"
-                               Value="@MarketReaction" Note="@MarketReactionNote" />
-            </CausalityStrip>
-
-            <div class="layout">
-                <div class="profile rise rise-2">
-
-                    <section class="balance">
-                        <div class="balance__head">
-                            <span class="label">Баланс факторов</span>
-                            <span class="balance__meta">из описания собрано <span class="num-sm">@TotalFactors</span> @FactorWord</span>
-                        </div>
-                        <BalanceBar Positive="PositiveFactors.Count" Negative="NegativeFactors.Count" />
-                    </section>
-
-                    <div class="factors">
-                        <Panel Title="Позитивные факторы" Class="factors__panel" Flush="true">
-                            <MetaContent><span class="num-sm">@PositiveFactors.Count</span></MetaContent>
-                            <ChildContent>
-                                @if (PositiveFactors.Count > 0)
-                                {
-                                    <ul class="factor-list">
-                                        @foreach (var factor in PositiveFactors)
-                                        {
-                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@FactorTitle(factor)">@factor.Name</span></li>
-                                        }
-                                    </ul>
-                                }
-                                else
-                                {
-                                    <p class="factors__empty">—</p>
-                                }
-                            </ChildContent>
-                        </Panel>
-
-                        <Panel Title="Негативные факторы" Class="factors__panel" Flush="true">
-                            <MetaContent><span class="num-sm">@NegativeFactors.Count</span></MetaContent>
-                            <ChildContent>
-                                @if (NegativeFactors.Count > 0)
-                                {
-                                    <ul class="factor-list">
-                                        @foreach (var factor in NegativeFactors)
-                                        {
-                                            <li class="factor"><span class="factor__dot" aria-hidden="true"></span><span class="factor__text" title="@FactorTitle(factor)">@factor.Name</span></li>
-                                        }
-                                    </ul>
-                                }
-                                else
-                                {
-                                    <p class="factors__empty">—</p>
-                                }
-                            </ChildContent>
-                        </Panel>
-                    </div>
-                </div>
-
-                <Panel Title="Исходное описание" Class="source rise rise-3">
-                    <MetaContent><text>то, что вы написали</text></MetaContent>
-                    <ChildContent>
-                        <p class="source__text">@profile.Description</p>
-                        <dl class="source__spec hairline-top">
-                            <div class="source__row">
-                                <dt>Тип актива</dt>
-                                <dd>@AssetTypeName(profile.AssetType)</dd>
-                            </div>
-                            <div class="source__row">
-                                <dt>Отрасль</dt>
-                                <dd>@(string.IsNullOrWhiteSpace(draftIndustry) ? "—" : draftIndustry)</dd>
-                            </div>
-                            <div class="source__row">
-                                <dt>Государственная поддержка</dt>
-                                <dd>@(includeGovernmentSupport ? "учитывается" : "не учитывается")</dd>
-                            </div>
-                            <div class="source__row">
-                                <dt>Потенциал роста</dt>
-                                <dd>
-                                    @if (growthPotential is { } value)
-                                    {
-                                        <span class="num">@value</span>
-                                    }
-                                    else
-                                    {
-                                        <span class="nodata">—</span>
-                                    }
-                                </dd>
-                            </div>
-                        </dl>
-                    </ChildContent>
-                </Panel>
-            </div>
-
-            <p class="page-foot hairline-top">@SavedNote</p>
-        }
     </main>
 </div>
-
-@* Подтверждение: создание нового актива прервёт торги (раздел 9.12) *@
-@if (isConfirmOpen)
-{
-    <div class="overlay" @onclick="CloseConfirm">
-        <div class="confirm glass" role="dialog" aria-modal="true" aria-labelledby="confirm-title"
-             tabindex="-1" @ref="confirmDialog" @onkeydown="HandleConfirmKey" @onclick:stopPropagation="true">
-            <h2 id="confirm-title">Создать новый актив?</h2>
-            <p class="confirm__text">Актив в сессии один. Текущие торги по «@SessionAsset.Draft.Name» остановятся, агенты снимут открытые заявки. История сделок сохранится.</p>
-            <div class="confirm__meta">
-                <span>открытых заявок <span class="num-sm">@OpenOrdersCount</span></span>
-                <span>агентов <span class="num-sm">@SessionAgentsCount</span></span>
-                <span>шаг симуляции <span class="num-sm">@SessionTick</span></span>
-            </div>
-            <div class="confirm__actions">
-                <AppButton Variant="ghost" OnClick="CloseConfirm">Отмена</AppButton>
-                <AppButton Variant="primary" OnClick="ConfirmAndGenerate">Создать и остановить торги</AppButton>
-            </div>
-        </div>
-    </div>
-}
 
 @code {
     private const int MinDescriptionLength = 120;
@@ -466,15 +343,18 @@
         "Розничная торговля"
     ];
 
-    // Что появится в профиле. Текст описывает разделы профиля, а не выдумывает
-    // их: каждый пункт отрисовывается ниже из AssetProfile.
     private static readonly PromiseItem[] ProfilePromise =
     [
-        new("Позитивные и негативные факторы", "Что работает на цену актива, а что против неё. С ними по смыслу сопоставляется каждая новость."),
-        new("Вес факторов", "Насколько сильно каждый фактор влияет на цену: от 0 до 1."),
-        new("Чувствительность к новостям", "Число от 0,45 до 0,95: насколько сильно новости двигают цену этого актива."),
-        new("Тикер", "Система сгенерирует его из названия — вводить не нужно.")
+        new("Профиль", "позитивные и негативные факторы с весом"),
+        new("Чувствительность к новостям", "0,45–0,95"),
+        new("Стартовая цена", "рассчитает система"),
+        new("Тикер", "3–4 латинские буквы, из названия")
     ];
+
+    /// <summary>Тикер из адреса: <c>/assets/new?edit=GLEN</c> — правка описания этого актива.</summary>
+    [SupplyParameterFromQuery(Name = "edit")] public string? Edit { get; set; }
+
+    private SessionAsset? editing;
 
     private AssetType selectedAssetType = AssetType.Stock;
     private string assetName = string.Empty;
@@ -485,94 +365,80 @@
 
     private bool isIndustryOpen;
     private bool isGenerating;
-    private bool isConfirmOpen;
-    private bool isConfirmFocused;
     private bool isFormTouched;
-
-    private AssetProfile? profile;
-    private string draftIndustry = string.Empty;
-    private ElementReference confirmDialog;
 
     protected override void OnInitialized()
     {
-        // Черновик пустой, пока пользователь ничего не вводил: в макете форма
-        // пустая, а демо-актив сессии живёт отдельно и подписан в крошках.
-        if (ActiveAssetContext.Draft is { } draft)
-        {
-            selectedAssetType = draft.AssetType;
-            assetName = draft.Name;
-            assetDescription = draft.Description;
-            selectedIndustry = string.IsNullOrWhiteSpace(draft.Industry) ? null : draft.Industry;
-            includeGovernmentSupport = draft.IncludeGovernmentSupport;
-
-            // Ноль и «не задан» в черновике неразличимы, а нулевой потенциал
-            // роста смысла не имеет — читаем ноль как незаполненное поле.
-            growthPotential = draft.GrowthPotential > 0 ? draft.GrowthPotential : null;
-            draftIndustry = draft.Industry;
-            isFormTouched = true;
-        }
-
-        if (ActiveAssetContext.Profile is { } saved)
-        {
-            profile = saved;
-        }
+        Registry.Changed += HandleRegistryChanged;
+        Markets.Changed += HandleRegistryChanged;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnParametersSet()
     {
-        // Фокус переводится в диалог один раз на открытие: иначе каждый
-        // повторный рендер утаскивал бы фокус с кнопок внутри диалога.
-        if (isConfirmOpen && !isConfirmFocused)
+        editing = Registry.Find(Edit);
+
+        // Правка — форма заполнена тем, с чем актив создавали. Новый актив —
+        // черновиком, если человек уходил со страницы и вернулся.
+        var draft = editing is { } asset
+            ? asset.Draft ?? new AssetDraft(asset.Name, asset.Description, asset.AssetType, string.Empty, false, 0)
+            : Registry.Draft;
+
+        if (draft is null)
         {
-            isConfirmFocused = true;
-            await confirmDialog.FocusAsync();
+            return;
         }
+
+        selectedAssetType = draft.AssetType;
+        assetName = draft.Name;
+        assetDescription = draft.Description;
+        selectedIndustry = string.IsNullOrWhiteSpace(draft.Industry) ? null : draft.Industry;
+        includeGovernmentSupport = draft.IncludeGovernmentSupport;
+
+        // Ноль и «не задан» неразличимы, а нулевой потенциал роста смысла не
+        // имеет — читаем ноль как незаполненное поле.
+        growthPotential = draft.GrowthPotential > 0 ? draft.GrowthPotential : null;
+        isFormTouched = true;
     }
 
-    // ── Сессия ──────────────────────────────────────────────────────────────
+    private void HandleRegistryChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private ActiveAssetView SessionAsset => ActiveAssetContext.GetView();
-
-    /// <summary>
-    /// Актив в крошках показывается, только когда у него есть имя: стёртое поле
-    /// названия оставляло в пути пустой элемент «Активы ›  › Создание актива».
-    /// </summary>
-    private bool HasSessionAsset => !string.IsNullOrWhiteSpace(SessionAsset.Draft.Name);
+    public void Dispose()
+    {
+        Registry.Changed -= HandleRegistryChanged;
+        Markets.Changed -= HandleRegistryChanged;
+    }
 
     private Crumb[] BuildCrumbs() =>
-        HasSessionAsset
-            ? [
-                new("Активы", Href: "/create-asset"),
-                new(SessionAsset.Draft.Name,
-                    IsAsset: true,
-                    ChipText: SessionAsset.IsFallback ? "Демо-контекст" : null),
-                new("Создание актива")
-              ]
-            : [
-                new("Активы", Href: "/create-asset"),
-                new("Создание актива")
-              ];
+        editing is { } asset
+            ? [new("Активы", Href: "/assets"), new(asset.Name, Href: $"/assets/{asset.Symbol}"), new("Описание")]
+            : [new("Активы", Href: "/assets"), new("Новый актив")];
 
-    private string Symbol => ActiveAssetDefaults.BuildSymbol(profile?.Name ?? assetName);
+    /// <summary>Тикер, который получит актив: свободный, а не просто собранный из имени.</summary>
+    private string SuggestedSymbol =>
+        editing?.Symbol ?? Registry.SuggestSymbol(assetName);
 
-    private string SessionNote => SessionAsset.IsFallback
-        ? $"Демо-контекст: в сессии пример «{SessionAsset.Draft.Name}» — новый актив заменит его."
-        : "Актив в сессии один: новый актив заменит текущий.";
-
-    private int OpenOrdersCount
+    private string SessionNote
     {
         get
         {
-            var book = SimulationRunner.Current?.OrderBook;
-            return book is null
-                ? 0
-                : book.Bids.Sum(level => level.OrdersCount) + book.Asks.Sum(level => level.OrdersCount);
+            if (editing is not null)
+            {
+                return "Новый профиль заменит прежний; прошлые прогоны остаются в истории.";
+            }
+
+            if (Registry.IsFull)
+            {
+                return $"В сессии уже {IAssetRegistry.Limit} активов — это предел. Уберите актив в архив, чтобы создать новый.";
+            }
+
+            var place = Registry.Assets.Count + 1;
+            return Markets.IsRunning
+                ? $"Торги идут — актив сразу вступит в торги, агенты получат по {IAgentComposition.InitialPosition:0} шт. Он будет {place}-м из {IAssetRegistry.Limit} возможных в сессии."
+                : $"Актив вступит в торги при запуске. Он будет {place}-м из {IAssetRegistry.Limit} возможных в сессии.";
         }
     }
 
-    private int SessionAgentsCount => SimulationRunner.Current?.Agents.Count ?? 0;
-
-    private int SessionTick => SimulationRunner.Current?.Tick ?? 0;
+    private bool CanSubmit => IsValid && !isGenerating && (editing is not null || !Registry.IsFull);
 
     // ── Валидация ───────────────────────────────────────────────────────────
 
@@ -586,79 +452,6 @@
     private bool NameInvalid => ShowErrors && !NameValid;
     private bool DescriptionInvalid => ShowErrors && !DescriptionValid;
     private int ErrorCount => (NameValid ? 0 : 1) + (DescriptionValid ? 0 : 1);
-
-    // ── Профиль на экране ───────────────────────────────────────────────────
-
-    private bool IsFallbackProfile => profile?.Source == ProfileSource.Fallback;
-
-    private string SourceBadge => IsFallbackProfile ? "Запасной алгоритм" : "Профиль построен AI";
-
-    private string SourceNote => IsFallbackProfile
-        ? "Языковая модель была недоступна: профиль собран по типу актива и отрасли, текст описания не анализировался."
-        : $"Профиль построен по описанию · тикер сгенерирован системой · {(ActiveAssetContext.UpdatedAt ?? DateTimeOffset.Now).ToLocalTime():d MMMM yyyy, HH:mm:ss}";
-
-    /// <summary>
-    /// Одно действие — одна формулировка (раздел 17). «Изменить описание» и
-    /// «Построить профиль заново» — одна кнопка: в обычном профиле пользователь
-    /// правит текст, в запасном — повторяет разбор того же текста.
-    /// </summary>
-    private string SecondaryActionLabel => IsFallbackProfile ? "Построить профиль заново" : "Изменить описание";
-
-    private Task SecondaryAction() => IsFallbackProfile ? RebuildProfile() : RunEditDescription();
-
-    private string SavedNote => IsFallbackProfile
-        ? "Описание можно проанализировать заново, когда модель ответит."
-        : "Профиль сохранён. Актив в сессии один — торги пойдут по нему.";
-
-    private IReadOnlyList<AssetFactor> PositiveFactors => profile?.PositiveFactors.ToArray() ?? [];
-
-    private IReadOnlyList<AssetFactor> NegativeFactors => profile?.NegativeFactors.ToArray() ?? [];
-
-    private int TotalFactors => profile?.Factors.Count ?? 0;
-
-    private static string FactorTitle(AssetFactor factor) => $"{factor.Name} · вес {factor.Importance:F2}";
-
-    private string FactorWord => (TotalFactors % 100 is >= 11 and <= 14) switch
-    {
-        true => "факторов",
-        false => (TotalFactors % 10) switch
-        {
-            1 => "фактор",
-            2 or 3 or 4 => "фактора",
-            _ => "факторов"
-        }
-    };
-
-    private string DescriptionExcerpt => profile?.Description ?? string.Empty;
-
-    private string SensitivityZoneName
-    {
-        get
-        {
-            return SensitivityScale.Word(profile?.NewsSensitivity ?? SensitivityMin);
-        }
-    }
-
-    private string SensitivityNote => IsFallbackProfile
-        ? $"{SensitivityZoneName} · значение по отрасли"
-        : SensitivityZoneName;
-
-    private string MarketReaction => SensitivityZoneName switch
-    {
-        "высокая" => "Новость по теме двигает цену сильнее среднего",
-        "средняя" => "Новость по теме двигает цену на среднюю величину",
-        _ => "Новость по теме двигает цену слабее среднего"
-    };
-
-    private string MarketReactionNote => SensitivityZoneName switch
-    {
-        "высокая" => "новостной агент на «Торгах» реагирует активнее",
-        "средняя" => "новостной агент на «Торгах» реагирует умеренно",
-        _ => "новостной агент на «Торгах» реагирует сдержаннее"
-    };
-
-    private static string AssetTypeName(AssetType assetType) =>
-        AssetTypes.First(option => option.Type == assetType).Name;
 
     // ── Действия формы ──────────────────────────────────────────────────────
 
@@ -712,82 +505,24 @@
         growthPotential = null;
         isIndustryOpen = false;
         isFormTouched = false;
-        profile = null;
-        draftIndustry = string.Empty;
-        ActiveAssetContext.Clear();
-    }
-
-    private Task RunEditDescription()
-    {
-        EditDescription();
-        return Task.CompletedTask;
-    }
-
-    private void EditDescription()
-    {
-        profile = null;
-        isIndustryOpen = false;
-        ActiveAssetContext.SetDraft(BuildDraft());
-    }
-
-    private Task RebuildProfile()
-    {
-        profile = null;
-        return GenerateProfileAsync();
-    }
-
-    /// <summary>
-    /// Актив в сессии один: если торги идут, новый актив их прервёт, и это
-    /// подтверждается явно.
-    /// </summary>
-    private Task RequestProfile()
-    {
-        if (!IsValid)
-        {
-            isFormTouched = true;
-            return Task.CompletedTask;
-        }
-
-        // Подтверждения «новый актив прервёт торги» больше нет: актив
-        // вступает в идущие торги, ничего не прерывая.
-        if (Registry.IsFull)
-        {
-            return Task.CompletedTask;
-        }
-
-        return GenerateProfileAsync();
-    }
-
-    private void CloseConfirm()
-    {
-        isConfirmOpen = false;
-        isConfirmFocused = false;
-    }
-
-    private Task HandleConfirmKey(KeyboardEventArgs args)
-    {
-        if (args.Key == "Escape")
-        {
-            CloseConfirm();
-        }
-
-        return Task.CompletedTask;
-    }
-
-    private async Task ConfirmAndGenerate()
-    {
-        CloseConfirm();
-        await SimulationRunner.StopAsync();
-        await GenerateProfileAsync();
+        Registry.SetDraft(null);
     }
 
     /// <summary>
     /// Генерация профиля моделью идёт десятки секунд — всё это время на
-    /// экране скелетон по форме будущего профиля.
+    /// экране скелетон по форме будущего профиля. Готовый профиль уходит в
+    /// каталог бэкенда, и человек попадает в карточку актива: там профиль и
+    /// живёт (DESIGN.md 16.1.1).
     /// </summary>
     private async Task GenerateProfileAsync()
     {
-        if (isGenerating)
+        if (!IsValid)
+        {
+            isFormTouched = true;
+            return;
+        }
+
+        if (!CanSubmit)
         {
             return;
         }
@@ -795,6 +530,8 @@
         isGenerating = true;
         isIndustryOpen = false;
         StateHasChanged();
+
+        SessionAsset saved;
 
         try
         {
@@ -809,43 +546,40 @@
                 GrowthPotential = growthPotential
             });
 
-            draftIndustry = draft.Industry;
-            profile = generated;
-            ActiveAssetContext.SetProfile(draft, generated);
+            if (editing is { } asset)
+            {
+                saved = Registry.Update(asset.Symbol, draft, generated);
+            }
+            else
+            {
+                // Если торги идут, актив вступает в них сразу (DESIGN.md 16).
+                saved = Registry.Add(draft, generated);
 
-            // Профиль уходит в каталог бэкенда: с этого момента актив есть
-            // у сессии, а если торги идут — сразу торгуется (DESIGN.md 16).
-            var created = Registry.Add(
-                new AssetDraft(draft.Name, draft.Description, draft.AssetType, draft.Industry,
-                    draft.IncludeGovernmentSupport, draft.GrowthPotential),
-                generated);
-
-            // Уведомление пишет страница: у реестра есть событие, но
-            // колокольчик — про то, что сделал человек, а не про любое
-            // изменение каталога.
-            NotificationFeed.NoteAssetCreated(draft.Name, created.Symbol);
-
-            // Актив отдан реестру: следующий заход на «Новый актив» — с
-            // чистого листа, а не с профилем только что созданного.
-            ActiveAssetContext.Clear();
+                // Уведомление пишет страница: колокольчик — про то, что сделал
+                // человек, а не про любое изменение каталога.
+                NotificationFeed.NoteAssetCreated(draft.Name, saved.Symbol);
+            }
         }
         finally
         {
             isGenerating = false;
         }
+
+        Navigation.NavigateTo($"/assets/{saved.Symbol}");
     }
 
+    /// <summary>Черновик нового актива переживает уход со страницы; правка описания черновика не пишет.</summary>
     private void SyncDraft()
     {
-        if (isGenerating || profile is not null)
+        if (isGenerating || editing is not null)
         {
             return;
         }
 
-        ActiveAssetContext.SetDraft(BuildDraft());
+        Registry.SetDraft(BuildDraft());
     }
 
-    private ActiveAssetDraft BuildDraft() =>
+    private AssetDraft BuildDraft() =>
         new(
             Name: assetName.Trim(),
             Description: assetDescription.Trim(),

@@ -1,0 +1,42 @@
+.ui-factors {
+    margin: 0;
+    padding: 0 var(--s-4) var(--s-2);
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Маркер прижат к первой строке, а не к центру блока: у фактора в две
+   строки он уезжал бы на середину и переставал читаться как начало пункта. */
+.ui-factors__item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-2);
+    padding: var(--s-3) 0;
+    min-height: var(--h-row-tall);
+    border-bottom: 1px solid var(--line-1);
+}
+
+.ui-factors__item:last-child { border-bottom: 0; }
+
+.ui-factors__dot {
+    flex: none;
+    margin-top: var(--s-2);
+    width: var(--s-1);
+    height: var(--s-1);
+    border-radius: var(--r-pill);
+    background: var(--text-3);
+}
+
+.ui-factors__text {
+    min-width: 0;
+    font: var(--t-body);
+    color: var(--text-1);
+    text-wrap: pretty;
+}
+
+.ui-factors__empty {
+    margin: 0;
+    padding: var(--s-4) var(--s-5);
+    color: var(--text-quiet);
+}
