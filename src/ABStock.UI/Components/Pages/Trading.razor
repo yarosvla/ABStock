@@ -99,6 +99,10 @@
                 </TitleContent>
                 <Context>@PageContext</Context>
                 <Actions>
+                    @* Пара к «Открыть торги» в карточке актива: строка идущего рынка
+                       на «Активах» ведёт сюда, и без этой кнопки в профиль из торгов
+                       не попасть. *@
+                    <AppButton Variant="ghost" Href="@($"/assets/{asset.Symbol}")">Профиль актива</AppButton>
                     @if (isRunning)
                     {
                         <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
