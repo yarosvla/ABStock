@@ -108,6 +108,10 @@
     gap: var(--s-3);
 }
 
+/* Отступ больше зазора внутри заголовка: кнопка — отдельный объект, а не
+   продолжение тикера. */
+.trading-title ::deep .trading-title__profile { margin-left: var(--s-2); }
+
 .trading-title h1 {
     margin: 0;
     font: var(--t-display);

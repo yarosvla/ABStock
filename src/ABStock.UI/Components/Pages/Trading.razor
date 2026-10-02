@@ -95,14 +95,15 @@
                     <span class="trading-title">
                         <h1>@asset.Name</h1>
                         <Ticker Symbol="@asset.Symbol" Large="true" />
+                        @* Пара к «Открыть торги» в карточке актива: строка идущего
+                           рынка на «Активах» ведёт сюда, и без этой кнопки в профиль
+                           из торгов не попасть. Стоит у названия, а не среди
+                           действий справа: она про актив, а те — про сессию. *@
+                        <AppButton Variant="secondary" Icon="book" Href="@($"/assets/{asset.Symbol}")" Class="trading-title__profile">Профиль актива</AppButton>
                     </span>
                 </TitleContent>
                 <Context>@PageContext</Context>
                 <Actions>
-                    @* Пара к «Открыть торги» в карточке актива: строка идущего рынка
-                       на «Активах» ведёт сюда, и без этой кнопки в профиль из торгов
-                       не попасть. *@
-                    <AppButton Variant="ghost" Href="@($"/assets/{asset.Symbol}")">Профиль актива</AppButton>
                     @if (isRunning)
                     {
                         <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
