@@ -27,28 +27,14 @@
     gap: var(--s-5);
 
     /* ---------- размеры этой страницы ----------
-       Раздел 8 запрещает голые px в .razor.css. Ширины колонок одной таблицы
-       и высота одного графика — не системные величины, им нечего делать в
-       design-system.css; но и рассыпаться по правилам они не должны. Поэтому
-       объявлены здесь один раз и дальше берутся через var().
-
-       Все значения лежат на шаге 4px (раздел 8). До сверки `--w-col-money`,
-       `--w-col-pnl` (150), `--w-col-position` (110) и `--h-equity` (150) с
-       шага сходили; ширины подняты
-       до ближайших значений на шаге, а не опущены: колонки с числами уже
-       упирались в шапку, и убавлять их — значит рисковать переносом
-       заголовка в две строки. Шесть добавленных пикселей забирает гибкая
-       колонка объяснения, которой они не нужны. */
-    --h-equity: 152px;      /* высота поля графика; макет 01 рисует 150 */
-    --w-legend: 260px;      /* легенда справа от поля */
-    --h-roster-max: 480px;  /* 15 строк по --h-row плюс шапка */
-
-    --w-col-agent: 260px;
-    --w-col-money: 152px;
-    --w-col-position: 112px;
-    --w-col-portfolio: 160px;
-    --w-col-pnl: 152px;
-    --w-col-go: 32px;
+       Колонки одной таблицы и высота одного графика — не системные величины,
+       но объявлены здесь один раз и дальше берутся через var() (раздел 8). */
+    --h-equity: 228px;       /* поле графика; артборд рисует 228 */
+    --w-equity-labels: 176px;/* колонка подписей у концов линий */
+    --w-col-agent: 200px;
+    --w-col-money: 104px;
+    --w-col-pnl: 96px;
+    --w-col-changes: 212px;
 }
 
 /* ============================================================================
@@ -108,269 +94,222 @@
 .metrics__unit { color: var(--text-3); }
 
 /* ============================================================================
-   Панель графика: поле + легенда справа
+   График и матрица — пара над таблицей: время слева, доля справа
    ============================================================================ */
-
-/* Заголовок и график здесь — один визуальный блок, разделительной линии
-   между ними на макете нет. */
-.equity ::deep .ui-panel__head { border-bottom: none; padding-bottom: 0; }
-
-.equity__body {
-    display: flex;
-    gap: var(--s-6);
+.agents-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: var(--gutter);
     align-items: stretch;
 }
 
+@media (max-width: 1439px) {
+    .agents-pair { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+    .agents-page { padding: var(--s-5); }
+}
+
+.equity__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--w-equity-labels);
+    gap: var(--s-3);
+}
+
 .equity__stage {
-    flex: 1;
-    min-width: 0;
     height: var(--h-equity);
+    min-width: 0;
 }
 
 .equity__stage--empty { display: flex; }
 
-.legend {
-    flex: none;
-    width: var(--w-legend);
+/* Подписи у концов линий: колонка той же высоты, что поле, подпись стоит
+   на высоте конца своей линии — top ставит модуль графика. */
+.equity__labels {
+    position: relative;
+    height: var(--h-equity);
+}
+
+.equity__label {
+    position: absolute;
+    left: 0;
+    right: 0;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: var(--s-2);
+    height: 20px;
+    padding: 0 var(--s-1);
+    border-radius: var(--r-xs);
+    white-space: nowrap;
+    transition: top var(--d-fast) var(--e-out), background-color var(--d-fast) var(--e-out);
+}
+
+.equity__label.is-active { background: var(--gph-750); }
+
+.equity__name {
+    font: var(--t-caption);
+    color: var(--text-1);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ---------- матрица «Кто чем владеет» (раздел 9.27) ---------- */
+.matrix {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) repeat(var(--matrix-cols), minmax(0, 72px)) 72px;
+    align-items: center;
     gap: var(--s-1);
 }
 
-.legend__row {
+.matrix__col {
     display: flex;
-    align-items: flex-start;
-    gap: var(--s-2);
-    padding: var(--s-1) var(--s-2);
-    border-radius: var(--r-sm);
-    cursor: default;
-    transition: background-color var(--d-fast) var(--e-out);
+    justify-content: center;
+    padding-bottom: var(--s-1);
 }
 
-.legend__row.is-active { background: var(--gph-750); }
-
-/* Точка легенды выравнивается по первой строке текста, а не по центру блока:
-   у строки «сделок не было» блок выше. */
-.legend__row ::deep .ui-status { margin-top: var(--s-1); }
-
-.legend__body {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.legend__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--s-3);
-}
-
-.legend__name {
-    font: var(--t-body-sm);
-    color: var(--text-1);
-}
-
-.legend__head .num-md {
-    font: var(--n-md);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-1);
-}
-
-.legend__note {
+.matrix__col--held {
+    justify-content: flex-end;
     font: var(--t-caption);
     color: var(--text-3);
 }
 
-/* ============================================================================
-   Таблица «Агенты в сессии» — раздел 9.8
-   ============================================================================ */
-
-/* Высота панели — по содержимому (раздел 7.1). Внутренний скролл с липкой
-   шапкой включается, только когда строк действительно много. */
-.roster__scroll.is-scrollable {
-    max-height: var(--h-roster-max);
-    overflow-y: auto;
-}
-
-.roster__table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
-}
-
-.roster__table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    height: var(--h-thead);
-    padding: 0 0 0 var(--s-3);
-    background: var(--gph-850);
-    border-bottom: 1px solid var(--line-1);
-    font-weight: inherit;
-}
-
-.roster__table tbody tr {
-    position: relative;
-    height: var(--h-row);
-}
-
-.roster__table tbody td,
-.roster__table tbody th {
-    padding: 0 0 0 var(--s-3);
-    border-bottom: 1px solid var(--line-1);
-    font-weight: inherit;
-    vertical-align: middle;
-}
-
-.roster__table tr > *:first-child { padding-left: var(--s-5); }
-.roster__table tr > *:last-child { padding-right: var(--s-5); }
-
-/* ---------- колонки ---------- */
-.roster__c-name { width: var(--w-col-agent); }
-.roster__c-cash { width: var(--w-col-money); }
-.roster__c-pos  { width: var(--w-col-position); }
-.roster__c-port { width: var(--w-col-portfolio); }
-.roster__c-pnl  { width: var(--w-col-pnl); }
-.roster__c-go   { width: var(--w-col-go); }
-
-/* Выравнивание задаётся КОЛОНКОЙ, а не строкой, и потому одинаково у шапки и
-   у значений (раздел 9.8: «Заголовок колонки выравнивается так же, как её
-   значения. Разное выравнивание заголовка и значения визуально разваливает
-   таблицу»).
-
-   Раньше text-align: left стоял на .roster__table thead th и .roster__table
-   tbody td — это (0,2,1) против (0,1,1) у правила колонки, и правило колонки
-   не действовало НИКОГДА: числа выравнивались влево вопреки собственному
-   комментарию рядом. Пункт 73 docs/ui-backlog.md. Лечится не наращиванием
-   специфичности, а снятием лишнего правила: у td выравнивание по умолчанию
-   левое, у th — центральное, поэтому текстовые колонки объявляют left явно. */
-.roster__c-name,
-.roster__c-why {
-    text-align: left;
-}
-
-.roster__c-cash,
-.roster__c-pos,
-.roster__c-port,
-.roster__c-pnl {
-    text-align: right;
-}
-
-/* Между последней числовой колонкой и текстовой — зазор не меньше --s-6,
-   иначе число упирается в текст (раздел 9.8). */
-.roster__table .roster__c-why { padding-left: var(--s-6); }
-
-.roster__c-go { text-align: right; color: var(--text-2); }
-
-.roster__table .num-sm {
-    font: var(--n-sm);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-1);
-}
-
-.roster__c-port.num-sm,
-.roster__c-cash.num-sm { color: var(--text-1); }
-
-/* Рыночный тон сильнее базового цвета числа. .roster__table .num-sm даёт
-   (0,2,1), а .tone-up — (0,1,1): без этих трёх правил позиция и P/L набраны
-   --text-1, то есть рыночного цвета в таблице нет вовсе. Замерено по пикселям
-   базовой линии: герой-число P/L над таблицей #3FA37A, P/L строки #F0F1F2.
-   Пункт 98 docs/ui-backlog.md. Тот же приём уже стоит на «Торгах»
-   (.agents__c-num.tone-up) и на детальной (.price__ohlc .num-sm.tone-up). */
-.roster__table .num-sm.tone-up { color: var(--up-text); }
-.roster__table .num-sm.tone-down { color: var(--down-text); }
-.roster__table .num-sm.tone-flat { color: var(--text-2); }
-
-/* ---------- строка группы ---------- */
-.roster__table tbody tr.is-group {
-    background: var(--gph-750);
-    /* Группа отделяется линией сверху, а не размером шрифта (раздел 9.8). */
-    border-top: 1px solid var(--line-1);
-}
-
-.roster__table tbody tr.is-group > * { border-top: 1px solid var(--line-1); }
-
-.roster__title {
-    font: var(--t-h3);
-    color: var(--text-1);
-}
-
-.roster__table tbody tr.is-group .num-sm { color: var(--text-2); }
-
-/* ---------- строка экземпляра ---------- */
-.roster__name {
+.matrix__name {
     display: flex;
     align-items: center;
     gap: var(--s-2);
     min-width: 0;
-}
-
-.roster__link {
     font: var(--t-body-sm);
     color: var(--text-1);
+    white-space: nowrap;
+}
+
+/* Плотность ячейки — доля актива: смесь --text-1 с прозрачным. Плотная
+   ячейка переключает текст на тёмный, иначе он тонет в заливке. */
+.matrix__cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    height: var(--s-10);
+    border-radius: var(--r-sm);
+    background: color-mix(in srgb, var(--text-1) var(--fill), transparent);
+    color: var(--text-1);
+}
+
+.matrix__cell.is-strong { color: var(--gph-950); }
+
+.matrix__qty {
+    font: var(--n-xs);
+    opacity: 0.75;
+}
+
+.matrix__held {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    color: var(--text-2);
+}
+
+/* ============================================================================
+   Таблица «Агенты в сессии» — стратегия и её экземпляры (раздел 9.8)
+   ============================================================================ */
+.roster__heading {
+    margin: 0;
+    font: var(--t-h2);
+    letter-spacing: -0.015em;
+    color: var(--text-1);
+}
+
+/* Длинный список прокручивается внутри панели, шапка липкая (9.8). */
+.roster__scroll {
+    max-height: calc(var(--h-row) * 18);
+    overflow-y: auto;
+}
+
+.grp__row {
+    display: grid;
+    grid-template-columns:
+        var(--w-col-agent) var(--w-col-money) var(--w-col-money)
+        var(--w-col-pnl) var(--w-col-changes) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--s-3);
+    min-height: var(--h-row);
+    padding: 0 var(--s-5);
+    border-bottom: 1px solid var(--line-1);
+    color: inherit;
     text-decoration: none;
 }
 
-/* Ссылка растягивается на всю строку: кликается вся строка, но в разметке
-   остаётся настоящая ссылка — с фокусом, клавиатурой и адресом в статусной
-   строке браузера. */
-.roster__link::after {
-    content: "";
-    position: absolute;
-    inset: 0;
+.grp__row--head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-height: var(--h-thead);
+    background: var(--gph-850);
 }
 
-.roster__table tbody tr.is-instance:hover { background: var(--gph-750); }
-
-.roster__table tbody tr.is-instance:has(.roster__link:focus-visible) {
-    background: var(--gph-700);
-    box-shadow: inset 2px 0 0 var(--acc-line);
+/* Строка группы — фон --gph-750 и линия сверху, а не размер (9.8). */
+.grp__row--group {
+    min-height: var(--h-row-tall);
+    background: var(--gph-750);
+    border-top: 1px solid var(--line-2);
 }
 
-/* Шеврон появляется на строке под курсором: на всех сразу это ряд стрелок,
-   а не подсказка. */
-.roster__c-go ::deep .ui-icon { opacity: 0; transition: opacity var(--d-fast) var(--e-out); }
-.roster__table tbody tr.is-instance:hover .roster__c-go ::deep .ui-icon { opacity: 1; }
+.grp__row--group.is-typed { background: var(--gph-700); }
 
-/* ---------- действие и объяснение ---------- */
-.roster__why {
-    display: block;
-    /* Длинное объяснение обрезается по границе средствами CSS: обрубать
-       слово на середине нельзя (раздел 17). */
-    overflow: hidden;
+a.grp__row--instance:hover { background: var(--gph-750); }
+
+.grp__row--foot {
+    border-bottom: 0;
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.grp__name {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font: var(--t-body-sm);
+    font-weight: 500;
+    color: var(--text-1);
     white-space: nowrap;
-    text-overflow: ellipsis;
+}
+
+.grp__link { color: inherit; text-decoration: none; }
+.grp__link:hover { text-decoration: underline; }
+
+.grp__inst {
+    padding-left: var(--s-6);
     font: var(--t-body-sm);
     color: var(--text-2);
 }
 
-.roster__act { color: var(--text-1); }
-
-.roster__table tbody tr.is-group .roster__why { color: var(--text-3); }
-
-/* ---------- подсветка типа ----------
-   Наведение на строку группы выводит её линию вперёд на графике: гаснут там
-   линии, а не строки таблицы (артборд 06). Обратная связка — наведение на
-   элемент легенды — подсвечивает строки своего типа здесь. */
-.roster__table tbody tr,
-.legend__row {
-    transition: background-color var(--d-fast) var(--e-out);
+.grp__why {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    padding: var(--s-1) 0;
 }
 
-.roster__table tbody tr.is-group:hover { background: var(--gph-700); }
-.roster__table tbody tr.is-typed { background: var(--gph-750); }
-.roster__table tbody tr.is-group.is-typed { background: var(--gph-700); }
+.grp__act { font: var(--t-body-sm); font-weight: 500; color: var(--text-1); }
 
-/* ============================================================================
-   Служебное
-   ============================================================================ */
-.sr-only {
-    position: absolute;
-    width: 1px; height: 1px;
-    padding: 0; margin: -1px;
-    overflow: hidden;
-    clip-path: inset(50%);
+.grp__reason {
+    font: var(--t-caption);
+    color: var(--text-3);
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+
+.grp__go {
+    display: flex;
+    justify-content: flex-end;
+    color: var(--text-3);
+}
+
+.caption { font: var(--t-caption); color: var(--text-3); }
+.t1 { color: var(--text-1); }
+.t2 { color: var(--text-2); }
+.t3 { color: var(--text-3); }
+.right { text-align: right; justify-self: end; }

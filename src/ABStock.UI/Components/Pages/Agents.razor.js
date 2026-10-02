@@ -106,8 +106,8 @@ function createBundle(element) {
         crosshair: { mode: CrosshairMode.Hidden },
         handleScroll: false,
         handleScale: false,
-        // Проценты стоят СЛЕВА: справа лежит легенда, и подписи оси слипались
-        // бы с её строками.
+        // Проценты стоят СЛЕВА: справа колонка подписей у концов линий, и
+        // подписи оси слипались бы с ней.
         leftPriceScale: {
             visible: true,
             borderVisible: false,
@@ -162,14 +162,16 @@ function createBundle(element) {
         chart.resize(
             Math.max(1, Math.round(entry.contentRect.width)),
             Math.max(1, Math.round(entry.contentRect.height)));
+        requestAnimationFrame(() => placeEndLabels(bundle));
     });
     resizeObserver.observe(element);
 
-    const bundle = { chart, series, baseline, palette, resizeObserver, highlight: null };
+    const bundle = { chart, series, baseline, palette, resizeObserver, highlight: null, labels: null, newsTimes: [] };
 
     bundle.themeUnsubscribe = onThemeChange(() => {
         bundle.palette = readPalette();
         applyPalette(bundle);
+        applyNewsMarkers(bundle);
     });
 
     return bundle;
@@ -228,6 +230,71 @@ export function render(element, payload) {
 
     bundle.chart.timeScale().fitContent();
     applyHighlight(bundle, bundle.highlight);
+
+    bundle.labels = payload?.labels ?? payload?.Labels ?? bundle.labels;
+    bundle.newsTimes = (payload?.news ?? payload?.News ?? []).map(toLocalChartTime);
+    applyNewsMarkers(bundle);
+
+    // Координаты концов линий известны только после отрисовки кадра.
+    requestAnimationFrame(() => placeEndLabels(bundle));
+}
+
+/**
+ * Отметка новости — стрелка над линией в момент новости, цветом маркера
+ * новости (тот же токен, что на свечах «Торгов»). Библиотека ставит маркер
+ * только на существующую точку ряда, поэтому время прижимается к ближайшей.
+ */
+function applyNewsMarkers(bundle) {
+    const data = bundle.series.trend.data?.() ?? [];
+    if (data.length === 0) {
+        bundle.series.trend.setMarkers([]);
+        return;
+    }
+
+    const color = getComputedStyle(document.documentElement).getPropertyValue("--chart-news-marker").trim();
+    const markers = bundle.newsTimes
+        .map(time => data.reduce((best, point) =>
+            Math.abs(point.time - time) < Math.abs(best.time - time) ? point : best, data[0]).time)
+        .filter((time, index, all) => all.indexOf(time) === index)
+        .map(time => ({ time, position: "aboveBar", shape: "arrowDown", color, text: "новость" }));
+
+    bundle.series.trend.setMarkers(markers);
+}
+
+/**
+ * Подписи стоят в своей колонке справа от холста, на высоте конца своей
+ * линии. Если две линии кончаются рядом, подписи расталкиваются вниз на
+ * высоту строки — иначе «Трендовый» и «Новостной» легли бы друг на друга.
+ */
+function placeEndLabels(bundle) {
+    const container = bundle.labels;
+    if (!container) {
+        return;
+    }
+
+    const rowHeight = 20;
+    const placed = [];
+
+    for (const type of TYPES) {
+        const label = container.querySelector(`[data-type="${type}"]`);
+        const data = bundle.series[type].data?.() ?? [];
+        if (!label || data.length === 0) {
+            continue;
+        }
+
+        const y = bundle.series[type].priceToCoordinate(data[data.length - 1].value);
+        if (y !== null) {
+            placed.push({ label, y });
+        }
+    }
+
+    placed.sort((a, b) => a.y - b.y);
+    let floor = -Infinity;
+    for (const item of placed) {
+        const top = Math.max(item.y - rowHeight / 2, floor);
+        item.label.style.top = `${Math.round(top)}px`;
+        floor = top + rowHeight;
+    }
 }
 
 /**
