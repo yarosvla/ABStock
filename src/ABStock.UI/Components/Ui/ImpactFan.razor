@@ -141,7 +141,7 @@
             {
                 var asset = FindAsset(signal.Symbol);
                 return new Row(signal, asset?.Name ?? signal.Symbol,
-                    asset is null ? "в архиве" : AgentDisplay.GetAssetTypeLabel(asset.AssetType));
+                    asset is null ? "удалён" : AgentDisplay.GetAssetTypeLabel(asset.AssetType));
             })
             .ToArray();
 

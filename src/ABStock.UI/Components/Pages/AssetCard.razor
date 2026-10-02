@@ -29,7 +29,7 @@
             <Panel Class="rise rise-1">
                 <div class="profile-empty">
                     <EmptyState IconName="search" Title="Такого актива нет"
-                                Description="Актив мог уйти в архив — тогда он больше не участвует в сессии.">
+                                Description="Актив мог быть удалён — тогда он больше не участвует в сессии.">
                         <Action>
                             <AppButton Variant="primary" Href="/assets">Все активы</AppButton>
                         </Action>
@@ -70,10 +70,19 @@
                         : "Профиль построен по описанию") · тикер сгенерирован системой · создан @Created(asset)
                 </Context>
                 <Actions>
-                    @* Править и убирать актив можно только вне торгов: идущий рынок
-                       торгует тем профилем, с которым актив в них вступил. *@
-                    <AppButton Variant="secondary" Disabled="trades" OnClick="Archive"
-                               title="@(trades ? "Убрать актив в архив можно после остановки торгов" : null)">В архив</AppButton>
+                    @* Править и удалять актив можно только вне торгов: идущий рынок
+                       торгует тем профилем, с которым актив в них вступил.
+                       Удаление — в два нажатия: первое спрашивает, второе удаляет. *@
+                    @if (confirmingDelete && !trades)
+                    {
+                        <AppButton Variant="ghost" OnClick="CancelDelete">Отмена</AppButton>
+                        <AppButton Variant="danger" OnClick="Delete">Удалить @asset.Symbol</AppButton>
+                    }
+                    else
+                    {
+                        <AppButton Variant="secondary" Disabled="trades" OnClick="AskDelete"
+                                   title="@(trades ? "Удалить актив можно после остановки торгов" : null)">Удалить</AppButton>
+                    }
                     @if (Markets.Market(asset.Id) is not null)
                     {
                         <AppButton Variant="secondary" Href="@($"/trading/{asset.Symbol}")">Открыть торги</AppButton>
@@ -195,8 +204,25 @@
 
     private void HandleChanged() => _ = InvokeAsync(StateHasChanged);
 
-    private void Archive()
+    private bool confirmingDelete;
+
+    // Свитчер ведёт на карточку другого актива тем же компонентом: вопрос
+    // «удалить GLEN?» не должен доехать до KVAN.
+    protected override void OnParametersSet() => confirmingDelete = false;
+
+    private void AskDelete() => confirmingDelete = !Markets.IsRunning;
+
+    private void CancelDelete() => confirmingDelete = false;
+
+    /// <summary>
+    /// Для человека актив удалён: его нет ни в списке, ни в слотах. В
+    /// каталоге он уходит в архив — метода удаления у бэкенда нет, а прошлые
+    /// прогоны и новости ссылаются на актив.
+    /// </summary>
+    private void Delete()
     {
+        confirmingDelete = false;
+
         if (Asset is not { } asset || Markets.IsRunning)
         {
             return;

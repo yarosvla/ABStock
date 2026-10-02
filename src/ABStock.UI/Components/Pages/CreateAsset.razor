@@ -433,7 +433,7 @@
 
             if (Registry.IsFull)
             {
-                return $"В сессии уже {IAssetRegistry.Limit} активов — это предел. Уберите актив в архив, чтобы создать новый.";
+                return $"В сессии уже {IAssetRegistry.Limit} активов — это предел. Удалите актив, чтобы создать новый.";
             }
 
             var place = Registry.Assets.Count + 1;
