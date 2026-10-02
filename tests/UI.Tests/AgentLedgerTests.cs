@@ -39,6 +39,36 @@ public sealed class AgentLedgerTests
     }
 
     [Fact]
+    public void Итог_по_активу_раскладывается_на_зафиксированный_и_открытый()
+    {
+        var ledger = AgentLedger.Build(Account, Markets);
+        var kvan = ledger.Assets.Single(asset => asset.Symbol == "KVAN");
+
+        // Продал 20 по 49 при средней 50: −20 зафиксировано. Остаток 30 × (48 − 50) = −60.
+        Assert.Equal(-20m, kvan.Realized);
+        Assert.Equal(-60m, kvan.Unrealized);
+        Assert.Equal(50m, kvan.AverageEntryPrice);
+        Assert.Equal(kvan.Pnl, kvan.Realized + kvan.Unrealized);
+    }
+
+    [Fact]
+    public void Копейки_по_активам_сходятся_с_общим_итогом()
+    {
+        // Три актива по +0,004: по отдельности каждый округлился бы в 0,00,
+        // а в сумме это 0,01 — копейка достаётся одной строке.
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        var markets = ids.Select((id, index) => new LedgerMarket(id, $"A{index}", 100m, 100m, null)).ToArray();
+        var account = new AgentAccountSnapshot("Trend1", AgentType.TrendFollowing, 0m, 0m, 0m, 0m, 0m,
+            ids.ToDictionary(id => id, id => new AgentPositionSnapshot(id, 1m, 0m, 1m, 100m) { CostBasis = 99.996m }));
+
+        var ledger = AgentLedger.Build(account, markets);
+
+        Assert.Equal(0.01m, ledger.Pnl);
+        Assert.Equal(ledger.Pnl, ledger.Assets.Sum(asset => asset.Pnl));
+        Assert.All(ledger.Assets, asset => Assert.Equal(asset.Pnl, asset.Realized + asset.Unrealized));
+    }
+
+    [Fact]
     public void Сделки_всех_активов_с_тикером_от_свежей_к_старой()
     {
         var ledger = AgentLedger.Build(Account, Markets);
@@ -73,8 +103,10 @@ public sealed class AgentLedgerTests
             cash + 60m * 102m + 30m * 48m, initial,
             new Dictionary<Guid, AgentPositionSnapshot>
             {
-                [Glen] = new(Glen, 60m, 0m, 50m, 102m),
-                [Kvan] = new(Kvan, 30m, 0m, 50m, 48m)
+                // Стоимость покупки: запас по цене открытия плюс покупки,
+                // минус доля проданного по средней цене — как ведёт её бэкенд.
+                [Glen] = new(Glen, 60m, 0m, 50m, 102m) { CostBasis = 50m * 100m + 10m * 101m },
+                [Kvan] = new(Kvan, 30m, 0m, 50m, 48m) { CostBasis = 30m * 50m, RealizedPnl = 20m * (49m - 50m) }
             });
     }
 

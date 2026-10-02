@@ -15,17 +15,21 @@ public sealed record LedgerMarket(
 /// <summary>Сделка агента с тикером — строка рельса «Сделки агента».</summary>
 public sealed record LedgerTrade(DateTimeOffset At, string Symbol, OrderSide Side, decimal Price, decimal Quantity);
 
+/// <param name="AverageEntryPrice">Средняя цена покупки бумаг в позиции; null — позиции нет.</param>
+/// <param name="Realized">Зафиксированный P/L: проданные бумаги против их средней цены покупки.</param>
+/// <param name="Unrealized">Открытый P/L: бумаги в позиции по текущей цене против их средней цены.</param>
 /// <param name="Pnl">
-/// P/L по активу: сколько стоит позиция сейчас минус сколько стоил стартовый
-/// запас по цене открытия, плюс деньги, полученные и потраченные на сделках
-/// этим активом. Сумма по активам — P/L всего портфеля: деньги агента
-/// меняются только сделками.
+/// P/L по активу — зафиксированный плюс открытый. Стартовый запас бэкенд
+/// оценивает по цене открытия, поэтому сумма по активам — P/L всего портфеля.
 /// </param>
 public sealed record LedgerAsset(
     string Symbol,
     decimal Quantity,
     decimal Change,
     decimal Value,
+    decimal? AverageEntryPrice,
+    decimal Realized,
+    decimal Unrealized,
     decimal Pnl,
     int Buys,
     int Sells);
@@ -43,8 +47,8 @@ public sealed record LedgerView(
 /// а история лежит по прогонам активов: здесь она сводится обратно в одно
 /// целое — сделки с тикером, P/L по каждому активу и кривая капитала.
 ///
-/// P/L по активу выводится из сделок и стартового запаса, а не берётся у
-/// бэкенда: контракт его пока не отдаёт, а из истории он честно считается.
+/// P/L по активу — из позиции бэкенда: он ведёт стоимость покупки по
+/// каждой сделке, а не восстанавливает её по окну истории.
 /// </summary>
 public static class AgentLedger
 {
@@ -56,7 +60,15 @@ public static class AgentLedger
             .OrderByDescending(trade => trade.At)
             .ToArray();
 
-        var assets = markets.Select(market => Asset(account, market)).ToArray();
+        var positions = markets.Select(market => account.Positions.GetValueOrDefault(market.AssetId)).ToArray();
+
+        // Итог по активам — копейками, которые сходятся с общим итогом. Если
+        // округлять каждую строку отдельно, шесть активов расходятся с «Общим»
+        // на несколько копеек, а таблицу на защите складывают первой (раздел 10.1).
+        var exact = positions.Select(position => position?.TotalPnl ?? 0m).ToArray();
+        var totals = Apportion(exact);
+
+        var assets = markets.Select((market, index) => Asset(market, positions[index], totals[index])).ToArray();
 
         return new LedgerView(
             trades,
@@ -64,29 +76,51 @@ public static class AgentLedger
             Equity(account, markets),
             Math.Round(account.InitialPortfolioValue, 0, MidpointRounding.AwayFromZero),
             Math.Round(account.PortfolioValue, 0, MidpointRounding.AwayFromZero),
-            Math.Round(account.PortfolioValue - account.InitialPortfolioValue, 2, MidpointRounding.AwayFromZero));
+            assets.Sum(asset => asset.Pnl));
     }
 
-    private static LedgerAsset Asset(AgentAccountSnapshot account, LedgerMarket market)
+    /// <summary>
+    /// Округление до копеек методом наибольших остатков: каждое значение
+    /// округляется вниз, недостающие до округлённой суммы копейки получают
+    /// строки с самыми большими отброшенными долями.
+    /// </summary>
+    private static decimal[] Apportion(IReadOnlyList<decimal> values)
     {
-        var position = account.Positions.GetValueOrDefault(market.AssetId);
+        var cents = values.Select(value => value * 100m).ToArray();
+        var floors = cents.Select(decimal.Floor).ToArray();
+        var missing = (int)(Math.Round(cents.Sum(), 0, MidpointRounding.AwayFromZero) - floors.Sum());
+
+        foreach (var index in Enumerable.Range(0, cents.Length).OrderByDescending(index => cents[index] - floors[index]).Take(missing))
+        {
+            floors[index] += 1m;
+        }
+
+        return floors.Select(value => value / 100m).ToArray();
+    }
+
+    private static LedgerAsset Asset(LedgerMarket market, AgentPositionSnapshot? position, decimal pnl)
+    {
         var quantity = position?.Quantity ?? 0m;
         var initial = position?.InitialQuantity ?? 0m;
         var records = market.Report?.Trades ?? [];
 
-        // Деньги, которые принесли сделки этим активом: продажи плюс, покупки минус.
-        var cashFlow = records.Sum(trade => (trade.Side == OrderSide.Sell ? 1m : -1m) * trade.Price * trade.Quantity);
-        var pnl = quantity * market.Price - initial * market.Open + cashFlow;
+        // Строка тоже сходится: открытый P/L — итог строки минус зафиксированный.
+        var realized = Round2(position?.RealizedPnl ?? 0m);
 
         return new LedgerAsset(
             market.Symbol,
             Math.Round(quantity, 1, MidpointRounding.AwayFromZero),
             Math.Round(quantity - initial, 1, MidpointRounding.AwayFromZero),
             Math.Round(quantity * market.Price, 0, MidpointRounding.AwayFromZero),
-            Math.Round(pnl, 2, MidpointRounding.AwayFromZero),
+            position?.AverageEntryPrice is { } average ? Round2(average) : null,
+            realized,
+            pnl - realized,
+            pnl,
             records.Count(trade => trade.Side == OrderSide.Buy),
             records.Count(trade => trade.Side == OrderSide.Sell));
     }
+
+    private static decimal Round2(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
 
     /// <summary>
     /// Капитал во времени: деньги плюс бумаги всех активов по ценам на тот

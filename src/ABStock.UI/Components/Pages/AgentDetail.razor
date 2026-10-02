@@ -212,20 +212,38 @@
                                     <span class="kv__key">Общий</span>
                                     <span class="num-lg @DeltaTone(ledger.Pnl)">@Pnl2(ledger.Pnl)</span>
                                 </div>
-                                @{ var maxPnl = Math.Max(0.01m, ledger.Assets.Max(asset => Math.Abs(asset.Pnl))); }
-                                @foreach (var asset in ledger.Assets)
-                                {
-                                    <div class="plbar">
-                                        <Ticker Symbol="@asset.Symbol" />
-                                        <span class="plbar__track">
-                                            <span class="plbar__axis"></span>
-                                            <span class="plbar__fill plbar__fill--@(asset.Pnl >= 0m ? "up" : "down")" style="@PlBarStyle(asset.Pnl, maxPnl)"></span>
-                                        </span>
-                                        <span class="num-sm right @DeltaTone(asset.Pnl)">@Pnl2(asset.Pnl)</span>
+                                @* Итог раскладывается на две части: что агент уже
+                                   зафиксировал продажами и что висит в открытой
+                                   позиции. Средняя цена — точка отсчёта обеих. *@
+                                <div class="pltable" role="table" aria-label="P/L по активам">
+                                    <div class="pltable__row" role="row">
+                                        <span class="label" role="columnheader">Актив</span>
+                                        @* Рельс 300–340 px: полные названия не помещаются,
+                                           сокращения расшифрованы в подсказке и под таблицей. *@
+                                        <span class="label right pltable__head" role="columnheader" title="Средняя цена покупки">Ср. цена</span>
+                                        <span class="label right pltable__head" role="columnheader" title="Закрытый P/L — зафиксирован продажами">Закр.</span>
+                                        <span class="label right pltable__head" role="columnheader" title="Открытый P/L — позиция по текущей цене">Откр.</span>
+                                        <span class="label right" role="columnheader">Итого</span>
                                     </div>
-                                }
+                                    @{ var maxPnl = Math.Max(0.01m, ledger.Assets.Max(asset => Math.Abs(asset.Pnl))); }
+                                    @foreach (var asset in ledger.Assets)
+                                    {
+                                        <div class="pltable__row" role="row">
+                                            <span role="cell"><Ticker Symbol="@asset.Symbol" /></span>
+                                            <span class="num-xs t2 right" role="cell">@(asset.AverageEntryPrice is { } average ? Price2(average) : "—")</span>
+                                            <span class="num-xs right @DeltaTone(asset.Realized)" role="cell">@Pnl2(asset.Realized)</span>
+                                            <span class="num-xs right @DeltaTone(asset.Unrealized)" role="cell">@Pnl2(asset.Unrealized)</span>
+                                            <span class="num-sm right @DeltaTone(asset.Pnl)" role="cell">@Pnl2(asset.Pnl)</span>
+                                            @* Полоса итога растёт от оси посередине: вправо прибыль, влево убыток. *@
+                                            <span class="plbar__track pltable__bar" aria-hidden="true">
+                                                <span class="plbar__axis"></span>
+                                                <span class="plbar__fill plbar__fill--@(asset.Pnl >= 0m ? "up" : "down")" style="@PlBarStyle(asset.Pnl, maxPnl)"></span>
+                                            </span>
+                                        </div>
+                                    }
+                                </div>
                             </div>
-                            <p class="pl__note">P/L актива — стоимость позиции сейчас минус стартовый запас по цене открытия, плюс деньги от сделок этим активом.</p>
+                            <p class="pl__note">Закр. — P/L, зафиксированный продажами: проданные бумаги против средней цены покупки. Откр. — позиция по текущей цене против той же средней. Стартовый запас считается купленным по цене открытия.</p>
                         </ChildContent>
                     </Panel>
 

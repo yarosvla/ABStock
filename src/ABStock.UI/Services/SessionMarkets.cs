@@ -58,14 +58,17 @@ public interface ISessionMarkets
 /// Цена на каждом шаге с открытия, прореженная до разумного числа точек —
 /// ряд спарклайна «с открытия».
 /// </param>
-/// <param name="TradeCount">Сделок по активу за сессию.</param>
+/// <param name="TradeCount">
+/// Сделок по активу за сессию — счётчик биржи, а не подсчёт по окну
+/// последних сделок, которое бывает уже числа сделок за шаг.
+/// </param>
 public sealed record AssetMarket(
     Guid AssetId,
     Guid RunId,
     decimal Open,
     SimulationTickResult Last,
     IReadOnlyList<decimal> Prices,
-    int TradeCount)
+    long TradeCount)
 {
     public decimal LastPrice => Last.Snapshot.LastPrice;
 
@@ -353,7 +356,6 @@ public sealed class SessionMarkets : ISessionMarkets, IDisposable
         private const int MaxStored = 86_400;
 
         private readonly List<decimal> _prices = [];
-        private readonly HashSet<Guid> _trades = [];
 
         public Guid AssetId { get; } = assetId;
 
@@ -367,11 +369,6 @@ public sealed class SessionMarkets : ISessionMarkets, IDisposable
             if (_prices.Count > MaxStored)
             {
                 _prices.RemoveAt(0);
-            }
-
-            foreach (var trade in tick.Snapshot.RecentTrades)
-            {
-                _trades.Add(trade.Id);
             }
         }
 
@@ -394,7 +391,7 @@ public sealed class SessionMarkets : ISessionMarkets, IDisposable
                 sampled.Add(_prices[^1]);
             }
 
-            return new AssetMarket(AssetId, runId, open, Last!, sampled, _trades.Count);
+            return new AssetMarket(AssetId, runId, open, Last!, sampled, Last!.Snapshot.TotalTradeCount);
         }
     }
 }

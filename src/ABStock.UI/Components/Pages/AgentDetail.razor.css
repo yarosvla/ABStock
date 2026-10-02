@@ -374,13 +374,26 @@
 
 .pl { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3) var(--s-4); }
 
-/* Полоса P/L растёт от оси посередине: вправо прибыль, влево убыток. */
-.plbar {
+/* Таблица P/L: тикер, средняя цена, зафиксированный, открытый, итог. Полоса
+   итога — отдельной строкой под цифрами: в рельс 300–340 px пять колонок
+   и полоса рядом не помещаются. Полоса растёт от оси посередине: вправо
+   прибыль, влево убыток. */
+.pltable { display: flex; flex-direction: column; gap: var(--s-3); }
+
+.pltable__row {
     display: grid;
-    grid-template-columns: var(--w-ticker) minmax(0, 1fr) var(--w-tape-price);
+    grid-template-columns: var(--w-ticker) repeat(4, minmax(0, 1fr));
     align-items: center;
-    gap: var(--s-3);
+    column-gap: var(--s-2);
+    row-gap: var(--s-1);
 }
+
+.pltable__row > * { white-space: nowrap; }
+
+/* «Ср. цена» переносится на две строки, а не сдвигает соседние колонки. */
+.pltable__row > .pltable__head { white-space: normal; }
+
+.pltable__bar { grid-column: 1 / -1; }
 
 .plbar__track {
     position: relative;
