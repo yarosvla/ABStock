@@ -79,19 +79,19 @@ public sealed class AssetRegistryTests
     }
 
     [Fact]
-    public void Правка_описания_сохраняет_тикер()
+    public void Правка_описания_правит_тот_же_актив()
     {
         var catalog = NewRegistry();
         var created = catalog.Add(Draft("Гелиос Энерго"), Profile());
 
         var updated = catalog.Update("glen", Draft("Гелиос Солар", growth: 90), Profile());
 
+        // Тот же актив: адрес, тикер и история прогонов не рвутся.
+        Assert.Equal(created.Id, updated.Id);
         Assert.Equal("GLEN", updated.Symbol);
         Assert.Equal("Гелиос Солар", catalog.Find("GLEN")?.Name);
-        Assert.NotEqual(created.StartPrice, updated.StartPrice);
-        // Прежний актив ушёл в архив, слот не занят дважды.
+        Assert.Equal(90, updated.GrowthPotential);
         Assert.Single(catalog.Assets);
-        Assert.Null(catalog.Find(created.Id));
     }
 
     [Fact]
@@ -112,6 +112,7 @@ public sealed class AssetRegistryTests
 
         var asset = catalog.Add(Draft("Гелиос Энерго", growth: 37), Profile(0.63m));
 
+        // Цену считает бэкенд; интерфейс её не передаёт.
         Assert.Equal(0m, asset.StartPrice % 0.05m);
         Assert.InRange(asset.StartPrice, 50m, 200m);
     }
@@ -132,22 +133,46 @@ public sealed class AssetRegistryTests
     }
 
     [Fact]
-    public void После_перезапуска_тикеры_те_же()
+    public void Тикер_и_параметры_формы_хранит_каталог()
     {
-        // Бэкенд тикеров не хранит: реестр собирает их заново из названий в
-        // порядке создания, и адрес /trading/GLEN обязан вести туда же.
         var backend = new InMemoryAssetCatalog();
         var before = new AssetRegistry(backend);
-        before.Add(Draft("Гелиос Энерго"), Profile());
+        before.Add(Draft("Гелиос Энерго", growth: 37), Profile());
         before.Add(Draft("Гелиос Энергия"), Profile());
-        before.Add(Draft("КвантЭнерго"), Profile());
 
         var after = new AssetRegistry(backend);
 
         Assert.Equal(
             before.Assets.Select(asset => (asset.Id, asset.Symbol)),
             after.Assets.Select(asset => (asset.Id, asset.Symbol)));
-        Assert.Null(after.Assets[0].Draft);
+        Assert.Equal("Энергетика", after.Assets[0].Industry);
+        Assert.Equal(37, after.Assets[0].GrowthPotential);
+    }
+
+    [Fact]
+    public void Служебный_тикер_старого_актива_заменяется_читаемым()
+    {
+        // Актив из базы до миграции: каталог выдал ему тикер «AS…» из идентификатора.
+        var backend = new InMemoryAssetCatalog();
+        var legacy = backend.Create(new CreateAssetRequest(Profile() with { Name = "Гелиос Энерго" }));
+
+        var registry = new AssetRegistry(backend);
+
+        Assert.Equal("GLEN", registry.Assets.Single().Symbol);
+        Assert.Equal(legacy.AssetId, registry.Assets.Single().Id);
+    }
+
+    [Fact]
+    public void Архивный_актив_уходит_из_списка_но_остаётся_в_каталоге()
+    {
+        var backend = new InMemoryAssetCatalog();
+        var registry = new AssetRegistry(backend);
+        var created = registry.Add(Draft("Гелиос Энерго"), Profile());
+
+        registry.Archive("GLEN");
+
+        Assert.Empty(registry.Assets);
+        Assert.True(backend.Get(created.Id)?.IsArchived);
     }
 
     [Fact]

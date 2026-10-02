@@ -85,8 +85,12 @@
                                     @foreach (var type in AssetTypes)
                                     {
                                         var isSelected = type.Type == selectedAssetType;
+                                        @* Тип существующего актива не меняется: от него
+                                           зависят профиль и стартовая цена, и каталог
+                                           такую правку отклоняет. *@
                                         <button class="type @(isSelected ? "is-selected" : null)" type="button"
                                                 aria-pressed="@(isSelected ? "true" : "false")"
+                                                disabled="@(editing is not null && !isSelected)"
                                                 @onclick="() => SelectAssetType(type.Type)">
                                             <strong>@type.Name</strong>
                                             <small>@type.Hint</small>
@@ -380,7 +384,8 @@
         // Правка — форма заполнена тем, с чем актив создавали. Новый актив —
         // черновиком, если человек уходил со страницы и вернулся.
         var draft = editing is { } asset
-            ? asset.Draft ?? new AssetDraft(asset.Name, asset.Description, asset.AssetType, string.Empty, false, 0)
+            ? new AssetDraft(asset.Name, asset.Description, asset.AssetType, asset.Industry ?? string.Empty,
+                asset.IncludeGovernmentSupport, asset.GrowthPotential ?? 0)
             : Registry.Draft;
 
         if (draft is null)

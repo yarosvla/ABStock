@@ -139,13 +139,13 @@
                     <MetaContent>то, что вы написали</MetaContent>
                     <ChildContent>
                         <p class="source__text">@asset.Description</p>
-                        @* Параметры формы бэкенд не хранит: после перезапуска сервера
-                           их нет, и честнее показать прочерк, чем угадать. *@
+                        @* Прочерк — у актива, созданного до того, как каталог
+                           начал хранить параметры формы: честнее, чем угадать. *@
                         <dl class="source__spec hairline-top">
                             <div class="source__row"><dt>Тип актива</dt><dd>@AgentDisplay.GetAssetTypeLabel(asset.AssetType)</dd></div>
-                            <div class="source__row"><dt>Отрасль</dt><dd>@Or(asset.Draft?.Industry)</dd></div>
-                            <div class="source__row"><dt>Государственная поддержка</dt><dd>@(asset.Draft is { } draft ? draft.IncludeGovernmentSupport ? "учитывается" : "не учитывается" : "—")</dd></div>
-                            <div class="source__row"><dt>Потенциал роста</dt><dd class="num">@(asset.Draft is { GrowthPotential: > 0 } growth ? growth.GrowthPotential.ToString() : "—")</dd></div>
+                            <div class="source__row"><dt>Отрасль</dt><dd>@Or(asset.Industry)</dd></div>
+                            <div class="source__row"><dt>Государственная поддержка</dt><dd>@(asset.Industry is null ? "—" : asset.IncludeGovernmentSupport ? "учитывается" : "не учитывается")</dd></div>
+                            <div class="source__row"><dt>Потенциал роста</dt><dd class="num">@(asset.GrowthPotential?.ToString() ?? "—")</dd></div>
                         </dl>
                     </ChildContent>
                 </Panel>

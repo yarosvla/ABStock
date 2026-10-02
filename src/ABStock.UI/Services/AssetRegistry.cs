@@ -4,10 +4,10 @@ using ABStock.Shared;
 namespace ABStock.UI.Services;
 
 /// <summary>
-/// Активы сессии глазами интерфейса. Сами активы, их порядок и хранение —
-/// каталог бэкенда (<see cref="IAssetCatalog"/>); реестр добавляет то, чего в
-/// <see cref="Asset"/> пока нет, а экраны без этого не работают: тикер,
-/// параметры формы, архив и предел в 8 активов.
+/// Активы сессии глазами интерфейса. Сами активы, тикеры, параметры формы,
+/// архив и стартовая цена — каталог бэкенда (<see cref="IAssetCatalog"/>);
+/// реестр добавляет то, что нужно только экранам: правило тикера, предел в
+/// 8 активов, черновик формы и событие для рынка.
 ///
 /// Страница больше не спрашивает «какой актив», она спрашивает «какие активы»
 /// и отдельно — какой выбран в этой вкладке (<see cref="ISelectedAsset"/>).
@@ -45,8 +45,8 @@ public interface IAssetRegistry
     SessionAsset Add(AssetDraft draft, AssetProfile profile);
 
     /// <summary>
-    /// Описание изменилось — профиль собран заново. Тикер прежний; актив в
-    /// каталоге бэкенда новый, потому что править актив бэкенд не умеет.
+    /// Описание изменилось — профиль собран заново. Актив тот же: тикер,
+    /// идентификатор и история прогонов остаются.
     /// </summary>
     SessionAsset Update(string symbol, AssetDraft draft, AssetProfile profile);
 
@@ -61,21 +61,11 @@ public interface IAssetRegistry
 /// контуров сразу. Поэтому состояние — один снимок, который заменяется
 /// целиком: читатель не может увидеть список от одной правки и черновик от
 /// другой.
-///
-/// Тикер, параметры формы и архив живут в памяти процесса — бэкенд их не
-/// хранит. После перезапуска тикеры собираются заново из названий в порядке
-/// создания и выходят теми же; параметры формы теряются, и профиль актива
-/// показывает вместо них прочерк. Это требование к контракту, а не решение.
 /// </summary>
 public sealed class AssetRegistry : IAssetRegistry
 {
     private readonly IAssetCatalog _catalog;
     private readonly Lock _sync = new();
-    private readonly Dictionary<Guid, AssetDraft> _drafts = [];
-    private readonly HashSet<Guid> _archived = [];
-    // Тикер, закреплённый за активом. Заполняется при загрузке и при
-    // создании; тикер замещённого (Update) актива переходит к замене.
-    private readonly Dictionary<Guid, string> _symbols = [];
     private volatile Snapshot? _snapshot;
 
     public AssetRegistry(IAssetCatalog catalog)
@@ -108,7 +98,7 @@ public sealed class AssetRegistry : IAssetRegistry
     {
         lock (_sync)
         {
-            return FreeSymbolLocked(name, exceptSymbol);
+            return FreeSymbolLocked(Current, name, exceptSymbol);
         }
     }
 
@@ -128,10 +118,14 @@ public sealed class AssetRegistry : IAssetRegistry
                 throw new InvalidOperationException($"В сессии уже {IAssetRegistry.Limit} активов — это предел.");
             }
 
-            var symbol = FreeSymbolLocked(draft.Name, exceptSymbol: null);
-            var asset = CreateInCatalog(draft, profile);
-            _symbols[asset.AssetId] = symbol;
-            _drafts[asset.AssetId] = draft;
+            // Стартовую цену считает бэкенд: в запросе её нет намеренно.
+            var asset = _catalog.Create(new CreateAssetRequest(Named(draft, profile))
+            {
+                Ticker = FreeSymbolLocked(current, draft.Name, exceptSymbol: null),
+                Industry = draft.Industry,
+                IncludeGovernmentSupport = draft.IncludeGovernmentSupport,
+                GrowthPotential = GrowthOf(draft)
+            });
 
             // Черновик формы отдан активу: следующий «Новый актив» — с чистого листа.
             _snapshot = Rebuild(current.Revision + 1, draft: null);
@@ -158,14 +152,16 @@ public sealed class AssetRegistry : IAssetRegistry
                 ?? throw new KeyNotFoundException($"Актива {symbol} в сессии нет.");
 
             // Тикер не пересобирается из нового названия: по нему актив знают
-            // адрес, свитчер и закладки. Прежний актив уходит в архив — его
-            // прогоны остаются в истории под его же идентификатором.
-            var asset = CreateInCatalog(draft, profile);
-            _archived.Add(previous.Id);
-            _symbols[asset.AssetId] = previous.Symbol;
-            _drafts[asset.AssetId] = draft;
+            // адрес, свитчер и закладки.
+            _catalog.Update(previous.Id, new UpdateAssetRequest(
+                Named(draft, profile),
+                previous.Symbol,
+                draft.Industry,
+                draft.IncludeGovernmentSupport,
+                GrowthOf(draft)));
+
             _snapshot = Rebuild(current.Revision + 1, current.Draft);
-            updated = Find(asset.AssetId)!;
+            updated = Find(previous.Id)!;
         }
 
         Changed?.Invoke();
@@ -185,9 +181,9 @@ public sealed class AssetRegistry : IAssetRegistry
                 return;
             }
 
-            // Слот освобождается, тикер — нет: иначе прошлый прогон «GLEN» и
-            // новый актив «GLEN» стали бы неотличимы.
-            _archived.Add(asset.Id);
+            // Слот освобождается, тикер — нет: каталог держит тикер архивного
+            // актива, и прошлый прогон «GLEN» не спутать с новым активом.
+            _catalog.Archive(asset.Id);
             _snapshot = Rebuild(current.Revision + 1, current.Draft);
         }
 
@@ -204,10 +200,6 @@ public sealed class AssetRegistry : IAssetRegistry
         Changed?.Invoke();
     }
 
-    /// <summary>
-    /// Первое обращение читает каталог бэкенда: активы прошлых запусков
-    /// сервера получают тикеры в том же порядке создания, что и в первый раз.
-    /// </summary>
     private Snapshot Current
     {
         get
@@ -219,78 +211,93 @@ public sealed class AssetRegistry : IAssetRegistry
 
             lock (_sync)
             {
-                return _snapshot ??= Rebuild(revision: 0, draft: null);
+                if (_snapshot is null)
+                {
+                    RenameGeneratedTickers();
+                    _snapshot = Rebuild(revision: 0, draft: null);
+                }
+
+                return _snapshot;
             }
         }
     }
 
-    private Asset CreateInCatalog(AssetDraft draft, AssetProfile profile)
+    /// <summary>
+    /// Активы, созданные до того, как каталог начал хранить тикер, получили
+    /// при миграции служебный «AS…» из идентификатора. В адресе и на экранах
+    /// такой тикер нечитаем, поэтому при первом чтении действующие активы
+    /// получают тикер по правилу интерфейса — в порядке создания.
+    /// </summary>
+    private void RenameGeneratedTickers()
     {
-        // Название и описание — те, что ввёл человек: профиль модели может
-        // вернуть их переформулированными, а актив называется так, как его
-        // назвали. Стартовую цену бэкенд пока не считает — её считает
-        // интерфейс (StartPrices), и это тоже требование к контракту.
-        var named = profile with
-        {
-            Name = draft.Name.Trim(),
-            Description = string.IsNullOrWhiteSpace(profile.Description) ? draft.Description.Trim() : profile.Description
-        };
+        var all = _catalog.GetAll(includeArchived: true);
+        var taken = all.Select(asset => asset.Ticker).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        return _catalog.Create(new CreateAssetRequest(named, StartPrices.Calculate(draft, profile)));
+        foreach (var asset in all.Where(IsGenerated).Where(asset => !asset.IsArchived).OrderBy(asset => asset.CreatedAt))
+        {
+            var ticker = AssetSymbols.Candidates(asset.Name).First(candidate => !taken.Contains(candidate));
+            _catalog.Update(asset.AssetId, new UpdateAssetRequest(
+                asset.Profile, ticker, asset.Industry, asset.IncludeGovernmentSupport, asset.GrowthPotential));
+            taken.Add(ticker);
+        }
+
+        static bool IsGenerated(Asset asset) =>
+            string.Equals(asset.Ticker, AssetFactory.GenerateTicker(asset.AssetId), StringComparison.OrdinalIgnoreCase);
     }
 
     private Snapshot Rebuild(int revision, AssetDraft? draft)
     {
-        var assets = new List<SessionAsset>();
+        // Архивные — отдельно: их тикеры заняты, но строк у них нет.
+        var all = _catalog.GetAll(includeArchived: true);
 
-        foreach (var asset in _catalog.GetAll().OrderBy(asset => asset.CreatedAt))
+        var assets = all
+            .Where(asset => !asset.IsArchived)
+            .OrderBy(asset => asset.CreatedAt)
+            .Select(asset => new SessionAsset(asset))
+            .ToArray();
+
+        var taken = all.Select(asset => asset.Ticker).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return new Snapshot(assets, taken, draft, revision);
+    }
+
+    private static string FreeSymbolLocked(Snapshot current, string name, string? exceptSymbol) =>
+        AssetSymbols.Candidates(name).First(candidate =>
+            string.Equals(candidate, exceptSymbol, StringComparison.OrdinalIgnoreCase)
+            || !current.TakenSymbols.Contains(candidate));
+
+    /// <summary>
+    /// Название и описание — те, что ввёл человек: профиль модели может
+    /// вернуть их переформулированными, а актив называется так, как его назвали.
+    /// </summary>
+    private static AssetProfile Named(AssetDraft draft, AssetProfile profile) =>
+        profile with
         {
-            if (!_symbols.TryGetValue(asset.AssetId, out var symbol))
-            {
-                symbol = AssetSymbols.Candidates(asset.Name).First(candidate => !_symbols.ContainsValue(candidate));
-                _symbols[asset.AssetId] = symbol;
-            }
+            Name = draft.Name.Trim(),
+            Description = string.IsNullOrWhiteSpace(draft.Description) ? profile.Description : draft.Description.Trim()
+        };
 
-            if (_archived.Contains(asset.AssetId))
-            {
-                continue;
-            }
-
-            assets.Add(new SessionAsset(asset, symbol, _drafts.GetValueOrDefault(asset.AssetId)));
-        }
-
-        return new Snapshot(assets, draft, revision);
-    }
-
-    private string FreeSymbolLocked(string name, string? exceptSymbol)
-    {
-        _ = Current;
-        // Занятые тикеры — и действующих, и архивных активов (см. Archive).
-        var taken = _symbols.Values
-            .Where(symbol => !string.Equals(symbol, exceptSymbol, StringComparison.OrdinalIgnoreCase))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return AssetSymbols.Candidates(name).First(candidate => !taken.Contains(candidate));
-    }
+    /// <summary>Ноль в форме — незаполненное поле: нулевой потенциал роста смысла не имеет.</summary>
+    private static int? GrowthOf(AssetDraft draft) => draft.GrowthPotential > 0 ? draft.GrowthPotential : null;
 
     /// <summary>Состояние целиком. Заменяется, а не правится по полю.</summary>
-    private sealed record Snapshot(IReadOnlyList<SessionAsset> Assets, AssetDraft? Draft, int Revision);
+    private sealed record Snapshot(
+        IReadOnlyList<SessionAsset> Assets,
+        IReadOnlySet<string> TakenSymbols,
+        AssetDraft? Draft,
+        int Revision);
 }
 
-/// <summary>
-/// Актив сессии: актив бэкенда плюс то, что знает о нём интерфейс.
-/// </summary>
-/// <param name="Draft">
-/// То, что человек ввёл в форму. Null у актива, созданного до перезапуска
-/// сервера: бэкенд параметров формы не хранит.
-/// </param>
-public sealed record SessionAsset(Asset Asset, string Symbol, AssetDraft? Draft)
+/// <summary>Актив сессии: актив каталога под именами, которыми его зовут экраны.</summary>
+public sealed record SessionAsset(Asset Asset)
 {
     public Guid Id => Asset.AssetId;
 
+    public string Symbol => Asset.Ticker;
+
     public string Name => Asset.Name;
 
-    public string Description => Draft?.Description ?? Asset.Description;
+    public string Description => Asset.Description;
 
     public AssetType AssetType => Asset.AssetType;
 
@@ -299,6 +306,13 @@ public sealed record SessionAsset(Asset Asset, string Symbol, AssetDraft? Draft)
     public decimal StartPrice => Asset.StartPrice;
 
     public DateTimeOffset CreatedAt => Asset.CreatedAt;
+
+    /// <summary>Пусто — актив создан до того, как каталог начал хранить отрасль.</summary>
+    public string? Industry => string.IsNullOrWhiteSpace(Asset.Industry) ? null : Asset.Industry;
+
+    public bool IncludeGovernmentSupport => Asset.IncludeGovernmentSupport;
+
+    public int? GrowthPotential => Asset.GrowthPotential;
 }
 
 /// <summary>То, что человек ввёл в форму «Нового актива».</summary>

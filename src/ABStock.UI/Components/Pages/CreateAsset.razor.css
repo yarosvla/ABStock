@@ -164,8 +164,13 @@
 .type strong { font: var(--t-h3); color: var(--text-1); }
 .type small  { font: var(--t-caption); color: var(--text-3); }
 
-.type:hover { background: var(--gph-750); border-color: var(--line-3); }
-.type:hover small { color: var(--text-2); }
+.type:hover:not(:disabled) { background: var(--gph-750); border-color: var(--line-3); }
+.type:hover:not(:disabled) small { color: var(--text-2); }
+
+/* Правка описания: тип актива не меняется, остальные плитки выключены. */
+.type:disabled { cursor: not-allowed; }
+.type:disabled strong,
+.type:disabled small { color: var(--text-4); }
 
 /* Выбранная плитка. В белой теме (раздел 19) выбор читается формой, а не
    оттенком: кромка 1,5px (--selected-ring добирает полпикселя inset-тенью,
