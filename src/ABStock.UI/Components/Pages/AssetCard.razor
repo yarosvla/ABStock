@@ -1,0 +1,240 @@
+@page "/assets/{Symbol}"
+@rendermode InteractiveServer
+@using ABStock.Shared
+@using ABStock.UI.Services
+@using static ABStock.UI.Services.NumberFormat
+@implements IDisposable
+@inject IAssetRegistry Registry
+@inject ISessionMarkets Markets
+@inject ISelectedAsset Selected
+@inject NavigationManager Navigation
+
+<PageTitle>@(Asset is { } titled ? $"Профиль {titled.Symbol}" : "Профиль актива")</PageTitle>
+
+@{
+    var asset = Asset;
+    var trades = asset is not null && Markets.IsRunning && Markets.Trades(asset.Id);
+}
+
+<div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
+
+<div class="profile-shell">
+    <TopNavigation ActivePage="Assets" ShowClock="true" />
+
+    <main class="profile-page">
+        @if (asset is null)
+        {
+            <Breadcrumbs Items="@(new Crumb[] { new("Активы", Href: "/assets"), new(Symbol) })" />
+            <PageHead Title="Профиль актива" />
+            <Panel Class="rise rise-1">
+                <div class="profile-empty">
+                    <EmptyState IconName="search" Title="Такого актива нет"
+                                Description="Актив мог быть удалён — тогда он больше не участвует в сессии.">
+                        <Action>
+                            <AppButton Variant="primary" Href="/assets">Все активы</AppButton>
+                        </Action>
+                    </EmptyState>
+                </div>
+            </Panel>
+        }
+        else
+        {
+            var profile = asset.Profile;
+            var positive = profile.PositiveFactors.ToArray();
+            var negative = profile.NegativeFactors.ToArray();
+            var fallback = profile.Source == ProfileSource.Fallback;
+
+            <Breadcrumbs Items="@(new Crumb[]
+                         {
+                             new("Активы", Href: "/assets"),
+                             new(asset.Name, IsAsset: true, Symbol: asset.Symbol, SwitchTarget: "assets"),
+                             new("Профиль")
+                         })" />
+
+            <PageHead ContextClass="@(fallback ? "is-warn" : null)">
+                <TitleContent>
+                    <span class="profile-title">
+                        <h1>@asset.Name</h1>
+                        <Ticker Symbol="@asset.Symbol" Large="true" />
+                        <Badge Tone="flat">@AgentDisplay.GetAssetTypeLabel(asset.AssetType)</Badge>
+                        <Badge Tone="wait">@StatusLabel(asset)</Badge>
+                        @if (fallback)
+                        {
+                            <Badge Tone="warn">Запасной алгоритм</Badge>
+                        }
+                    </span>
+                </TitleContent>
+                <Context>
+                    @(fallback
+                        ? "Языковая модель была недоступна: профиль собран по типу актива и отрасли"
+                        : "Профиль построен по описанию") · тикер сгенерирован системой · создан @Created(asset)
+                </Context>
+                <Actions>
+                    @* Править и удалять актив можно только вне торгов: идущий рынок
+                       торгует тем профилем, с которым актив в них вступил.
+                       Удаление — в два нажатия: первое спрашивает, второе удаляет. *@
+                    @if (confirmingDelete && !trades)
+                    {
+                        <AppButton Variant="ghost" OnClick="CancelDelete">Отмена</AppButton>
+                        <AppButton Variant="danger" OnClick="Delete">Удалить @asset.Symbol</AppButton>
+                    }
+                    else
+                    {
+                        <AppButton Variant="secondary" Disabled="trades" OnClick="AskDelete"
+                                   title="@(trades ? "Удалить актив можно после остановки торгов" : null)">Удалить</AppButton>
+                    }
+                    @if (Markets.Market(asset.Id) is not null)
+                    {
+                        <AppButton Variant="secondary" Href="@($"/trading/{asset.Symbol}")">Открыть торги</AppButton>
+                    }
+                    <AppButton Variant="primary" Disabled="trades" Href="@(trades ? null : $"/assets/new?edit={asset.Symbol}")"
+                               title="@(trades ? "Описание меняется после остановки торгов" : null)">Изменить описание</AppButton>
+                </Actions>
+            </PageHead>
+
+            @* Полоса связи: от описания до того, как актив входит в рынок (раздел 9.19). *@
+            <CausalityStrip Class="rise rise-1" Label="Как профиль связан с рынком">
+                <CausalityStep Label="Описание" Weight="1.1"
+                               Value="@asset.Description" Truncate="true"
+                               Note="@($"{asset.Description.Length} символов · ниже целиком")" />
+
+                <CausalityStep Label="Чувствительность к новостям" Weight="1.5">
+                    <ZoneScale Value="profile.NewsSensitivity"
+                               Min="SensitivityScale.Min" Max="SensitivityScale.Max"
+                               Zones="SensitivityZones"
+                               Compact="true"
+                               Note="@(fallback ? $"{SensitivityScale.Word(profile.NewsSensitivity)} · значение по отрасли" : SensitivityScale.Word(profile.NewsSensitivity))"
+                               Tone="@(fallback ? "warn" : "acc")" />
+                </CausalityStep>
+
+                <CausalityStep Label="Стартовая цена">
+                    <span class="num-lg">@Price2(asset.StartPrice) <span class="unit">₽</span></span>
+                    <span class="ui-causality__note">рассчитана системой</span>
+                </CausalityStep>
+
+                <CausalityStep Label="@(trades ? "В торгах" : "Вступит в торги")" Weight="1.2">
+                    <span class="profile-strip__value">@(trades ? $"с {Markets.StartedAt:HH:mm}" : Markets.IsRunning ? "сразу после создания" : "при запуске торгов")</span>
+                    <span class="ui-causality__note">агенты @(trades ? "получили" : "получат") по <span class="num-xs">@Count0(IAgentComposition.InitialPosition)</span> шт, как в остальных активах</span>
+                </CausalityStep>
+            </CausalityStrip>
+
+            <div class="layout">
+                <div class="profile rise rise-2">
+                    <section class="balance">
+                        <div class="balance__head">
+                            <span class="label">Баланс факторов</span>
+                            <span class="balance__meta">из описания собрано <span class="num-sm">@profile.Factors.Count</span> @Plural(profile.Factors.Count, "фактор", "фактора", "факторов")</span>
+                        </div>
+                        <BalanceBar Positive="positive.Length" Negative="negative.Length" />
+                    </section>
+
+                    <div class="factors">
+                        <Panel Title="Позитивные факторы" Class="factors__panel" Flush="true">
+                            <MetaContent><span class="num-sm">@positive.Length</span></MetaContent>
+                            <ChildContent>
+                                <FactorList Factors="positive" />
+                            </ChildContent>
+                        </Panel>
+                        <Panel Title="Негативные факторы" Class="factors__panel" Flush="true">
+                            <MetaContent><span class="num-sm">@negative.Length</span></MetaContent>
+                            <ChildContent>
+                                <FactorList Factors="negative" />
+                            </ChildContent>
+                        </Panel>
+                    </div>
+                </div>
+
+                <Panel Title="Исходное описание" Class="source rise rise-3">
+                    <MetaContent>то, что вы написали</MetaContent>
+                    <ChildContent>
+                        <p class="source__text">@asset.Description</p>
+                        @* Прочерк — у актива, созданного до того, как каталог
+                           начал хранить параметры формы: честнее, чем угадать. *@
+                        <dl class="source__spec hairline-top">
+                            <div class="source__row"><dt>Тип актива</dt><dd>@AgentDisplay.GetAssetTypeLabel(asset.AssetType)</dd></div>
+                            <div class="source__row"><dt>Отрасль</dt><dd>@Or(asset.Industry)</dd></div>
+                            <div class="source__row"><dt>Государственная поддержка</dt><dd>@(asset.Industry is null ? "—" : asset.IncludeGovernmentSupport ? "учитывается" : "не учитывается")</dd></div>
+                            <div class="source__row"><dt>Потенциал роста</dt><dd class="num">@(asset.GrowthPotential?.ToString() ?? "—")</dd></div>
+                        </dl>
+                    </ChildContent>
+                </Panel>
+            </div>
+        }
+    </main>
+</div>
+
+@code {
+    [Parameter] public string Symbol { get; set; } = string.Empty;
+
+    private static readonly ZoneScale.Zone[] SensitivityZones =
+        SensitivityScale.Zones.Select(zone => new ZoneScale.Zone(zone.Name, zone.To)).ToArray();
+
+    private SessionAsset? Asset => Registry.Find(Symbol);
+
+    /// <summary>Статус актива в сессии — бейджем рядом с именем, а не в пути (раздел 13).</summary>
+    private string StatusLabel(SessionAsset asset) =>
+        Markets.IsRunning && Markets.Trades(asset.Id) ? "в торгах"
+        : Markets.HasSession && Markets.Market(asset.Id) is null ? "не торговался"
+        : Markets.HasSession ? "торги остановлены"
+        : "до запуска";
+
+    /// <summary>Сегодня — время, раньше — дата: список активов переживает перезапуск (ревью А-11).</summary>
+    private static string Created(SessionAsset asset)
+    {
+        var local = asset.CreatedAt.ToLocalTime();
+        return local.Date == DateTime.Today ? $"в {local:HH:mm}" : local.ToString("d MMMM");
+    }
+
+    private static string Or(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
+
+    protected override void OnInitialized()
+    {
+        Registry.Changed += HandleChanged;
+        Markets.Changed += HandleChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Профиль актива — тоже выбор актива: «Торги» откроются на нём же.
+        if (firstRender && Asset is { } asset)
+        {
+            await Selected.RememberAsync(asset.Symbol);
+        }
+    }
+
+    private void HandleChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private bool confirmingDelete;
+
+    // Свитчер ведёт на карточку другого актива тем же компонентом: вопрос
+    // «удалить GLEN?» не должен доехать до KVAN.
+    protected override void OnParametersSet() => confirmingDelete = false;
+
+    private void AskDelete() => confirmingDelete = !Markets.IsRunning;
+
+    private void CancelDelete() => confirmingDelete = false;
+
+    /// <summary>
+    /// Для человека актив удалён: его нет ни в списке, ни в слотах. В
+    /// каталоге он уходит в архив — метода удаления у бэкенда нет, а прошлые
+    /// прогоны и новости ссылаются на актив.
+    /// </summary>
+    private void Delete()
+    {
+        confirmingDelete = false;
+
+        if (Asset is not { } asset || Markets.IsRunning)
+        {
+            return;
+        }
+
+        Registry.Archive(asset.Symbol);
+        Navigation.NavigateTo("/assets");
+    }
+
+    public void Dispose()
+    {
+        Registry.Changed -= HandleChanged;
+        Markets.Changed -= HandleChanged;
+    }
+}

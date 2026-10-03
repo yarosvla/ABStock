@@ -1,27 +1,25 @@
-﻿@page "/news"
+@page "/news"
 @rendermode InteractiveServer
-@using ABStock.AI.Models
-@using ABStock.AI.Services
-@using ABStock.Application.Simulation
+@using System.Globalization
+@using System.Text
+@using ABStock.Application.MarketHistory
 @using ABStock.Shared
 @using ABStock.UI.Services
+@using static ABStock.UI.Services.NumberFormat
 @implements IDisposable
-@inject INewsProcessingService NewsProcessingService
-@inject ISimulationRunner SimulationRunner
-@inject IActiveAssetContext ActiveAssetContext
-@inject ISessionNewsFeed NewsFeed
+@inject INewsDesk NewsDesk
+@inject IAssetRegistry Registry
+@inject ISessionMarkets Markets
+@inject ISessionEvents Events
+@inject IMarketCandleReader CandleReader
+@inject IAgentStatisticsReader AgentStatistics
 
 <PageTitle>Новости</PageTitle>
 
 @{
-    // Локальные хелперы разметки: сопоставление значения с токеном оформления.
-    // Форматирование и бизнес-логика живут в @code.
-    var asset = CurrentAsset;
-    var profile = asset.Profile;
-    var isRunning = SimulationRunner.IsRunning;
-    var snapshot = latestMarket?.Snapshot;
-    var entries = NewsFeed.Entries;
-    var hasResult = signal is not null;
+    var isRunning = Markets.IsRunning;
+    var news = SelectedNews;
+    var showComposer = isRunning && (isComposing || Events.News.Count == 0) && !isAnalyzing;
 }
 
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
@@ -30,277 +28,88 @@
     <TopNavigation ActivePage="News" ShowClock="true" />
 
     <main class="news-page">
+        @* Новости общие на все активы — актива в пути нет (раздел 13). *@
+        <Breadcrumbs Items="@(new Crumb[] { new("Активы", Href: "/assets"), new("Новости") })">
+            <Aside>
+                <SessionChip Running="isRunning" Elapsed="@SessionClock.Format(Markets)" />
+            </Aside>
+        </Breadcrumbs>
 
-        @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
-        <Breadcrumbs Items="@(new Crumb[]
-                     {
-                         new("Активы", Href: "/create-asset"),
-                         new(asset.Draft.Name, IsAsset: true),
-                         new("Новости")
-                     })" />
-
-        @* ── PageHeader: H1 + одна строка контекста · до двух действий ───────── *@
         <PageHead Title="Новости">
             <Context>
-                @if (analyzedAt is not null && errorMessage is null)
-                {
-                    <text>Сигнал рассчитан в <span class="num-sm">@analyzedAt.Value.ToString("HH:mm:ss")</span></text>
-                }
-                else
-                {
-                    <text>Текст новости превращается в сигнал, на который реагирует новостной агент</text>
-                }
-                <text> · </text><span class="num-sm">@asset.Symbol</span>
-                <text> · новостей в сессии </text><span class="num-sm">@entries.Count</span>
+                Каждая новость разбирается сразу по всем активам в торгах ·
+                новостей в сессии <span class="num-sm">@Events.News.Count</span>
             </Context>
             <Actions>
-                @if (isRunning && (hasResult || errorMessage is not null))
+                @if (isRunning && !showComposer && !isAnalyzing)
                 {
-                    <AppButton Variant="primary" OnClick="StartNewEntry">Новая новость</AppButton>
+                    <AppButton Variant="primary" Icon="plus" OnClick="OpenComposer">Добавить новость</AppButton>
                 }
             </Actions>
         </PageHead>
 
-        @* ── Полоса связи — одна на экран (раздел 9.19) ──────────────────────
-             До анализа во всех шести шагах прочерк: формула появляется
-             только после расчёта. *@
-        <CausalityStrip Class="rise rise-1" Label="Как новость превращается в сигнал и в цену">
-
-            <CausalityStep Label="Новость" Weight="1.1">
-                @if (isAnalyzing)
-                {
-                    <Skeleton Width="60%" Height="13px" />
-                }
-                else if (analyzedAt is null)
-                {
-                    <span class="strip__idle">не введена</span>
-                }
-                else
-                {
-                    <span class="strip__value num-sm">@analyzedAt.Value.ToString("HH:mm")</span>
-                    <span class="ui-causality__note"><span class="num-sm">@AnalyzedLength</span> символов · текст ниже</span>
-                }
-            </CausalityStep>
-
-            <CausalityStep Label="Тональность и уверенность" Weight="1">
-                @if (isAnalyzing)
-                {
-                    <Skeleton Width="96px" Height="20px" Radius="var(--r-pill)" />
-                }
-                else if (signal is null)
-                {
-                    <span class="strip__dash num-sm">—</span>
-                }
-                else
-                {
-                    <span class="badge badge--@PolarityTone">@PolarityName</span>
-                    <span class="ui-causality__note">уверенность <span class="num-sm num-sm--bright">@Fixed2(signal.Confidence)</span></span>
-                }
-            </CausalityStep>
-
-            <CausalityStep Label="Совпадение с профилем" Weight="1.1">
-                @if (isAnalyzing)
-                {
-                    <Skeleton Width="56%" Height="14px" />
-                }
-                else if (signal is null)
-                {
-                    <span class="strip__dash num-sm">—</span>
-                }
-                else
-                {
-                    <span class="strip__value num">@Fixed2(signal.MatchScore)</span>
-                    <span class="ui-causality__note">
-                        средняя близость · задето <span class="num-sm">@MatchedCount</span> факторов профиля из <span class="num-sm">@ProfileItemCount</span>
-                    </span>
-                }
-            </CausalityStep>
-
-            <CausalityStep Label="Сила влияния" Weight="1.4">
-                @if (isAnalyzing)
-                {
-                    <Skeleton Width="62px" Height="24px" />
-                }
-                else if (signal is null)
-                {
-                    <span class="strip__dash num-sm">—</span>
-                }
-                else
-                {
-                    <span class="strip__impact num-lg">@Fixed2(signal.ImpactScore)</span>
-                    <span class="ui-causality__note">тональность × близость × вес фактора × чувствительность актива</span>
-                }
-            </CausalityStep>
-
-            <CausalityStep Label="Новостной агент" Weight="1.2">
-                @if (isAnalyzing)
-                {
-                    <Skeleton Width="78%" Height="13px" />
-                }
-                else if (signal is null)
-                {
-                    <span class="strip__dash num-sm">—</span>
-                }
-                else if (agentDecision is null)
-                {
-                    <span class="strip__idle">ждёт ближайшего шага симуляции</span>
-                }
-                else
-                {
-                    <span class="strip__agent">
-                        <StatusDot Tone="agent-news" />
-                        @AgentActionName
-                    </span>
-                }
-            </CausalityStep>
-
-            <CausalityStep Label="Сдвиг цены" Weight="1">
-                @if (isAnalyzing)
-                {
-                    <Skeleton Width="84%" Height="14px" />
-                }
-                else if (signal is null || priceBefore is null)
-                {
-                    <span class="strip__dash num-sm">—</span>
-                }
-                else if (priceAfter is null)
-                {
-                    <span class="strip__idle">цена ещё не пересчитана</span>
-                }
-                else if (PriceUnchanged)
-                {
-                    <span class="strip__value num-sm">без изменения</span>
-                    <span class="ui-causality__note">цена <span class="num-sm">@Money(priceAfter.Value)</span></span>
-                }
-                else
-                {
-                    <span class="strip__value num-sm"><span class="strip__was">@Fixed2(priceBefore.Value)</span> → @Fixed2(priceAfter.Value)</span>
-                    <span class="ui-causality__note tone-@PriceTone">@PriceDeltaLabel</span>
-                }
-            </CausalityStep>
-
-        </CausalityStrip>
-
-        @* ── Рабочая область: рельс 280 · центр · рельс 340 ──────────────────── *@
-        <div class="workspace">
-
-            @* ─────────── ЛЕВЫЙ РЕЛЬС · хронология событий сессии ─────────── *@
-            <div class="rail rail--left">
-                <Panel Title="История сессии" Class="rise rise-2" Flush="true">
-                    <MetaContent>
-                        @if (entries.Count > 0)
-                        {
-                            <span class="num-sm">@entries.Count</span>
-                        }
-                    </MetaContent>
-                    <ChildContent>
-                        @if (entries.Count > 0)
-                        {
-                            <div class="events">
-                                @foreach (var entry in entries)
+        <div class="news-layout">
+            @* ─────────── Левый рельс — та же хронология, что на «Торгах» ─────────── *@
+            <Panel Title="События сессии" Class="news-events rise rise-1" Flush="true">
+                <MetaContent><span class="num-sm">@Count0(Events.Entries.Count)</span></MetaContent>
+                <ChildContent>
+                    @if (Events.Entries.Count > 0)
+                    {
+                        <div class="events">
+                            @foreach (var entry in Events.Entries)
+                            {
+                                if (entry.Kind == SessionEventKind.News)
                                 {
-                                    <NewsEventRow At="entry.At" Text="@entry.Text"
-                                                  Polarity="entry.Polarity" ImpactScore="entry.ImpactScore"
-                                                  Current="@IsCurrentEntry(entry)" />
+                                    var isCurrent = entry.At == news?.At;
+                                    <div class="events__row" role="button" tabindex="0"
+                                         aria-pressed="@(isCurrent ? "true" : "false")"
+                                         @onclick="() => SelectNews(entry)"
+                                         @onkeydown="@(args => HandleNewsKey(args, entry))">
+                                        <SessionEventRow Event="entry" Current="isCurrent" />
+                                    </div>
                                 }
-                            </div>
-                        }
-                        else
-                        {
-                            <EmptyState IconName="news"
-                                        Title="Новостей ещё не было"
-                                        Description="Здесь копится хронология сессии: время, тональность и сила влияния каждой новости." />
-                        }
-                    </ChildContent>
-                </Panel>
-            </div>
+                                else
+                                {
+                                    <SessionEventRow Event="entry" />
+                                }
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <EmptyState IconName="news" Title="Событий пока нет"
+                                    Description="Здесь копится хронология сессии: новости, запуск торгов, заметные сделки агентов." />
+                    }
+                </ChildContent>
+            </Panel>
 
-            @* ─────────── ЦЕНТР · разбор ─────────── *@
-            <div class="center">
-
-                @* Решение новостного агента живёт под полосой связи во всех
-                   состояниях: шаг полосы несёт короткое действие, развёрнутое
-                   объяснение — здесь. До появления новости агент неактивен, и
-                   это состояние показывается, а не прячется (раздел 16.4). *@
-                @if (!isRunning)
+            <div class="news-main">
+                @if (!isRunning && Events.News.Count == 0)
                 {
-                    @* Состояние: торги не запущены. Новость появляется только
-                       после старта — сигналу нужен рынок, который отреагирует. *@
-                    <Panel Class="rise rise-3">
-                        <EmptyState IconName="news"
-                                    Title="Новость вводить некуда"
-                                    Description="Новости появляются только после старта торгов: сигналу нужен рынок, который на него отреагирует.">
+                    <Panel Class="rise rise-2">
+                        <EmptyState IconName="news" Title="Новость вводить некуда"
+                                    Description="Новость разбирается по активам в торгах: сигналу нужен рынок, который на него отреагирует.">
                             <Action>
-                                <AppButton Variant="primary" Href="/trading">Перейти к торгам</AppButton>
+                                <AppButton Variant="primary" Href="/assets">Перейти к активам</AppButton>
                             </Action>
                         </EmptyState>
                     </Panel>
                 }
-                else if (isAnalyzing)
+
+                @if (showComposer)
                 {
-                    @* Состояние: анализ идёт. Скелетоны по форме будущего разбора. *@
-                    <Panel Class="rise rise-3" Title="Разбор новости">
-                        <MetaContent><Skeleton Width="96px" Height="10px" /></MetaContent>
-                        <ChildContent>
-                            <div class="loading">
-                                <div class="loading__block">
-                                    <span class="label">Текст новости</span>
-                                    <Skeleton Height="13px" />
-                                    <Skeleton Width="82%" Height="13px" />
-                                </div>
-                                <div class="loading__block hairline-top">
-                                    <span class="label">Сила влияния</span>
-                                    <Skeleton Height="26px" />
-                                    <div class="loading__row">
-                                        <Skeleton Width="56px" Height="10px" />
-                                        <Skeleton Width="56px" Height="10px" />
-                                    </div>
-                                </div>
-                                <div class="loading__block hairline-top">
-                                    <span class="label">Сработавшие факторы профиля</span>
-                                    <Skeleton Height="14px" />
-                                    <Skeleton Width="88%" Height="14px" />
-                                    <Skeleton Width="64%" Height="14px" />
-                                </div>
-                            </div>
-                        </ChildContent>
-                    </Panel>
-                }
-                else if (errorMessage is not null)
-                {
-                    @* Состояние: анализ не выполнен. Текст новости сохранён,
-                       полоса связи выше стоит с прочерками, торги идут дальше. *@
-                    <Panel Class="rise rise-3 news-error" Flush="true">
-                        <div class="error-bar">
-                            <span class="error-bar__text"><Icon Name="alert" Size="16" />@errorMessage</span>
-                            <AppButton Variant="secondary" Size="26" OnClick="RetryAsync">Повторить анализ</AppButton>
-                        </div>
-                        <div class="error-body">
-                            <div class="news-text__head">
-                                <span class="label">Текст новости</span>
-                                <span class="news-text__meta">сохранён · <span class="num-sm">@AnalyzedLength</span> символов</span>
-                            </div>
-                            <p class="news-text__body">@analyzedText</p>
-                        </div>
-                        <p class="error-foot hairline-top">Торги идут, цена продолжает обновляться — сигнал не рассчитан только по этой новости.</p>
-                    </Panel>
-                }
-                else if (signal is null)
-                {
-                    @* Состояние: ввод. *@
-                    <Panel Title="Новая новость" Class="rise rise-3">
+                    <Panel Title="Новая новость" Class="rise rise-2">
                         <MetaContent>
-                            <text>от <span class="num-sm">@MinNewsLength</span> до <span class="num-sm">@MaxNewsLength</span> символов</text>
+                            разберётся по <span class="num-sm">@TradingCount</span> @Plural(TradingCount, "активу", "активам", "активам") в торгах
                         </MetaContent>
                         <ChildContent>
                             <div class="composer">
-                                <textarea id="news-text"
-                                          class="composer__field @(HasLengthError ? "is-error" : null)"
-                                          rows="6"
-                                          maxlength="@MaxNewsLength"
+                                <textarea class="composer__field @(HasLengthError ? "is-error" : null)"
+                                          rows="5"
+                                          maxlength="@INewsDesk.MaxLength"
                                           aria-label="Текст новости"
                                           aria-invalid="@(HasLengthError ? "true" : null)"
-                                          placeholder="Что произошло с компанией. Обычный текст: сообщение, заголовок новости, фрагмент отчёта."
+                                          placeholder="Что произошло. Обычный текст: сообщение, заголовок новости, фрагмент отчёта."
                                           @bind="newsText"
                                           @bind:event="oninput"></textarea>
 
@@ -309,479 +118,278 @@
                                     {
                                         <p class="composer__error">
                                             <Icon Name="alert" Size="14" />
-                                            Нужно не меньше <span class="num-sm">@MinNewsLength</span> символов — введено <span class="num-sm">@TrimmedLength</span>
+                                            Нужно не меньше <span class="num-sm">@INewsDesk.MinLength</span> символов — введено <span class="num-sm">@TrimmedLength</span>
                                         </p>
-                                    }
-                                    else if (CanAnalyze)
-                                    {
-                                        <p class="composer__hint">Текст готов к анализу</p>
                                     }
                                     else
                                     {
-                                        <p class="composer__hint">Кнопка станет доступна после <span class="num-sm">@MinNewsLength</span> символов</p>
+                                        <p class="composer__hint">Тональность считается один раз, сила влияния — по профилю каждого актива</p>
                                     }
 
                                     <div class="composer__actions">
-                                        <span class="composer__count num-sm">@TrimmedLength / @MaxNewsLength</span>
-                                        <AppButton Variant="primary" Disabled="@(!CanAnalyze)" OnClick="AnalyzeAsync">Проанализировать</AppButton>
+                                        <span class="composer__count num-sm">@TrimmedLength / @INewsDesk.MaxLength</span>
+                                        @if (Events.News.Count > 0)
+                                        {
+                                            <AppButton Variant="ghost" OnClick="CloseComposer">Отмена</AppButton>
+                                        }
+                                        <AppButton Variant="primary" Disabled="@(!CanAnalyze)" OnClick="AnalyzeAsync">Разобрать по активам</AppButton>
                                     </div>
                                 </div>
                             </div>
                         </ChildContent>
                     </Panel>
-
                 }
-                else
-                {
-                    @* Состояние: разбор готов. *@
-                    <Panel Class="rise rise-3">
-                        <div class="news-text__head">
-                            <span class="label">Текст новости</span>
-                            <span class="news-text__meta">
-                                введена пользователем <span class="num-sm">@analyzedAt!.Value.ToString("HH:mm")</span> ·
-                                <span class="num-sm">@AnalyzedLength</span> символов
-                            </span>
-                        </div>
-                        <p class="news-text__body">@analyzedText</p>
-                    </Panel>
 
-                    <Panel Title="Сила влияния" Class="rise rise-4">
-                        <MetaContent>
-                            <text>типичное значение около <span class="num-sm">@Fixed2(TypicalImpact)</span></text>
-                        </MetaContent>
+                @if (isAnalyzing)
+                {
+                    <Panel Title="Влияние новости по активам" Class="rise rise-2">
+                        <MetaContent>разбор по профилям</MetaContent>
                         <ChildContent>
-                            @* Шкала — модуль: знак говорит о направлении, а оно уже
-                               стоит бейджем тональности и числом в полосе связи. *@
-                            <ZoneScale Value="Math.Abs(signal.ImpactScore)"
-                                       Min="ImpactMin" Max="ImpactMax"
-                                       Zones="ImpactZones"
-                                       Note="@ImpactNote" />
+                            <div class="news-loading">
+                                @for (var i = 0; i < Math.Max(1, TradingCount); i++)
+                                {
+                                    <div class="news-loading__row">
+                                        <Skeleton Width="180px" Height="28px" />
+                                        <Skeleton Height="12px" />
+                                        <Skeleton Width="80px" Height="14px" />
+                                    </div>
+                                }
+                            </div>
+                        </ChildContent>
+                    </Panel>
+                }
+
+                @if (errorMessage is not null)
+                {
+                    <Panel Class="rise rise-2" Flush="true">
+                        <div class="error-bar">
+                            <span class="error-bar__text"><Icon Name="alert" Size="16" />@errorMessage</span>
+                            <AppButton Variant="secondary" Size="26" OnClick="AnalyzeAsync">Повторить разбор</AppButton>
+                        </div>
+                        <p class="error-foot">Текст сохранён в поле ввода. Торги идут дальше — не разобрана только эта новость.</p>
+                    </Panel>
+                }
+
+                @* Главный объект экрана: новость веером расходится по активам. *@
+                @if (news?.Fan is { } fan && !showComposer)
+                {
+                    var selected = SelectedSymbolFor(fan);
+                    var row = fan.For(selected);
+                    var asset = Registry.Find(selected);
+
+                    <Panel Class="rise rise-2" Flush="true">
+                        <Head>
+                            <span class="news-title">
+                                <h2>Влияние новости по активам</h2>
+                                <span class="caption num-xs">@news.At.ToString("HH:mm")</span>
+                            </span>
+                            <span class="ui-panel__meta">строка выбирает актив · толщина связи — сила влияния</span>
+                        </Head>
+                        <ChildContent>
+                            <ImpactFan News="news"
+                                       SelectedSymbol="@selected"
+                                       SelectedSymbolChanged="SelectAsset"
+                                       FindAsset="Registry.Find"
+                                       CurrentPrice="CurrentPrice" />
                         </ChildContent>
                     </Panel>
 
-                    @* Сработавшие факторы — те, чья близость к новости выше порога. *@
-                    <Panel Title="Сработавшие факторы профиля" Class="rise rise-5" Flush="true">
-                        <MetaContent>
-                            <text>профиль собран на «Создании актива»</text>
-                        </MetaContent>
-                        <ChildContent>
-                            @if (MatchedFactors.Count > 0)
-                            {
-                                <div class="factors">
-                                    @foreach (var factor in MatchedFactors)
+                    <div class="news-pair">
+                        @* ── Разбор выбранного актива: формула одной строкой ── *@
+                        <Panel Flush="true" Class="rise rise-3">
+                            <Head>
+                                <span class="news-title"><h2>Разбор</h2>@if (selected is not null) { <Ticker Symbol="@selected" /> }</span>
+                                <span class="ui-panel__meta">выбранная строка веера</span>
+                            </Head>
+                            <ChildContent>
+                                @if (row is null || !row.WasAnalyzed)
+                                {
+                                    <p class="news-note">Актив не был в торгах — новость по нему не разбиралась.</p>
+                                }
+                                else if (!row.IsHit)
+                                {
+                                    <p class="news-note">Ни один пункт профиля @selected не совпал с новостью — сигнала нет, и агенты этот актив по ней не торгуют.</p>
+                                }
+                                else
+                                {
+                                    var signal = row.Signal!;
+                                    var sensitivity = asset?.Profile.NewsSensitivity ?? 0m;
+                                    var factorsSum = sensitivity == 0m ? 0m : signal.ImpactScore / sensitivity;
+
+                                    @* Формула — та, что считает модуль новостей: вклады сработавших
+                                       факторов, умноженные на чувствительность актива. *@
+                                    <div class="formula">
+                                        <span class="formula__term"><span class="num-lg">@Signed2(factorsSum)</span><span class="caption">вклад сработавших факторов</span></span>
+                                        <span class="formula__op">×</span>
+                                        <span class="formula__term"><span class="num-lg">@sensitivity.ToString("F2")</span><span class="caption">чувствительность @selected</span></span>
+                                        <span class="formula__op">=</span>
+                                        <span class="formula__term formula__term--result"><span class="num-lg">@Signed2(signal.ImpactScore)</span><span class="caption">сила влияния</span></span>
+                                    </div>
+                                    <div class="factors-head">
+                                        <span class="label">Сработавшие факторы профиля</span>
+                                        <span class="caption"><span class="num-xs">@signal.Factors.Count</span> из <span class="num-xs">@(asset?.Profile.Factors.Count ?? 0)</span></span>
+                                    </div>
+                                    @foreach (var factor in signal.Factors)
                                     {
+                                        var contribution = Contribution(signal, factor, factorsSum);
                                         <div class="factor">
-                                            <span class="badge badge--@factor.Tone factor__kind">@factor.KindName</span>
-                                            <span class="factor__text" title="@factor.Text">@factor.Text</span>
-                                            <span class="factor__excerpt">близость <span class="num-sm">@Fixed2(factor.Similarity)</span> · вес <span class="num-sm">@Fixed2(factor.Importance)</span></span>
+                                            <Badge Tone="@(contribution >= 0m ? "up" : "down")">@(factor.Kind == NewsFactorKind.Positive ? "позитивный" : "негативный")</Badge>
+                                            <span class="factor__text">
+                                                <span class="factor__name">@factor.Text</span>
+                                                <span class="caption">
+                                                    близость <span class="num-xs">@factor.Similarity.ToString("F2")</span> ·
+                                                    вес <span class="num-xs">@factor.Importance.ToString("F2")</span> ·
+                                                    вклад <span class="num-xs @DeltaTone(contribution)">@Signed2(contribution)</span>
+                                                </span>
+                                            </span>
                                         </div>
                                     }
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="factors-summary">
-                                    <p class="factors-summary__note">
-                                        Ни один фактор профиля не оказался близок к новости по смыслу — сила
-                                        влияния нулевая, цену двигает только тональность.
-                                    </p>
-                                </div>
-                            }
-                        </ChildContent>
-                    </Panel>
+                                }
+                            </ChildContent>
+                        </Panel>
 
-                    <Panel Title="Объяснение модели" Class="rise rise-6">
-                        <p class="explanation">@signal.Explanation</p>
-                    </Panel>
-                }
-
-                @if (isRunning)
-                {
-                    <Panel Quiet="true" Class="rise rise-2">
-                        <div class="agent-line">
-                            <span class="label agent-line__label">Новостной агент</span>
-                            <StatusDot Tone="agent-news" />
-                            <span class="agent-line__name">@NewsAgentName</span>
-                            <span class="agent-line__state">@AgentStateText</span>
-                            @if (NewsAgent is not null)
-                            {
-                                <span class="agent-line__metric">деньги <span class="num-sm">@Count0(NewsAgent.Cash)</span></span>
-                                <span class="agent-line__metric">позиция <span class="num-sm">@Position0(NewsAgent.Position)</span></span>
-                            }
-                        </div>
-                    </Panel>
-                }
-            </div>
-
-            @* ─────────── ПРАВЫЙ РЕЛЬС · состояние на сейчас ─────────── *@
-            <div class="rail rail--right">
-                <Panel Title="Профиль актива" Class="rise rise-3">
-                    @* Короткая мета: длинная разгоняла шапку панели и ломала заголовок
-                       на две строки — «Профиль / актива» (пункт 72, раздел 9.7). *@
-                    <MetaContent><text>@(signal is null ? "состояние на сейчас" : "на момент сигнала")</text></MetaContent>
-                    <ChildContent>
-                        <div class="profile">
-                            <ZoneScale Value="profile.NewsSensitivity"
-                                       Min="SensitivityMin" Max="SensitivityMax"
-                                       Zones="SensitivityZones"
-                                       Label="Чувствительность к новостям"
-                                       Note="@SensitivityName"
-                                       Compact="true" />
-
-                            <section class="profile__block hairline-top">
-                                <div class="profile__head">
-                                    <span class="label">Факторы профиля</span>
-                                    @* Сколько пунктов профиля новость задела. До разбора мета
-                                       пуста: числа ещё нет, и ноль был бы утверждением о том,
-                                       чего не считали (пункт 69, раздел 10). *@
-                                    @if (signal is not null)
+                        @* ── Реакция рынка: что стало с ценой и кто действовал ── *@
+                        <Panel Flush="true" Class="rise rise-3">
+                            <Head>
+                                <span class="news-title"><h2>Реакция рынка</h2>@if (selected is not null) { <Ticker Symbol="@selected" /> }</span>
+                                <span class="ui-panel__meta">@ReactionPeriod · отметка — новость</span>
+                            </Head>
+                            <ChildContent>
+                                @if (Reaction(news, selected) is { } reaction)
+                                {
+                                    <div class="reaction">
+                                        <div class="reaction__head">
+                                            <span class="num-md t3">@Price2(reaction.From) →</span>
+                                            <span class="num-lg">@Price2(reaction.To)</span>
+                                            <span class="num-sm @DeltaTone(reaction.To - reaction.From)">@Sign(reaction.Percent)@Percent2(Math.Abs(reaction.Percent)) %</span>
+                                            <span class="caption">после новости</span>
+                                        </div>
+                                        @if (reaction.Before.Length + reaction.After.Length > 1)
+                                        {
+                                            <div class="reaction__plot">
+                                                <svg width="100%" height="96" viewBox="0 0 400 96" preserveAspectRatio="none" aria-label="Цена @selected за сессию, отметка новости">
+                                                    <path class="reaction__open" d="@reaction.OpenPath" vector-effect="non-scaling-stroke" />
+                                                    <path class="reaction__news" d="@reaction.NewsPath" vector-effect="non-scaling-stroke" />
+                                                    <path class="reaction__line reaction__line--@reaction.BeforeTone" d="@reaction.Before" vector-effect="non-scaling-stroke" />
+                                                    <path class="reaction__line reaction__line--@reaction.AfterTone" d="@reaction.After" vector-effect="non-scaling-stroke" />
+                                                </svg>
+                                                <span class="reaction__label" style="left:@reaction.NewsLeft">новость</span>
+                                            </div>
+                                            <div class="reaction__axis num-xs">
+                                                <span>@reaction.Start.ToString("HH:mm")</span>
+                                                <span>@news.At.ToString("HH:mm")</span>
+                                                <span>@reaction.End.ToString("HH:mm")</span>
+                                            </div>
+                                        }
+                                    </div>
+                                    @foreach (var trade in NewsAgentTrades(news, selected))
                                     {
-                                        <span class="profile__meta">затронуто <span class="num-sm">@TouchedFactorCount</span></span>
+                                        <div class="factor">
+                                            <span class="agent-name"><StatusDot Tone="agent-news" />@trade.Agent</span>
+                                            <span class="factor__text">
+                                                <span class="factor__name">@(trade.Side == OrderSide.Buy ? "купил" : "продал") @Quantity1(trade.Quantity) шт @selected</span>
+                                                <span class="caption">средняя <span class="num-xs t2">@Price2(trade.AveragePrice)</span> · через <span class="num-xs">@trade.Delay</span> с после сигнала</span>
+                                            </span>
+                                        </div>
                                     }
-                                </div>
-                                <BalanceBar Positive="profile.PositiveFactors.Count()"
-                                            Negative="profile.NegativeFactors.Count()"
-                                            PositiveLabel="позитивных"
-                                            NegativeLabel="негативных"
-                                            HighlightPositive="@(TouchedKind == NewsFactorKind.Positive)"
-                                            HighlightNegative="@(TouchedKind == NewsFactorKind.Negative)" />
-                            </section>
-                        </div>
-                    </ChildContent>
-                </Panel>
-
-                <Panel Quiet="true" Class="rise rise-4">
-                    <div class="market">
-                        <span class="label">@MarketTitle</span>
-                        <dl class="kv">
-                            <div class="kv__row">
-                                <dt>цена</dt>
-                                <dd class="num-sm">@(snapshot is null ? "—" : Money(snapshot.LastPrice))</dd>
-                            </div>
-                            <div class="kv__row">
-                                <dt>спред</dt>
-                                <dd class="num-sm">@SpreadLabel</dd>
-                            </div>
-                            <div class="kv__row">
-                                <dt>объём за сессию</dt>
-                                <dd class="num-sm">@(snapshot is null ? "—" : Count0(snapshot.Volume))</dd>
-                            </div>
-                        </dl>
+                                }
+                                else
+                                {
+                                    <p class="news-note">Цена на момент новости неизвестна — актив не торговался.</p>
+                                }
+                            </ChildContent>
+                        </Panel>
                     </div>
-                </Panel>
+                }
             </div>
         </div>
     </main>
 </div>
 
 @code {
-    private const int MinNewsLength = 24;
-    private const int MaxNewsLength = 2000;
-
-    // Шкала силы влияния — из бизнес-логики (раздел 10.1), а не из текущих
-    // значений: типичный ImpactScore около 1,30. Заглушки анализаторов дают
-    // сегодня величины около 0,2, и маркер честно стоит в начале шкалы.
-    private const decimal ImpactMin = 0.30m;
-    private const decimal ImpactMax = 2.50m;
-    private const decimal TypicalImpact = 1.30m;
-
-    private const decimal SensitivityMin = 0.45m;
-    private const decimal SensitivityMax = 0.95m;
-
-    private static readonly ZoneScale.Zone[] ImpactZones =
-    [
-        new("слабая", 0.90m),
-        new("умеренная", 1.60m),
-        new("сильная", ImpactMax)
-    ];
-
-    private static readonly ZoneScale.Zone[] SensitivityZones =
-    [
-        new("низкая", 0.60m),
-        new("средняя", 0.75m),
-        new("высокая", SensitivityMax)
-    ];
+    /// <summary>Окно, в котором сделки новостных агентов считаются ответом на новость.</summary>
+    private static readonly TimeSpan ReactionWindow = TimeSpan.FromSeconds(30);
 
     private string newsText = string.Empty;
-    private string? analyzedText;
-    private DateTimeOffset? analyzedAt;
-    private NewsSignal? signal;
-    private string? errorMessage;
+    private bool isComposing;
     private bool isAnalyzing;
-
-    private SimulationTickResult? latestMarket;
-
-    // Реакция новостного агента. Сигнал забирается ближайшим шагом симуляции
-    // и больше не повторяется, поэтому решение и цену надо поймать на том
-    // самом шаге — дальше агент снова отвечает «новостей не было».
-    private bool awaitingReaction;
-    private AgentDecision? agentDecision;
-    private decimal? priceBefore;
-    private decimal? priceAfter;
-
-    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    private string? errorMessage;
+    private DateTimeOffset? selectedNewsAt;
+    private string? selectedSymbol;
 
     private int TrimmedLength => newsText.Trim().Length;
-    private bool CanAnalyze => TrimmedLength >= MinNewsLength;
-    private bool HasLengthError => TrimmedLength > 0 && TrimmedLength < MinNewsLength;
-    private int AnalyzedLength => analyzedText?.Length ?? 0;
 
-    private int MatchedCount =>
-        signal is null ? 0 : signal.PositiveMatches + signal.NegativeMatches;
+    private bool HasLengthError => TrimmedLength > 0 && TrimmedLength < INewsDesk.MinLength;
 
-    private int ProfileItemCount => CurrentAsset.Profile.Factors.Count;
+    private bool CanAnalyze => !isAnalyzing && Markets.IsRunning && TrimmedLength >= INewsDesk.MinLength;
 
-    private string PolarityName => signal?.Polarity switch
-    {
-        SignalPolarity.Positive => "Позитивная",
-        SignalPolarity.Negative => "Негативная",
-        _ => "Нейтральная"
-    };
+    private int TradingCount => Registry.Assets.Count(asset => Markets.Trades(asset.Id));
 
-    private string PolarityTone => signal?.Polarity switch
-    {
-        SignalPolarity.Positive => "up",
-        SignalPolarity.Negative => "down",
-        _ => "warn"
-    };
+    /// <summary>Какая новость разобрана. По умолчанию — свежая: за ней и приходят.</summary>
+    private SessionEvent? SelectedNews =>
+        Events.News.FirstOrDefault(entry => entry.At == selectedNewsAt) ?? Events.News.FirstOrDefault();
 
-    private string ImpactNote =>
-        signal is null ? string.Empty
-        : signal.ImpactScore < ImpactZones[0].To ? "слабая"
-        : signal.ImpactScore < ImpactZones[1].To ? "умеренная"
-        : "сильная";
-
-    private string SensitivityName
-    {
-        get
-        {
-            var value = CurrentAsset.Profile.NewsSensitivity;
-            return value < SensitivityZones[0].To ? "низкая"
-                : value < SensitivityZones[1].To ? "средняя"
-                : "высокая";
-        }
-    }
-
-    private AgentSnapshot? NewsAgent =>
-        latestMarket?.Agents.FirstOrDefault(agent => agent.Type == AgentType.NewsDriven);
-
-    private string NewsAgentName
-    {
-        get
-        {
-            var count = latestMarket?.Agents.Count(agent => agent.Type == AgentType.NewsDriven) ?? 0;
-            // Раздел 10.1: если строка представляет несколько экземпляров типа,
-            // это должно быть видно.
-            return count > 1 ? $"Новостной ×{count}" : "Новостной";
-        }
-    }
-
-    /// <summary>
-    /// Что написать в строке агента: после разбора — его собственное объяснение
-    /// решения (раздел 1.3, объяснимость), до разбора — чего он ждёт.
-    /// </summary>
-    private string AgentStateText
-    {
-        get
-        {
-            if (agentDecision is not null)
-            {
-                return agentDecision.Explanation;
-            }
-
-            if (signal is not null)
-            {
-                return "сигнал передан — решение будет на ближайшем шаге симуляции";
-            }
-
-            return NewsFeed.Entries.Count == 0
-                ? "ждёт сигнала — новостей после старта сессии не было"
-                : "ждёт следующую новость";
-        }
-    }
-
-    private string MarketTitle => signal is null ? "Рынок на сейчас" : "Рынок на момент сигнала";
-
-    private string SpreadLabel
-    {
-        get
-        {
-            var snapshot = latestMarket?.Snapshot;
-            return snapshot?.BestBid is null || snapshot.BestAsk is null
-                ? "—"
-                : Money(snapshot.BestAsk.Value - snapshot.BestBid.Value);
-        }
-    }
-
-    /// <summary>После округления до копеек цена не изменилась — раздел 10 запрещает «A → A».</summary>
-    private bool PriceUnchanged =>
-        priceBefore is not null && priceAfter is not null &&
-        Round2(priceBefore.Value) == Round2(priceAfter.Value);
-
-    private string PriceTone
-    {
-        get
-        {
-            if (priceBefore is null || priceAfter is null)
-            {
-                return "flat";
-            }
-
-            var delta = Round2(priceAfter.Value) - Round2(priceBefore.Value);
-            return delta > 0m ? "up" : delta < 0m ? "down" : "flat";
-        }
-    }
-
-    private string PriceDeltaLabel
-    {
-        get
-        {
-            if (priceBefore is null || priceAfter is null)
-            {
-                return "—";
-            }
-
-            var before = Round2(priceBefore.Value);
-            var delta = Round2(priceAfter.Value) - before;
-            var percent = before == 0m ? 0m : delta / before * 100m;
-            var arrow = delta > 0m ? "↗" : "↘";
-
-            return $"{arrow} {Sign(delta)}{Fixed2(Math.Abs(delta))} ₽ · {Sign(percent)}{Fixed2(Math.Abs(percent))} %";
-        }
-    }
-
-    private string AgentActionName => agentDecision?.Action switch
-    {
-        TradeAction.Buy => "покупает по рынку",
-        TradeAction.Sell => "продаёт по рынку",
-        _ => "держит позицию"
-    };
-
-    /// <summary>Строка истории, разбор которой открыт на экране.</summary>
-    private bool IsCurrentEntry(SessionNewsEntry entry) =>
-        signal is not null && analyzedAt is not null && entry.At == analyzedAt.Value;
-
-    /// <summary>
-    /// Сработавшие факторы профиля — из сигнала. Раньше список был захардкожен
-    /// пустым, потому что сопоставитель возвращал одни количества, и панель во
-    /// всех состояниях показывала пустое состояние (пункт 67 бэклога).
-    ///
-    /// </summary>
-    private IReadOnlyList<MatchedFactor> MatchedFactors =>
-        signal?.Factors
-            .Select(factor => new MatchedFactor(
-                factor.Text,
-                factor.Kind == NewsFactorKind.Positive ? "up" : "down",
-                factor.Kind == NewsFactorKind.Positive ? "позитивный" : "негативный",
-                factor.Similarity,
-                factor.Importance))
-            .ToArray()
-        ?? [];
-
-    /// <summary>Сколько пунктов профиля затронула новость — для меты (пункт 69).</summary>
-    private int TouchedFactorCount => MatchedFactors.Count;
-
-    /// <summary>
-    /// Какую сторону профиля новость задела сильнее — её половина полосы
-    /// баланса подсвечивается (артборды 02 и 03). Ничью не разрешаем в пользу
-    /// какой-либо стороны: если позитивных и негативных поровну, не подсвечено
-    /// ничего — подсветка тогда врала бы о перевесе, которого нет.
-    /// </summary>
-    private NewsFactorKind? TouchedKind
-    {
-        get
-        {
-            if (signal is null)
-            {
-                return null;
-            }
-
-            var positive = signal.Factors.Count(factor => factor.Kind == NewsFactorKind.Positive);
-            var negative = signal.Factors.Count(factor => factor.Kind == NewsFactorKind.Negative);
-
-            if (positive == negative)
-            {
-                return null;
-            }
-
-            return positive > negative ? NewsFactorKind.Positive : NewsFactorKind.Negative;
-        }
-    }
+    /// <summary>Строка веера по умолчанию — самый задетый актив.</summary>
+    private string? SelectedSymbolFor(NewsFan fan) =>
+        selectedSymbol is not null && fan.For(selectedSymbol) is not null
+            ? fan.For(selectedSymbol)!.Symbol
+            : fan.Lead?.Symbol ?? fan.Assets.FirstOrDefault(row => row.WasAnalyzed)?.Symbol;
 
     protected override void OnInitialized()
     {
-        latestMarket = SimulationRunner.Current;
-        SimulationRunner.OnTick += HandleMarketTick;
-        NewsFeed.Changed += HandleFeedChanged;
+        Markets.Changed += HandleChanged;
+        Events.Changed += HandleChanged;
     }
 
-    public void Dispose()
+    private void HandleChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private void OpenComposer()
     {
-        SimulationRunner.OnTick -= HandleMarketTick;
-        NewsFeed.Changed -= HandleFeedChanged;
+        isComposing = true;
+        errorMessage = null;
     }
 
-    private void HandleFeedChanged() => _ = InvokeAsync(StateHasChanged);
+    private void CloseComposer() => isComposing = false;
 
-    private void HandleMarketTick(SimulationTickResult tickResult)
+    private void SelectNews(SessionEvent entry)
     {
-        _ = InvokeAsync(() =>
+        selectedNewsAt = entry.At;
+        selectedSymbol = null;
+        isComposing = false;
+    }
+
+    private void HandleNewsKey(KeyboardEventArgs args, SessionEvent entry)
+    {
+        if (args.Key is "Enter" or " ")
         {
-            latestMarket = tickResult;
-
-            // Новость забирается ближайшим шагом после отправки — значит, это
-            // тот самый шаг, на котором агент её увидел.
-            if (awaitingReaction)
-            {
-                awaitingReaction = false;
-                agentDecision = tickResult.Decisions
-                    .FirstOrDefault(decision => decision.AgentName.Contains("News", StringComparison.Ordinal));
-                priceAfter = tickResult.Snapshot.LastPrice;
-            }
-
-            StateHasChanged();
-        });
+            SelectNews(entry);
+        }
     }
+
+    private void SelectAsset(string symbol) => selectedSymbol = symbol;
 
     private async Task AnalyzeAsync()
     {
-        if (!CanAnalyze || isAnalyzing)
+        if (!CanAnalyze)
         {
             return;
         }
 
-        var text = newsText.Trim();
-
         isAnalyzing = true;
         errorMessage = null;
-        agentDecision = null;
-        priceBefore = null;
-        priceAfter = null;
-        awaitingReaction = false;
+        StateHasChanged();
 
         try
         {
-            var result = await NewsProcessingService.AnalyzeAsync(new NewsAnalysisRequest
-            {
-                NewsText = text,
-                Profile = CurrentAsset.Profile
-            });
-
-            priceBefore = latestMarket?.Snapshot.LastPrice;
-
-            SimulationRunner.SubmitNews(result);
-            awaitingReaction = true;
-
-            signal = result;
-            analyzedText = text;
-            analyzedAt = NewsFeed.Add(text, result).At;
+            var entry = await NewsDesk.AnalyzeAsync(newsText);
+            selectedNewsAt = entry.At;
+            selectedSymbol = null;
+            newsText = string.Empty;
+            isComposing = false;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            signal = null;
-            analyzedText = text;
-            analyzedAt = DateTimeOffset.Now;
-            errorMessage = $"Анализ не выполнен — {ex.Message}";
+            errorMessage = $"Разбор не выполнен — {exception.Message}";
         }
         finally
         {
@@ -789,42 +397,136 @@
         }
     }
 
-    private async Task RetryAsync()
+    private decimal? CurrentPrice(string symbol) =>
+        Registry.Find(symbol) is { } asset ? Markets.Market(asset.Id)?.LastPrice : null;
+
+    /// <summary>
+    /// Вклад одного фактора. Модуль новостей отдаёт сумму и близость с весом
+    /// каждого фактора, но не тональность отдельно: она восстанавливается из
+    /// суммы — одна на все факторы, ведь текст один.
+    /// </summary>
+    private static decimal Contribution(NewsSignal signal, NewsFactorMatch factor, decimal factorsSum)
     {
-        newsText = analyzedText ?? string.Empty;
-        errorMessage = null;
-        await AnalyzeAsync();
+        var weights = signal.Factors.Sum(item => Signed(item) * item.Similarity * item.Importance);
+        var tone = weights == 0m ? 0m : factorsSum / weights;
+        return tone * Signed(factor) * factor.Similarity * factor.Importance;
     }
 
-    private void StartNewEntry()
+    private static decimal Signed(NewsFactorMatch factor) => factor.Kind == NewsFactorKind.Positive ? 1m : -1m;
+
+    private static string Signed2(decimal value) => Sign(value) + Math.Abs(value).ToString("F2");
+
+    private string ReactionPeriod =>
+        Markets.StartedAt is { } started
+            ? $"{started:HH:mm}–{(Markets.EndedAt ?? DateTimeOffset.Now):HH:mm}"
+            : "—";
+
+    // ── Реакция рынка ───────────────────────────────────────────────────────
+
+    private sealed record ReactionView(
+        decimal From, decimal To, decimal Percent,
+        string Before, string After, string BeforeTone, string AfterTone,
+        string OpenPath, string NewsPath, string NewsLeft,
+        DateTimeOffset Start, DateTimeOffset End);
+
+    /// <summary>
+    /// Ход цены выбранного актива за сессию с отметкой новости — по свечам
+    /// его прогона, теми же, что на графике «Торгов».
+    /// </summary>
+    private ReactionView? Reaction(SessionEvent news, string? symbol)
     {
-        newsText = string.Empty;
-        analyzedText = null;
-        analyzedAt = null;
-        signal = null;
-        errorMessage = null;
-        agentDecision = null;
-        priceBefore = null;
-        priceAfter = null;
-        awaitingReaction = false;
+        if (symbol is null
+            || Registry.Find(symbol) is not { } asset
+            || Markets.Market(asset.Id) is not { } market
+            || news.PricesAtNews?.TryGetValue(symbol, out var from) != true)
+        {
+            return null;
+        }
+
+        var candles = CandleReader.GetCandles(market.RunId, TimeSpan.FromSeconds(10), 360);
+        var points = candles.Select(candle => (Time: candle.StartedAt.ToLocalTime(), Price: candle.Close)).ToList();
+        points.Add((DateTimeOffset.Now, market.LastPrice));
+
+        var start = points[0].Time;
+        var end = points[^1].Time;
+        var span = Math.Max(1d, (end - start).TotalSeconds);
+        var low = points.Min(point => point.Price) - 0.05m;
+        var high = points.Max(point => point.Price) + 0.05m;
+
+        string X(DateTimeOffset time) => F((decimal)((time - start).TotalSeconds / span * 400d));
+        string Y(decimal price) => F(8m + (high - price) / Math.Max(0.01m, high - low) * 80m);
+
+        string Path(IEnumerable<(DateTimeOffset Time, decimal Price)> part)
+        {
+            var path = new StringBuilder();
+            foreach (var (time, price) in part)
+            {
+                path.Append(path.Length == 0 ? 'M' : 'L').Append(X(time)).Append(' ').Append(Y(price));
+            }
+
+            return path.ToString();
+        }
+
+        (DateTimeOffset Time, decimal Price) atNews = (news.At, from);
+        var before = points.Where(point => point.Time <= news.At).Append(atNews).ToArray();
+        var after = points.Where(point => point.Time > news.At).Prepend(atNews).ToArray();
+        var tone = (decimal a, decimal b) => b > a ? "up" : b < a ? "down" : "flat";
+        var newsX = X(news.At);
+
+        return new ReactionView(
+            from, market.LastPrice, from == 0m ? 0m : (market.LastPrice - from) / from * 100m,
+            Path(before), Path(after),
+            tone(before[0].Price, from), tone(from, market.LastPrice),
+            $"M0 {Y(market.Open)}H400", $"M{newsX} 0V96",
+            F((decimal)((news.At - start).TotalSeconds / span * 100d)) + "%",
+            start, end);
     }
 
-    private static decimal Round2(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
+    private sealed record AgentTrade(string Agent, OrderSide Side, decimal Quantity, decimal AveragePrice, int Delay);
 
-    /// <summary>Цена, спред, сила влияния, уверенность — два знака (раздел 10).</summary>
-    private static string Fixed2(decimal value) => value.ToString("F2");
+    /// <summary>
+    /// Что сделали новостные агенты в этом активе сразу после новости — по их
+    /// сделкам из истории прогона, а не по догадке.
+    /// </summary>
+    private IEnumerable<AgentTrade> NewsAgentTrades(SessionEvent news, string? symbol)
+    {
+        if (symbol is null || Registry.Find(symbol) is not { } asset || Markets.Market(asset.Id) is not { } market)
+        {
+            yield break;
+        }
 
-    private static string Money(decimal value) => $"{Fixed2(value)} ₽";
+        var names = AgentDisplay.BuildInstanceNames(market.Last.Agents);
 
-    /// <summary>Объём и деньги агента — ноль знаков.</summary>
-    private static string Count0(decimal value) =>
-        Math.Round(value, 0, MidpointRounding.AwayFromZero).ToString("N0");
+        foreach (var agent in market.Last.Agents.Where(agent => agent.Type == AgentType.NewsDriven))
+        {
+            var trades = AgentStatistics.GetReport(market.RunId, agent.Name)?.Trades
+                .Where(trade => trade.ExecutedAt >= news.At && trade.ExecutedAt <= news.At + ReactionWindow)
+                .ToArray() ?? [];
 
-    /// <summary>Позиция может быть отрицательной — знак обязателен (раздел 10).</summary>
-    private static string Position0(decimal value) => Sign(value) + Count0(Math.Abs(value));
+            if (trades.Length == 0)
+            {
+                continue;
+            }
 
-    private static string Sign(decimal value) => value > 0m ? "+" : value < 0m ? "−" : string.Empty;
+            var side = trades[0].Side;
+            var same = trades.Where(trade => trade.Side == side).ToArray();
+            var quantity = same.Sum(trade => trade.Quantity);
+            var average = quantity == 0m ? 0m : same.Sum(trade => trade.Price * trade.Quantity) / quantity;
 
-    /// <param name="Tone">up · down — бейдж сработавшего фактора окрашен (раздел 3).</param>
-    private sealed record MatchedFactor(string Text, string Tone, string KindName, decimal Similarity, decimal Importance);
+            yield return new AgentTrade(
+                names.GetValueOrDefault(agent.Name, agent.Name),
+                side,
+                quantity,
+                average,
+                (int)Math.Max(0, Math.Round((same[0].ExecutedAt - news.At).TotalSeconds)));
+        }
+    }
+
+    private static string F(decimal value) => value.ToString("0.#", CultureInfo.InvariantCulture);
+
+    public void Dispose()
+    {
+        Markets.Changed -= HandleChanged;
+        Events.Changed -= HandleChanged;
+    }
 }

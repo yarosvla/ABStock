@@ -1,5 +1,4 @@
-using ABStock.Application.MarketHistory;
-using ABStock.Application.Simulation;
+using ABStock.Application.Assets;
 using ABStock.Shared;
 using ABStock.UI.Services;
 using System.Globalization;
@@ -7,218 +6,157 @@ using System.Globalization;
 namespace ABStock.UI.Tests;
 
 /// <summary>
-/// Лента уведомлений колокольчика. Проверяются два самых хрупких места:
-/// переход позиции агента через ноль и сброс ленты при смене прогона.
+/// Лента уведомлений колокольчика. Самые хрупкие места: переход позиции
+/// агента через ноль — теперь по каждому активу — и сброс ленты при новой
+/// сессии.
 ///
 /// Переход через ноль хрупок потому, что событие определяется не сделкой, а
-/// сравнением двух соседних тиков, и точка отсчёта на первом тике агента
-/// выбирается отдельным правилом. Сброс хрупок потому, что рядом иначе
-/// окажутся события прошлого запуска и счётчики нынешнего.
+/// сравнением соседних шагов, и точка отсчёта — стартовый запас агента.
 /// </summary>
 public class NotificationFeedTests
 {
-    private static AgentSnapshot Agent(
-        string name,
-        decimal position,
-        decimal initialCash = 100_000m,
-        decimal? initialPortfolio = null) =>
-        new(
-            name,
-            AgentType.TrendFollowing,
-            Cash: 100_000m,
-            Position: position,
-            PortfolioValue: 100_000m,
-            InitialCash: initialCash,
-            InitialPortfolioValue: initialPortfolio ?? initialCash);
-
-    private static SimulationTickResult Tick(params AgentSnapshot[] agents) =>
-        new(
-            Tick: 1,
-            Snapshot: new MarketSnapshot(100m, 99m, 101m, 0m, [], []),
-            OrderBook: new OrderBookSnapshot([], []),
-            Agents: agents,
-            Decisions: []);
-
-    private static (NotificationFeed Feed, FakeRunner Runner, FakeNewsFeed News) Build()
-    {
-        // Та же культура, что выставляет Program.cs: дробная часть отделяется
-        // запятой (раздел 10). Без этого тест проверял бы формат, которого в
-        // работающем приложении не бывает, — «1.41» вместо «1,41».
-        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("ru-RU");
-
-        var runner = new FakeRunner();
-        var news = new FakeNewsFeed();
-        var feed = new NotificationFeed(runner, news, new FakeHistoryReader());
-        return (feed, runner, news);
-    }
+    private static readonly AssetRegistry Registry = BuildRegistry();
+    private static readonly Guid Glen = Registry.Find("GLEN")!.Id;
+    private static readonly Guid Kvan = Registry.Find("KVAN")!.Id;
 
     // ─────────────────────── переход позиции через ноль ───────────────────────
 
     [Fact]
-    public void Агент_вышедший_с_позицией_не_считается_открывшим_её()
+    public void Агент_вышедший_со_стартовым_запасом_не_считается_открывшим_позицию()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (50m, 50m)));
 
-        // Портфель на входе отличается от денег — агент заведён сразу с
-        // позицией, значит он её не открывал.
-        runner.Tick(Tick(Agent("a", position: 55m, initialCash: 100_000m, initialPortfolio: 106_800m)));
+        markets.Step(Account("Trend", glen: (48m, 50m)));
 
         Assert.DoesNotContain(feed.Entries, entry => entry.Kind == NotificationKind.Trade);
     }
 
     [Fact]
-    public void Агент_вышедший_пустым_и_купивший_на_первом_тике_открыл_позицию()
+    public void Агент_вышедший_без_бумаг_и_купивший_открыл_позицию_в_этом_активе()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (0m, 0m)));
 
-        // Портфель на входе равен деньгам — агент вышел пустым. Позицию на
-        // первом же тике он именно открыл, и проглатывать это событие вместе
-        // с точкой отсчёта нельзя.
-        runner.Tick(Tick(Agent("a", position: 40m, initialCash: 100_000m, initialPortfolio: 100_000m)));
+        markets.Step(Account("Trend", glen: (12m, 0m)));
 
-        var entry = Assert.Single(feed.Entries, e => e.Kind == NotificationKind.Trade);
+        var entry = Assert.Single(feed.Entries, item => item.Kind == NotificationKind.Trade);
         Assert.Equal("Агент открыл позицию", entry.Title);
-        Assert.Contains("длинная", entry.Detail);
+        Assert.Equal("GLEN", entry.Symbol);
+        Assert.Contains("Трендовый 1", entry.Detail);
     }
 
     [Fact]
     public void Закрытие_позиции_даёт_событие()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (50m, 50m)));
 
-        runner.Tick(Tick(Agent("a", 55m, initialPortfolio: 106_800m)));
-        runner.Tick(Tick(Agent("a", 0m, initialPortfolio: 106_800m)));
+        markets.Step(Account("Trend", glen: (0m, 50m)));
 
-        var entry = Assert.Single(feed.Entries, e => e.Kind == NotificationKind.Trade);
-        Assert.Equal("Агент закрыл позицию", entry.Title);
+        Assert.Equal("Агент закрыл позицию", feed.Entries[0].Title);
     }
 
     [Fact]
     public void Разворот_через_ноль_даёт_одно_событие_а_не_два()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (5m, 5m)));
 
-        runner.Tick(Tick(Agent("a", 55m, initialPortfolio: 106_800m)));
-        runner.Tick(Tick(Agent("a", -30m, initialPortfolio: 106_800m)));
+        markets.Step(Account("Trend", glen: (-3m, 5m)));
 
-        var entry = Assert.Single(feed.Entries, e => e.Kind == NotificationKind.Trade);
+        var entry = Assert.Single(feed.Entries, item => item.Kind == NotificationKind.Trade);
         Assert.Equal("Агент развернул позицию", entry.Title);
     }
 
     [Fact]
-    public void Движение_позиции_без_перехода_через_ноль_событием_не_является()
+    public void Позиции_в_разных_активах_считаются_отдельно()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (50m, 50m), kvan: (0m, 0m)));
 
-        // Именно ради этого событие привязано к переходу через ноль, а не к
-        // сделке: за сессию таких движений сотни.
-        runner.Tick(Tick(Agent("a", 55m, initialPortfolio: 106_800m)));
-        runner.Tick(Tick(Agent("a", 80m, initialPortfolio: 106_800m)));
-        runner.Tick(Tick(Agent("a", 42m, initialPortfolio: 106_800m)));
-        runner.Tick(Tick(Agent("a", 91m, initialPortfolio: 106_800m)));
+        markets.Step(Account("Trend", glen: (60m, 50m), kvan: (4m, 0m)));
 
-        Assert.DoesNotContain(feed.Entries, entry => entry.Kind == NotificationKind.Trade);
+        var entry = Assert.Single(feed.Entries, item => item.Kind == NotificationKind.Trade);
+        Assert.Equal("KVAN", entry.Symbol);
     }
 
-    // ────────────────────────── смена прогона ──────────────────────────
+    // ─────────────────────────────── сессия ───────────────────────────────
 
     [Fact]
-    public void Смена_прогона_очищает_ленту()
+    public void Новая_сессия_очищает_ленту()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
-        runner.Tick(Tick(Agent("a", 40m)));
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (0m, 0m)));
+        markets.Step(Account("Trend", glen: (3m, 0m)));
+        markets.Stop();
 
-        Assert.NotEmpty(feed.Entries);
+        markets.Start(Account("Trend", glen: (0m, 0m)));
 
-        runner.Start();
-
-        Assert.Empty(feed.Entries);
+        Assert.Equal("Торги запущены", Assert.Single(feed.Entries).Title);
     }
 
     [Fact]
-    public void После_смены_прогона_позиция_отсчитывается_заново()
+    public void Запуск_торгов_сообщает_активы_агентов_и_капитал()
     {
-        var (feed, runner, _) = Build();
+        var (feed, markets, _) = Build();
 
-        runner.Start();
-        runner.Tick(Tick(Agent("a", 55m, initialPortfolio: 106_800m)));
-        runner.Start();
+        markets.Start(Account("Trend", glen: (50m, 50m)), Account("Maker", glen: (50m, 50m)));
 
-        // Тот же агент с той же позицией в новом прогоне: это не закрытие и
-        // не открытие, а начало новой хронологии.
-        runner.Tick(Tick(Agent("a", 55m, initialPortfolio: 106_800m)));
-
-        Assert.DoesNotContain(feed.Entries, entry => entry.Kind == NotificationKind.Trade);
-    }
-
-    // ────────────────────────── системные и новости ──────────────────────────
-
-    [Fact]
-    public void Запуск_торгов_сообщает_число_агентов_и_капитал()
-    {
-        var (feed, runner, _) = Build();
-        runner.Start();
-
-        runner.Tick(Tick(
-            Agent("a", 0m, initialCash: 70_000m),
-            Agent("b", 0m, initialCash: 70_000m),
-            Agent("c", 0m, initialCash: 100_000m)));
-
-        var entry = Assert.Single(feed.Entries, e => e.Title == "Торги запущены");
-        Assert.Equal(NotificationKind.System, entry.Kind);
-        Assert.Contains("3 агента", entry.Detail);
-        Assert.Contains("240", entry.Detail);
+        var entry = Assert.Single(feed.Entries);
+        Assert.Equal("Торги запущены", entry.Title);
+        Assert.Equal("2 актива · 2 агента · капитал 200 000 ₽", entry.Detail);
     }
 
     [Fact]
-    public void Запуск_сообщается_один_раз_а_не_на_каждом_тике()
+    public void Запуск_сообщается_один_раз_а_не_на_каждом_шаге()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (50m, 50m)));
 
-        runner.Tick(Tick(Agent("a", 0m)));
-        runner.Tick(Tick(Agent("a", 0m)));
-        runner.Tick(Tick(Agent("a", 0m)));
+        markets.Step(Account("Trend", glen: (50m, 50m)));
+        markets.Step(Account("Trend", glen: (50m, 50m)));
 
-        Assert.Single(feed.Entries, e => e.Title == "Торги запущены");
+        Assert.Single(feed.Entries, entry => entry.Title == "Торги запущены");
     }
 
     [Fact]
-    public void Введённая_новость_попадает_в_ленту_один_раз()
+    public void Остановка_торгов_пишется_системным_событием()
     {
-        var (feed, runner, news) = Build();
-        runner.Start();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (50m, 50m)));
 
-        news.Add("Третий энергоблок введён", SignalPolarity.Positive, 1.41m);
+        markets.Stop();
 
-        // Лента новостей отдаёт весь список целиком на каждое изменение —
-        // вторая новость не должна продублировать первую.
-        news.Add("Тариф повышен", SignalPolarity.Positive, 1.05m);
-
-        var newsEntries = feed.Entries.Where(e => e.Kind == NotificationKind.News).ToArray();
-        Assert.Equal(2, newsEntries.Length);
-        Assert.Contains("Позитивная", newsEntries[0].Detail);
-        Assert.Contains("1,41", newsEntries[1].Detail);
+        Assert.Equal("Торги остановлены", feed.Entries[0].Title);
     }
 
-    // ────────────────────────── потолок и прочтение ──────────────────────────
+    // ─────────────────────────────── новости ───────────────────────────────
+
+    [Fact]
+    public void Введённая_новость_попадает_в_ленту_один_раз_с_самым_задетым_активом()
+    {
+        var (feed, markets, events) = Build();
+        markets.Start(Account("Trend", glen: (50m, 50m)));
+
+        events.Add("Минэнерго продлило субсидии", ("GLEN", 0.38m), ("KVAN", 0.74m));
+        events.Add("Минэнерго продлило субсидии", ("GLEN", 0.38m), ("KVAN", 0.74m), sameMoment: true);
+
+        var entry = Assert.Single(feed.Entries, item => item.Kind == NotificationKind.News);
+        Assert.Equal("KVAN", entry.Symbol);
+        Assert.Contains("задела 2 из 2 · сильнее всего KVAN 0,74", entry.Detail);
+    }
+
+    // ─────────────────────────────── общее ───────────────────────────────
 
     [Fact]
     public void Лента_не_растёт_дальше_пятидесяти_событий()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, _, _) = Build();
 
-        // Каждый тик переворачивает позицию, то есть даёт событие.
-        for (var i = 0; i < 80; i++)
+        for (var i = 0; i < 60; i++)
         {
-            runner.Tick(Tick(Agent("a", i % 2 == 0 ? 10m : -10m, initialPortfolio: 101_000m)));
+            feed.NoteAssetCreated($"Актив {i}", "GLEN");
         }
 
         Assert.Equal(50, feed.Entries.Count);
@@ -227,23 +165,20 @@ public class NotificationFeedTests
     [Fact]
     public void Свежее_событие_стоит_первым()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
+        var (feed, _, _) = Build();
 
-        runner.Tick(Tick(Agent("a", 55m, initialPortfolio: 106_800m)));
-        runner.Tick(Tick(Agent("a", 0m, initialPortfolio: 106_800m)));
+        feed.NoteAssetCreated("Первый", "GLEN");
+        feed.NoteAssetCreated("Второй", "KVAN");
 
-        Assert.Equal("Агент закрыл позицию", feed.Entries[0].Title);
+        Assert.Equal("Второй", feed.Entries[0].Detail);
     }
 
     [Fact]
     public void Прочтение_помечает_все_события()
     {
-        var (feed, runner, _) = Build();
-        runner.Start();
-        runner.Tick(Tick(Agent("a", 40m)));
-
-        Assert.Contains(feed.Entries, entry => !entry.IsRead);
+        var (feed, _, _) = Build();
+        feed.NoteAssetCreated("Гелиос Энерго", "GLEN");
+        feed.NoteAssetCreated("КвантЭнерго", "KVAN");
 
         feed.MarkAllRead();
 
@@ -251,107 +186,136 @@ public class NotificationFeedTests
     }
 
     [Fact]
-    public void Создание_актива_попадает_в_системные()
+    public void Создание_актива_во_время_торгов_говорит_что_он_вступил_в_торги()
     {
-        var (feed, _, _) = Build();
+        var (feed, markets, _) = Build();
+        markets.Start(Account("Trend", glen: (50m, 50m)));
 
-        feed.NoteAssetCreated("Гелиос Энерго", "HLEN");
+        feed.NoteAssetCreated("Аквамарин Агро", "AKAG");
 
-        var entry = Assert.Single(feed.Entries);
+        var entry = feed.Entries[0];
         Assert.Equal(NotificationKind.System, entry.Kind);
-        Assert.Contains("Гелиос Энерго", entry.Detail);
-        Assert.Contains("HLEN", entry.Detail);
+        Assert.Equal("AKAG", entry.Symbol);
+        Assert.Equal("Аквамарин Агро · вступил в торги", entry.Detail);
     }
 
-    // ────────────────────────────── дублёры ──────────────────────────────
+    // ─────────────────────────────── опоры ───────────────────────────────
 
-    private sealed class FakeRunner : ISimulationRunner
+    private static (NotificationFeed Feed, FakeMarkets Markets, FakeEvents Events) Build()
     {
-        public event Action<SimulationTickResult>? OnTick;
-        public event Action? OnStateChanged;
+        // Та же культура, что выставляет Program.cs: дробная часть — запятая
+        // (раздел 10), разряды — узкий неразрывный пробел.
+        var culture = (CultureInfo)CultureInfo.GetCultureInfo("ru-RU").Clone();
+        culture.NumberFormat.NumberGroupSeparator = " ";
+        CultureInfo.CurrentCulture = culture;
 
-        public SimulationTickResult? Current { get; private set; }
-        public Guid CurrentRunId { get; private set; } = Guid.Empty;
-        public bool IsRunning { get; private set; }
+        var markets = new FakeMarkets();
+        var events = new FakeEvents();
+        return (new NotificationFeed(markets, events, Registry), markets, events);
+    }
 
-        // Имя актива дублёр держит той же парой, что и настоящий раннер:
-        // есть прогон — есть имя, нет прогона — null.
-        public string? CurrentAssetName { get; private set; }
-
-        public void Start()
+    /// <param name="glen">Позиция и стартовый запас в GLEN.</param>
+    private static AgentAccountSnapshot Account(
+        string name,
+        (decimal Quantity, decimal Initial) glen,
+        (decimal Quantity, decimal Initial)? kvan = null)
+    {
+        var positions = new Dictionary<Guid, AgentPositionSnapshot>
         {
-            CurrentRunId = Guid.NewGuid();
+            [Glen] = new(Glen, glen.Quantity, 0m, glen.Initial, 100m)
+        };
+
+        if (kvan is { } k)
+        {
+            positions[Kvan] = new(Kvan, k.Quantity, 0m, k.Initial, 100m);
+        }
+
+        var type = name.StartsWith("Maker", StringComparison.Ordinal) ? AgentType.MarketMaker : AgentType.TrendFollowing;
+        return new(name, type, 100_000m, 0m, 100_000m, 100_000m, 100_000m, positions);
+    }
+
+    private static AssetRegistry BuildRegistry()
+    {
+        var registry = new AssetRegistry(new InMemoryAssetCatalog());
+        registry.Add(AssetRegistryTests.Draft("Гелиос Энерго"), AssetRegistryTests.Profile());
+        registry.Add(AssetRegistryTests.Draft("КвантЭнерго"), AssetRegistryTests.Profile());
+        return registry;
+    }
+
+    private sealed class FakeMarkets : ISessionMarkets
+    {
+        public bool IsRunning { get; private set; }
+        public bool HasSession => SessionId != Guid.Empty;
+        public Guid SessionId { get; private set; }
+        public DateTimeOffset? StartedAt { get; private set; }
+        public DateTimeOffset? EndedAt { get; private set; }
+        public int Tick { get; private set; }
+        public IReadOnlyList<AssetMarket> Markets => [];
+        public IReadOnlyList<AgentAccountSnapshot> Accounts { get; private set; } = [];
+
+        public event Action? Changed;
+
+        public AssetMarket? Market(Guid assetId) => null;
+        public bool Trades(Guid assetId) => IsRunning;
+        public Task StartAsync(IReadOnlyList<AgentSpec> agents) => Task.CompletedTask;
+        public Task StopAsync() => Task.CompletedTask;
+        public void SubmitNews(NewsFan fan) { }
+
+        public void Start(params AgentAccountSnapshot[] accounts)
+        {
             IsRunning = true;
-            CurrentAssetName = "Гелиос Энерго";
-            OnStateChanged?.Invoke();
+            SessionId = Guid.NewGuid();
+            StartedAt = DateTimeOffset.Now;
+            EndedAt = null;
+            Tick = 0;
+            Accounts = accounts;
+            Changed?.Invoke();
+        }
+
+        public void Step(params AgentAccountSnapshot[] accounts)
+        {
+            Tick++;
+            Accounts = accounts;
+            Changed?.Invoke();
         }
 
         public void Stop()
         {
             IsRunning = false;
-            CurrentAssetName = null;
-            OnStateChanged?.Invoke();
+            EndedAt = DateTimeOffset.Now;
+            Changed?.Invoke();
         }
-
-        public void Tick(SimulationTickResult tick)
-        {
-            Current = tick;
-            OnTick?.Invoke(tick);
-        }
-
-        public Task StartAsync(SimulationConfig config, CancellationToken ct = default)
-        {
-            Start();
-            return Task.CompletedTask;
-        }
-
-        public Task StopAsync()
-        {
-            Stop();
-            return Task.CompletedTask;
-        }
-
-        public void SubmitNews(NewsSignal signal) { }
     }
 
-    private sealed class FakeNewsFeed : ISessionNewsFeed
+    private sealed class FakeEvents : ISessionEvents
     {
-        private readonly List<SessionNewsEntry> _entries = [];
+        private readonly List<SessionEvent> _news = [];
+        private DateTimeOffset _last = DateTimeOffset.Now;
 
-        public IReadOnlyList<SessionNewsEntry> Entries => _entries.ToArray();
-        public int Revision { get; private set; }
+        public IReadOnlyList<SessionEvent> Entries => _news.ToArray();
+        public IReadOnlyList<SessionEvent> News => _news.ToArray();
+        public int Revision => _news.Count;
+
         public event Action? Changed;
 
-        public void Add(string text, SignalPolarity polarity, decimal impact)
+        public SessionEvent AddNews(string text, NewsFan fan) => throw new NotSupportedException();
+        public NewsReaction? ReactionTo(SessionEvent news) => null;
+
+        /// <param name="sameMoment">Повтор той же записи — лента отдаёт список целиком на каждом изменении.</param>
+        public void Add(string text, (string Symbol, decimal Impact) first, (string Symbol, decimal Impact) second, bool sameMoment = false)
         {
-            _entries.Insert(0, new SessionNewsEntry(DateTimeOffset.Now, text, polarity, 0.86m, impact));
-            Revision++;
+            if (!sameMoment)
+            {
+                _last = _last.AddSeconds(1);
+                var signals = new Dictionary<string, NewsSignal>
+                {
+                    [first.Symbol] = new(SignalPolarity.Positive, 0.46m, first.Impact, "") { MatchScore = 0.5m },
+                    [second.Symbol] = new(SignalPolarity.Positive, 0.46m, second.Impact, "") { MatchScore = 0.5m }
+                };
+                _news.Insert(0, new SessionEvent(_last, SessionEventKind.News, text, NewsFan.FromSignals(Registry.Assets, signals)));
+            }
+
             Changed?.Invoke();
         }
-
-        public SessionNewsEntry Add(string text, NewsSignal signal)
-        {
-            var entry = new SessionNewsEntry(
-                DateTimeOffset.Now, text, signal.Polarity, signal.Confidence, signal.ImpactScore);
-            _entries.Insert(0, entry);
-            Revision++;
-            Changed?.Invoke();
-            return entry;
-        }
-
-        public void Clear()
-        {
-            _entries.Clear();
-            Revision++;
-            Changed?.Invoke();
-        }
-    }
-
-    private sealed class FakeHistoryReader : ISimulationHistoryReader
-    {
-        public SimulationRunSummary? GetRun(Guid runId) => null;
-
-        public SimulationHistoryOverview GetOverview(int recentRuns = 10) =>
-            new(0, 0, 0, 0, []);
     }
 }

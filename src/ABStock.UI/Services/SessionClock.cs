@@ -49,4 +49,23 @@ public static class SessionClock
     /// </summary>
     public static string? Format(bool running, SimulationRunSummary? summary) =>
         Elapsed(running, summary)?.ToString(@"hh\:mm\:ss");
+
+    /// <summary>
+    /// Те же правила для сессии многих активов (<see cref="ISessionMarkets"/>):
+    /// идущая — «сейчас минус старт», остановленная — число шагов, потому что
+    /// шаг равен секунде. Null — сессии не было.
+    /// </summary>
+    public static string? Format(ISessionMarkets markets)
+    {
+        if (!markets.HasSession || markets.StartedAt is not { } startedAt)
+        {
+            return null;
+        }
+
+        var elapsed = markets.IsRunning
+            ? DateTimeOffset.Now - startedAt
+            : TimeSpan.FromSeconds(markets.Tick);
+
+        return (elapsed < TimeSpan.Zero ? TimeSpan.Zero : elapsed).ToString(@"hh\:mm\:ss");
+    }
 }

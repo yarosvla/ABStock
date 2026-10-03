@@ -1,10 +1,8 @@
-@using ABStock.Application.Simulation
 @using ABStock.UI.Services
 @implements IDisposable
-@inject ISimulationRunner SimulationRunner
+@inject ISessionMarkets Markets
 @inject IUserPreferences Preferences
 @inject INotificationFeed NotificationFeed
-@inject IAgentEquityHistory EquityHistory
 
 @* Оболочка приложения — раздел 13. Шапка 56px, стекло (под ней реально
    проезжает контент), нижняя кромка --line-1. Активный раздел — --text-1
@@ -100,7 +98,13 @@
                             <span class="notif__dot" aria-hidden="true"></span>
                             <div class="notif__body">
                                 <span class="notif__kind label">@KindLabel(notification.Kind)</span>
-                                <strong>@notification.Title</strong>
+                                <strong class="notif__title">
+                                    @notification.Title
+                                    @if (notification.Symbol is not null)
+                                    {
+                                        <Ticker Symbol="@notification.Symbol" />
+                                    }
+                                </strong>
                                 <p>@notification.Detail</p>
                             </div>
                             <time class="notif__time num-xs" datetime="@notification.At.ToString("O")">@notification.At.ToString("HH:mm:ss")</time>
@@ -130,7 +134,7 @@
 }
 
 @code {
-    [Parameter] public string ActivePage { get; set; } = "CreateAsset";
+    [Parameter] public string ActivePage { get; set; } = "Assets";
     [Parameter] public bool ShowClock { get; set; } = false;
 
     /// <summary>
@@ -143,7 +147,9 @@
     // Ровно пять разделов — раздел 16.
     private static readonly NavSection[] Sections =
     [
-        new("CreateAsset", "/create-asset", "Создание актива"),
+        // «Создание актива» вложено в «Активы» (DESIGN.md 16): раздел — пульт
+        // сессии, создание — его действие.
+        new("Assets", "/assets", "Активы"),
         new("Trading", "/trading", "Торги"),
         new("News", "/news", "Новости"),
         new("Agents", "/agents", "Агенты"),
@@ -151,7 +157,7 @@
     ];
 
     private bool IsNotificationsOpen { get; set; }
-    private bool IsTradingActive => SimulationRunner.IsRunning;
+    private bool IsTradingActive => Markets.IsRunning;
 
     /// <summary>
     /// Три состояния, а не два. До первого запуска торги не «остановлены» —
@@ -160,14 +166,14 @@
     /// показывают здесь «Торги не запущены», и подзаголовок «Агентов» уже
     /// различает эти два случая — не различала только шапка.
     ///
-    /// Признак «прогон был» — идентификатор в истории: она заполняется первым
-    /// же тиком и переживает остановку, в отличие от CurrentRunId раннера.
+    /// Признак «сессия была» — итог сессии в рынках: он переживает остановку,
+    /// в отличие от состояния раннера.
     /// </summary>
     private string MarketStatusLabel => IsTradingActive
         ? "Торги активны"
-        : EquityHistory.RunId == Guid.Empty
-            ? "Торги не запущены"
-            : "Торги остановлены";
+        : Markets.HasSession
+            ? "Торги остановлены"
+            : "Торги не запущены";
     private string Clock => DateTimeOffset.Now.ToString("HH:mm:ss");
 
     /// <summary>
@@ -214,11 +220,9 @@
         Preferences.Changed += HandlePreferencesChanged;
         NotificationFeed.Changed += HandleNotificationsChanged;
 
-        SimulationRunner.OnTick += HandleSimulationTick;
-
-        // После остановки тики прекращаются, поэтому одной подписки на OnTick
-        // мало: статус навсегда застывал бы на «Торги активны».
-        SimulationRunner.OnStateChanged += HandleStateChanged;
+        // Шаг сессии обновляет часы, смена состояния — статус: после
+        // остановки шагов нет, и статус иначе застыл бы на «Торги активны».
+        Markets.Changed += HandleStateChanged;
     }
 
     /// <summary>
@@ -265,12 +269,9 @@
 
     private void ClearNotifications() => NotificationFeed.Clear();
 
-    private void HandleSimulationTick(SimulationTickResult tick) => _ = InvokeAsync(StateHasChanged);
-
     public void Dispose()
     {
-        SimulationRunner.OnTick -= HandleSimulationTick;
-        SimulationRunner.OnStateChanged -= HandleStateChanged;
+        Markets.Changed -= HandleStateChanged;
         Preferences.Changed -= HandlePreferencesChanged;
         NotificationFeed.Changed -= HandleNotificationsChanged;
     }

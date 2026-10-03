@@ -1,0 +1,13 @@
+@* Тикер — раздел 9.23. Единственный признак актива: цвета у актива нет,
+   активы различаются тикером. Моно, uppercase. *@
+
+<span class="ui-ticker @(Large ? "ui-ticker--lg" : null) @Class">@Symbol.ToUpperInvariant()</span>
+
+@code {
+    [Parameter, EditorRequired] public string Symbol { get; set; } = string.Empty;
+
+    /// <summary>Рядом с именем актива в заголовке, строке списка и веере.</summary>
+    [Parameter] public bool Large { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+}

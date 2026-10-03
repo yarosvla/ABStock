@@ -43,6 +43,25 @@
     color: var(--text-1);
 }
 
+.ui-event__text { color: var(--text-1); }
+
+.ui-event__head {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+
+.ui-event__time {
+    font: var(--n-xs);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-3);
+}
+
+.ui-event__impact {
+    margin-left: auto;
+    color: var(--text-1);
+}
+
 /* Бейдж-состояние — раздел 9.6. Окрашен: тональность предсказывает
    направление цены (раздел 3). */
 .ui-event__badge {
@@ -60,6 +79,10 @@
 .ui-event__badge--warn { background: var(--warn-soft); color: var(--warn-500); }
 
 .ui-event__text {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    min-width: 0;
     margin: 0;
     font: var(--t-caption);
     color: var(--text-2);
@@ -67,3 +90,21 @@
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+.ui-event__impact--none {
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+/* Мини-веер — третья строка новости: сила по каждому активу, выделен тот,
+   чьё значение стоит справа; незадетые тише. */
+.ui-event__fan {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 var(--s-3);
+    color: var(--text-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.ui-event__fan .is-focus { color: var(--text-1); }
+.ui-event__fan .is-miss  { color: var(--text-quiet); }

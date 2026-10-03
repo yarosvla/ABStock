@@ -24,23 +24,27 @@ builder.Services.AddABStockApplication();
 builder.Services.AddABStockAI(builder.Configuration);
 builder.Services.AddABStockPersistence(
     builder.Configuration.GetConnectionString("ABStock") ?? "Data Source=abstock.db");
-// Актив сессии — singleton, как и сама симуляция: актив в сессии один, и он
-// принадлежит прогону, а не вкладке. Scoped переживал переходы по ссылкам, но
-// не перезагрузку страницы, не вход по прямому адресу и не переход со
-// статически отрисованной приветственной: «Торги» в свежем контуре не
-// находили актива и перезапускали прогон демонстрационной заглушкой посреди
-// сессии, которая торгует настоящим активом.
-builder.Services.AddSingleton<IActiveAssetContext, ActiveAssetContext>();
+// Активы сессии — поверх каталога бэкенда, который их хранит. Singleton:
+// активы принадлежат сессии, а не вкладке, и переживают перезагрузку
+// страницы и вход по прямому адресу. Тикеры и параметры формы бэкенд пока не хранит — их держит реестр.
+builder.Services.AddSingleton<IAssetRegistry, AssetRegistry>();
+// Выбранный актив — scoped: это свойство вкладки (адрес и localStorage), а
+// не сервера. Singleton переключал бы актив у всех открытых вкладок разом.
+builder.Services.AddScoped<ISelectedAsset, SelectedAsset>();
+// Рынки сессии и её хронология — singleton, как раннер, итог которого они
+// держат после остановки торгов.
+builder.Services.AddSingleton<ISessionMarkets, SessionMarkets>();
+builder.Services.AddSingleton<ISessionEvents, SessionEvents>();
+// Состав агентов — один на сессию и живёт в пульте «Активов».
+builder.Services.AddSingleton<IAgentComposition, AgentComposition>();
+// Ввод новости — scoped: состояния у него нет, а анализатор новостей
+// зарегистрирован модулем AI со своим временем жизни.
+builder.Services.AddScoped<INewsDesk, NewsDesk>();
 // Настройки интерфейса — scoped, и это осознанно: источник истины лежит в
 // localStorage браузера, а сервис лишь кэш на время жизни контура. Singleton
 // раздавал бы всем открытым вкладкам чужой акцент, потому что настройки
 // принадлежат браузеру, а не серверу.
 builder.Services.AddScoped<IUserPreferences, UserPreferences>();
-// Хронология новостей сессии — одна на весь продукт (DESIGN.md 13):
-// её читают и «Новости», и левый рельс «Торгов». Singleton, как и сама
-// симуляция: лента живёт ровно столько же, сколько прогон, чьи события
-// показывает, и переживает перезагрузку страницы вместе с ним.
-builder.Services.AddSingleton<ISessionNewsFeed, SessionNewsFeed>();
 // Стоимость портфеля по типам агентов с начала прогона — тоже singleton и по
 // той же причине. Читает её страница «Агенты».
 builder.Services.AddSingleton<IAgentEquityHistory, AgentEquityHistory>();
@@ -62,6 +66,13 @@ _ = app.Services.GetRequiredService<IAgentEquityHistory>();
 // Лента уведомлений — по той же причине: запуск торгов и первые переходы
 // позиций через ноль случаются раньше, чем кто-нибудь откроет колокольчик.
 _ = app.Services.GetRequiredService<INotificationFeed>();
+
+// Рынки и хронология сессии — тоже до первого тика: иначе цена открытия,
+// ряд спарклайна и строка «Торги запущены» начинались бы с того момента,
+// когда кто-нибудь откроет «Активы».
+_ = app.Services.GetRequiredService<ISessionMarkets>();
+_ = app.Services.GetRequiredService<ISessionEvents>();
+_ = app.Services.GetRequiredService<IAgentComposition>();
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

@@ -1,0 +1,29 @@
+@* Актив в строке: тикер, имя, под ним тип актива. Одна и та же ячейка на
+   «Активах», в свитчере и в веере новости — вторая строка всегда тип,
+   а не то тональность, то тип (ревью Н-3). *@
+
+<span class="ui-asset @Class">
+    <Ticker Symbol="@Symbol" Large="Large" />
+    <span class="ui-asset__text">
+        <span class="ui-asset__name @(Muted ? "ui-asset__name--muted" : null)">@Name</span>
+        @if (Sub is not null)
+        {
+            <span class="ui-asset__sub">@Sub</span>
+        }
+    </span>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Symbol { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Name { get; set; } = string.Empty;
+
+    /// <summary>Вторая строка: тип актива, реже — состояние («ждёт запуска»).</summary>
+    [Parameter] public string? Sub { get; set; }
+
+    [Parameter] public bool Large { get; set; } = true;
+
+    /// <summary>Актив вне торгов: ждёт запуска, не задет новостью.</summary>
+    [Parameter] public bool Muted { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+}

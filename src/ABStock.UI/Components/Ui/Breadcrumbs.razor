@@ -18,7 +18,17 @@
                 <Icon Name="chevron-right" Size="14" />
             }
 
-            @if (item.IsAsset)
+            @if (item.IsAsset && item.Symbol is not null)
+            {
+                <span class="ui-crumbs__asset">
+                    <AssetSwitcher CurrentSymbol="@item.Symbol" Target="@item.SwitchTarget" />
+                    @if (item.ChipText is not null)
+                    {
+                        <span class="ui-crumbs__chip">@item.ChipText</span>
+                    }
+                </span>
+            }
+            else if (item.IsAsset)
             {
                 <span class="ui-crumbs__asset">
                     <span class="ui-crumbs__name">@item.Title<Icon Name="chevron-down" Size="14" /></span>

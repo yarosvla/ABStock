@@ -42,6 +42,14 @@
     color: var(--text-quiet);
 }
 
+/* Разрыв цепочки: короткий пунктир на месте стрелки. */
+.ui-causality ::deep .ui-causality__step.is-break::before {
+    content: "";
+    top: var(--s-2);
+    width: var(--s-4);
+    border-top: 1px dashed var(--line-3);
+}
+
 /* Лейбл переносится по ПРОБЕЛАМ, а не где придётся: на 1280 шесть шагов узкие,
    и «Тональность и уверенность» при nowrap налезала на соседний шаг.
 

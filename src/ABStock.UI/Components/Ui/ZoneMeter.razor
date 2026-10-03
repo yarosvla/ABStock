@@ -1,0 +1,100 @@
+@using System.Globalization
+
+@* Шкала с зонами в ячейке таблицы — компактная форма 9.17. Значение со
+   словом зоны строкой над тонкой дорожкой; названий зон и чисел границ нет:
+   они стоят один раз — в заголовке колонки или в подвале веера.
+
+   Три состояния: значение на шкале; значение ниже начала шкалы («< 0,30»,
+   полый маркер у края); значения нет («не задет» — дорожка без заливки,
+   пунктирной кромкой). *@
+
+<span class="ui-meter @Class" role="img" aria-label="@AriaLabel">
+    <span class="ui-meter__head">
+        @if (Value is { } value)
+        {
+            <span class="ui-meter__value num-md">@(IsBelow ? $"< {Min:F2}" : value.ToString("F2"))</span>
+            @if (!IsBelow)
+            {
+                <span class="ui-meter__zone">@Word</span>
+            }
+        }
+        else
+        {
+            <span class="ui-meter__missing">@MissingText</span>
+        }
+    </span>
+    <span class="ui-meter__track @(Value is null ? "ui-meter__track--off" : null)">
+        @foreach (var zone in Segments)
+        {
+            <span class="ui-meter__zone-bar" style="flex:@zone.Share 1 0"></span>
+        }
+        @if (Value is not null)
+        {
+            <span class="ui-meter__mark @(IsBelow ? "ui-meter__mark--below" : null)" style="left:@Position"></span>
+        }
+    </span>
+</span>
+
+@code {
+    /// <summary>Значение или null — «не задет» (текст задаёт <see cref="MissingText"/>).</summary>
+    [Parameter] public decimal? Value { get; set; }
+
+    [Parameter, EditorRequired] public decimal Min { get; set; }
+    [Parameter, EditorRequired] public decimal Max { get; set; }
+    [Parameter, EditorRequired] public IReadOnlyList<(string Name, decimal To)> Zones { get; set; } = [];
+
+    [Parameter] public string MissingText { get; set; } = "—";
+
+    /// <summary>Как читается шкала вслух: «Сила влияния», «Чувствительность».</summary>
+    [Parameter] public string Subject { get; set; } = "Значение";
+
+    [Parameter] public string? Class { get; set; }
+
+    private bool IsBelow => Value < Min;
+
+    private string Word
+    {
+        get
+        {
+            foreach (var zone in Zones)
+            {
+                if (Value < zone.To)
+                {
+                    return zone.Name;
+                }
+            }
+
+            return Zones.Count > 0 ? Zones[^1].Name : string.Empty;
+        }
+    }
+
+    private IEnumerable<(string Name, string Share)> Segments
+    {
+        get
+        {
+            var from = Min;
+
+            foreach (var zone in Zones)
+            {
+                yield return (zone.Name, ((zone.To - from) / (Max - Min) * 100m).ToString("0.#", CultureInfo.InvariantCulture));
+                from = zone.To;
+            }
+        }
+    }
+
+    /// <summary>Позиция честная: (значение − минимум) / (максимум − минимум).</summary>
+    private string Position
+    {
+        get
+        {
+            var value = Math.Clamp(Value ?? Min, Min, Max);
+            return ((value - Min) / (Max - Min) * 100m).ToString("0.##", CultureInfo.InvariantCulture) + "%";
+        }
+    }
+
+    private string AriaLabel => Value is { } value
+        ? IsBelow
+            ? $"{Subject}: {value:F2}, ниже начала шкалы {Min:F2}"
+            : $"{Subject}: {value:F2} — {Word}, шкала от {Min:F2} до {Max:F2}"
+        : $"{Subject}: {MissingText}";
+}

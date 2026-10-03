@@ -1,210 +1,171 @@
 @page "/agents/{Name}"
 @rendermode InteractiveServer
+@using System.Globalization
 @using ABStock.Application.MarketHistory
-@using ABStock.Application.Simulation
 @using ABStock.Shared
 @using ABStock.UI.Services
 @using static ABStock.UI.Services.NumberFormat
 @implements IDisposable
 @implements IAsyncDisposable
-@inject ISimulationRunner SimulationRunner
-@inject IAgentStatisticsReader AgentStatisticsReader
-@inject ISimulationHistoryReader SimulationHistoryReader
-@inject IActiveAssetContext ActiveAssetContext
-@inject IAgentEquityHistory EquityHistory
+@inject ISessionMarkets Markets
+@inject IAssetRegistry Registry
+@inject IAgentStatisticsReader AgentStatistics
 @inject IJSRuntime JS
 
-<PageTitle>Агент · @InstanceName</PageTitle>
+<PageTitle>@(Account is null ? "Агент" : InstanceName)</PageTitle>
+
+@{
+    var account = Account;
+    var ledger = Ledger;
+    var isRunning = Markets.IsRunning;
+}
 
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
 <div class="agents-shell">
     <TopNavigation ActivePage="Agents" ShowClock="true" />
 
-    <main class="detail-page agent-@ToneKey">
+    <main class="detail-page @AgentDisplay.GetTypeTone(account?.AgentType ?? AgentType.MarketMaker)">
+        @* Агенты общие, поэтому в пути нет актива: Активы › Агенты › экземпляр (раздел 13). *@
+        <Breadcrumbs Items="@(new Crumb[] { new("Активы", Href: "/assets"), new("Агенты", Href: "/agents"), new(account is null ? Name : InstanceName) })">
+            <Aside>
+                <SessionChip Running="isRunning" Elapsed="@SessionClock.Format(Markets)" />
+            </Aside>
+        </Breadcrumbs>
 
-        <Breadcrumbs Items="@(new Crumb[]
-                     {
-                         new("Активы", Href: "/create-asset"),
-                         new(CurrentAsset.Draft.Name, IsAsset: true),
-                         new("Агенты", Href: "/agents"),
-                         new(InstanceName)
-                     })" />
-
-        @if (!HasSession)
+        @if (account is null || ledger is null)
         {
-            <PageHead Title="@InstanceName">
-                <Context>торги не запущены</Context>
-            </PageHead>
-
+            <PageHead Title="Агент" />
             <Panel Class="rise rise-1">
-                <ChildContent>
-                    <EmptyState IconName="users"
-                                Title="Агент ещё не торговал"
-                                Description="Сессия не запущена: у агента нет ни сделок, ни позиции, ни результата.">
-                        <Action>
-                            <AppButton Variant="primary" Href="/trading">Перейти к торгам</AppButton>
-                        </Action>
-                    </EmptyState>
-                </ChildContent>
-            </Panel>
-        }
-        else if (!IsKnownAgent)
-        {
-            @* Артборд 04: имя из адреса не встретилось в сессии. Состав сессии
-               в пояснении отвечает на следующий вопрос — а кто в ней есть.
-               Заголовка страницы здесь нет: он повторил бы слово в слово
-               заголовок пустого состояния под ним. *@
-            <Panel Class="rise rise-1">
-                <ChildContent>
-                    <EmptyState IconName="search"
-                                Title="@($"Агент «{Name}» не найден")"
-                                Description="@CompositionSentence">
-                        <Action>
-                            <AppButton Variant="primary" Href="/agents">Все агенты</AppButton>
-                        </Action>
-                    </EmptyState>
-                </ChildContent>
+                <EmptyState IconName="users" Title="Такого агента в сессии нет"
+                            Description="Агенты живут столько же, сколько сессия: после новой сессии ссылка на прошлого агента ведёт в никуда.">
+                    <Action>
+                        <AppButton Variant="primary" Href="/agents">Все агенты</AppButton>
+                    </Action>
+                </EmptyState>
             </Panel>
         }
         else
         {
+            var decision = LastTradeDecision;
+            var focus = FocusSymbol(decision);
+            var focusAsset = ledger.Assets.FirstOrDefault(asset => asset.Symbol == focus);
+
             <PageHead>
                 <TitleContent>
-                    <div class="ident">
+                    <span class="ident">
                         <h1>@InstanceName</h1>
-                        <span class="ident__kind">
-                            <StatusDot Tone="@AgentDisplay.GetTypeTone(AgentTypeValue)" />
-                            <span>@AgentDisplay.GetStrategyKind(AgentTypeValue)</span>
-                        </span>
-                        @if (IsIdle)
-                        {
-                            <span class="ident__state">@IdleStateLabel</span>
-                        }
-                    </div>
+                        <span class="ident__kind"><StatusDot Tone="@AgentDisplay.GetTypeTone(account.AgentType)" />@AgentDisplay.GetStrategyKind(account.AgentType)</span>
+                    </span>
                 </TitleContent>
                 <Context>
-                    @CurrentAsset.Draft.Name · <span class="num-sm">@CurrentAsset.Symbol</span>
-                    @if (StartedAtLabel is not null)
-                    {
-                        <text> · в работе с <span class="num-sm">@StartedAtLabel</span></text>
-                    }
-                    <text> · </text>
-                    @if (TradeCount == 0)
-                    {
-                        <text>заявок не выставлял</text>
-                    }
-                    else if (SimulationRunner.IsRunning)
-                    {
-                        <span class="tone-up">торгует</span>
-                    }
-                    else
-                    {
-                        @* Сессия остановлена: агент сделки совершил, но сейчас
-                           не торгует. Настоящее время здесь означало бы, что
-                           за остановленным экраном что-то происходит. *@
-                        <text>торговал в сессии</text>
-                    }
+                    @(Markets.StartedAt is { } started ? $"В работе с {started:HH:mm}" : "Сессия не запущена") ·
+                    торгует <span class="num-sm">@ledger.Assets.Count</span> @Plural(ledger.Assets.Count, "активом", "активами", "активами") из одного кошелька@(decision is null ? null : $" · сейчас {Verb(decision.Value.Decision)} {decision.Value.Symbol}")
                 </Context>
                 <Actions>
                     <AppButton Variant="secondary" Href="/agents">Все агенты</AppButton>
-                    @if (IsIdle && AgentTypeValue == AgentType.NewsDriven)
-                    {
-                        <AppButton Variant="primary" Href="/news">Добавить новость</AppButton>
-                    }
                 </Actions>
             </PageHead>
 
-            @* Полоса связи — одна на экран (раздел 9.19). Здесь она проходит
-               путь от решения агента до влияния на его результат, и именно она
-               делает объяснение проверяемым, а не просто текстом. *@
-            <CausalityStrip Class="rise rise-1" Label="От решения агента до его результата">
-                <CausalityStep Label="Последнее решение" Weight="1.1" Value="@DecisionLabel" />
-                <CausalityStep Label="Объяснение" Weight="1.9" Truncate="true" Value="@ExplanationLabel" />
-                <CausalityStep Label="Заявка" Weight="1" Value="@OrderLabel" />
-                <CausalityStep Label="Сделка" Weight="1" Value="@LastTradeLabel" />
-                <CausalityStep Label="Влияние на результат" Weight="1.1">
-                    @* Число здесь то же, что в панели P/L справа: разойтись им
-                       нельзя, иначе экран сам себе противоречит (раздел 10.1).
-                       Сделок может не быть, а позиция с открытия — быть, и тогда
-                       нереализованный P/L у бездействующего агента ненулевой. *@
-                    <span class="causality__impact">
-                        позиция <span class="num-sm @DeltaTone(CurrentPosition)">@Position0(CurrentPosition)</span>
-                        <text> · нереализованный </text>
-                        <span class="num-sm @DeltaTone(Unrealized)">@Pnl2(Unrealized)</span>
+            @* Цепочка последнего решения. Шаг «Почему GLEN» — у общего агента
+               выбор актива и есть главное объяснение (DESIGN.md 16.4). *@
+            <CausalityStrip Class="rise rise-1" Label="Последнее решение агента">
+                <CausalityStep Label="@(decision is null ? "Решение" : $"Решение · {DecisionTime:HH:mm:ss}")"
+                               Value="@(decision is null ? "ждёт" : $"{Verb(decision.Value.Decision)} {decision.Value.Symbol}")"
+                               Note="@(decision is null ? "на последнем шаге заявок не ставил" : OrderNote(decision.Value.Decision))" />
+
+                <CausalityStep Label="@($"Почему {focus ?? "этот актив"}")" Weight="2">
+                    <span class="trendpick">
+                        @foreach (var row in TrendRows)
+                        {
+                            <span class="trendpick__row @(row.Symbol == focus ? "is-picked" : null)">
+                                <Ticker Symbol="@row.Symbol" />
+                                <span class="num-sm @DeltaTone(row.Change)">@Sign(row.Change)@Percent2(Math.Abs(row.Change)) %</span>
+                            </span>
+                        }
                     </span>
+                    <span class="ui-causality__note">ход активов с открытия — агент сравнивает их по своей стратегии</span>
+                </CausalityStep>
+
+                <CausalityStep Label="Объяснение" Weight="1.4"
+                               Value="@(decision?.Decision.Explanation ?? "—")" />
+
+                <CausalityStep Label="Сделка" Weight="0.9">
+                    @if (ledger.Trades.FirstOrDefault(trade => trade.Symbol == focus) is { } last)
+                    {
+                        <span class="num-md t1">@Price2(last.Price) · @Quantity1(last.Quantity)</span>
+                        <span class="ui-causality__note">@(last.Side == OrderSide.Buy ? "покупка" : "продажа") в <span class="num-xs">@last.At.ToLocalTime().ToString("HH:mm:ss")</span></span>
+                    }
+                    else
+                    {
+                        <span class="ui-causality__value">сделок не было</span>
+                    }
+                </CausalityStep>
+
+                <CausalityStep Label="@($"Позиция {focus ?? ""}")" Weight="0.9">
+                    @if (focusAsset is not null)
+                    {
+                        <span class="nowrap"><span class="num-lg">@Quantity1(focusAsset.Quantity)</span> <span class="num-xs @DeltaTone(focusAsset.Change)">@Position1(focusAsset.Change)</span></span>
+                        <span class="ui-causality__note">за сессию</span>
+                    }
+                    else
+                    {
+                        <span class="ui-causality__value">—</span>
+                    }
                 </CausalityStep>
             </CausalityStrip>
 
             <div class="detail-work">
-
-                @* ─── ЛЕВЫЙ РЕЛЬС · хронология сделок агента (раздел 13) ─── *@
-                <div class="rail rail--left">
-                    <Panel Title="Сделки агента" Class="rise rise-2 trades" Flush="true">
-                        <MetaContent>
-                            @if (TradeCount > 0)
-                            {
-                                <text><span class="num-sm">@TradeCount</span> за сессию</text>
-                            }
-                            else
-                            {
-                                <span class="num-sm">0</span>
-                            }
-                        </MetaContent>
-                        <ChildContent>
-                            @if (TradeCount == 0)
-                            {
-                                <EmptyState IconName="news"
-                                            Title="Сделок нет"
-                                            Description="@NoTradesReason">
-                                    <Action>
-                                        @if (AgentTypeValue == AgentType.NewsDriven)
-                                        {
-                                            <AppButton Variant="primary" Href="/news">Добавить новость</AppButton>
-                                        }
-                                    </Action>
-                                </EmptyState>
-                            }
-                            else
-                            {
-                                <div class="tape">
-                                    <div class="tape__head">
-                                        <span class="label tape__c-time">Время</span>
-                                        <span class="label tape__c-price">Цена</span>
-                                        <span class="label tape__c-qty">Кол-во</span>
-                                    </div>
-                                    <div class="tape__list @(TradeCount > TapeRowsVisible ? "is-scrollable" : null)">
-                                        @foreach (var trade in TradeViews)
-                                        {
-                                            <button type="button"
-                                                    class="tape__row @(ActiveTrade == trade.Index ? "is-current" : null)"
-                                                    @key="trade.Index"
-                                                    @onclick="() => SelectTrade(trade.Index)"
-                                                    @onmouseenter="() => HoverTrade(trade.Index)"
-                                                    @onmouseleave="() => HoverTrade(null)">
-                                                <span class="num-xs tape__c-time">@trade.Time</span>
-                                                <span class="num-sm tape__c-price @(trade.IsBuy ? "tone-up" : "tone-down")">
-                                                    @(trade.IsBuy ? "↗" : "↘") @Price2(trade.Price)
-                                                </span>
-                                                <span class="num-sm tape__c-qty">@Quantity1(trade.Quantity)</span>
-                                            </button>
-                                        }
-                                    </div>
-                                </div>
-                            }
-                        </ChildContent>
-                    </Panel>
-                </div>
-
-                @* ─── ЦЕНТР · главная панель — цена с маркерами сделок ─── *@
-                <div class="center">
-                    <Panel Class="rise rise-2 price">
-                        <Head>
-                            <div class="price__id">
-                                <h2>@CurrentAsset.Draft.Name</h2>
-                                <span class="chip num-sm">@CurrentAsset.Symbol</span>
-                                <StatusDot Tone="@AgentDisplay.GetTypeTone(AgentTypeValue)">@MarkersLabel</StatusDot>
+                @* ─── Левый рельс — хронология: сделки агента по всем активам ─── *@
+                <Panel Title="Сделки агента" Class="rise rise-2" Flush="true">
+                    <MetaContent><span class="num-sm">@Count0(ledger.Trades.Count)</span> за сессию</MetaContent>
+                    <ChildContent>
+                        @if (ledger.Trades.Count == 0)
+                        {
+                            <p class="panel-note">@NoTradesReason(account.AgentType)</p>
+                        }
+                        else
+                        {
+                            <div class="tape__head">
+                                <span class="label tape__c-time">Время</span>
+                                <span class="label tape__c-sym">Актив</span>
+                                <span class="label tape__c-price">Цена</span>
+                                <span class="label tape__c-qty">Кол</span>
                             </div>
+                            <div class="tape__list is-scrollable">
+                                @foreach (var trade in ledger.Trades.Take(MaxTapeRows))
+                                {
+                                    <div class="tape__row @(trade.Symbol == chartSymbol ? "is-chart" : null)">
+                                        <span class="num-xs tape__c-time">@trade.At.ToLocalTime().ToString("HH:mm:ss")</span>
+                                        <span class="num-xs tape__c-sym">@trade.Symbol</span>
+                                        <span class="num-sm tape__c-price @(trade.Side == OrderSide.Buy ? "tone-up" : "tone-down")">@(trade.Side == OrderSide.Buy ? "↗" : "↘") @Price2(trade.Price)</span>
+                                        <span class="num-sm tape__c-qty">@Quantity1(trade.Quantity)</span>
+                                    </div>
+                                }
+                            </div>
+                            <div class="tape__foot">
+                                <span>↗ покупка · ↘ продажа</span>
+                                @if (chartSymbol is not null)
+                                {
+                                    <span>@chartSymbol выделен</span>
+                                }
+                            </div>
+                        }
+                    </ChildContent>
+                </Panel>
+
+                @* ─── Центр — график выбранного актива с метками сделок агента ─── *@
+                <div class="center">
+                    <Panel Class="price rise rise-2" Flush="true">
+                        <Head>
+                            <span class="price__id">
+                                <Segmented TValue="string"
+                                           Label="Актив на графике"
+                                           Items="@(ledger.Assets.Select(asset => new SegmentedItem<string>(asset.Symbol, asset.Symbol)).ToArray())"
+                                           Value="@chartSymbol"
+                                           ValueChanged="SelectChartSymbol" />
+                                <span class="caption">сделки агента в @chartSymbol: <span class="num-xs">@ChartTrades.Count</span></span>
+                            </span>
                             <Segmented TValue="string"
                                        Label="Таймфрейм"
                                        Items="@TimeframeItems"
@@ -212,173 +173,108 @@
                                        ValueChanged="SetTimeframe" />
                         </Head>
                         <ChildContent>
-                            <div class="price__ohlc">
-                                <span><small>откр</small><span class="num-sm">@Price2(OpenPrice)</span></span>
-                                <span><small>макс</small><span class="num-sm">@Price2(HighPrice)</span></span>
-                                <span><small>мин</small><span class="num-sm">@Price2(LowPrice)</span></span>
-                                <span><small>посл</small><span class="num-sm">@Price2(EffectiveLastPrice)</span></span>
-                                <span><small>объём</small><span class="num-sm">@Count0(SessionVolume)</span></span>
-                                <span class="num-sm @DeltaTone(PriceChange)">
-                                    @(PriceChange > 0m ? "↗" : PriceChange < 0m ? "↘" : "·") @Pnl2(PriceChange) ₽ ·
-                                    @Sign(PriceChangePercent)@Percent2(Math.Abs(PriceChangePercent)) %
-                                </span>
+                            <div class="price__body">
+                                <div class="price__stage" @ref="priceChart" role="img"
+                                     aria-label="Цена @chartSymbol и сделки агента @InstanceName"></div>
                             </div>
-
-                            <div class="price__stage" @ref="priceChart" role="img"
-                                 aria-label="Цена @CurrentAsset.Draft.Name и сделки агента @InstanceName"></div>
-
-                            @if (TradeCount > 0)
-                            {
-                                <div class="price__legend hairline-top">
-                                    <span class="marker marker--buy" aria-hidden="true"></span><span>покупка</span>
-                                    <span class="marker marker--sell" aria-hidden="true"></span><span>продажа</span>
-                                    @if (ActiveTrade is not null && ActiveTradeView is { } current)
-                                    {
-                                        <span class="marker marker--current" aria-hidden="true"></span>
-                                        <span class="price__legend-current">
-                                            выбранная сделка <span class="num-xs">@current.Time</span>
-                                        </span>
-                                    }
-                                </div>
-                            }
-                            else
-                            {
-                                @* Артборд 03: объяснить, почему маркеров нет,
-                                   вместо пустой легенды. *@
-                                <p class="price__note hairline-top">
-                                    Цена идёт на решениях других агентов сессии.
-                                    Маркеров этого агента на графике нет.
-                                </p>
-                            }
+                            <div class="price__legend hairline-top">
+                                <span class="marker marker--buy" aria-hidden="true"></span><span>покупка</span>
+                                <span class="marker marker--sell" aria-hidden="true"></span><span>продажа</span>
+                            </div>
                         </ChildContent>
                     </Panel>
 
-                    <Panel Title="Капитал агента" Class="rise rise-3 equity">
+                    <Panel Title="Капитал агента" Class="equity rise rise-3">
                         <MetaContent>
-                            @if (TradeCount > 0)
-                            {
-                                <text>
-                                    вход <span class="num-sm">@Money0(InitialPortfolio)</span>
-                                    → сейчас <span class="num-sm">@Money0(CurrentPortfolio)</span>
-                                </text>
-                            }
-                            else
-                            {
-                                <text><span class="num-sm">@Money0(CurrentPortfolio)</span> · без изменения</text>
-                            }
+                            вход <span class="num-sm">@Money0(ledger.InitialPortfolio)</span> → сейчас <span class="num-sm t1">@Money0(ledger.Portfolio)</span>
                         </MetaContent>
                         <ChildContent>
-                            @if (TradeCount > 0)
+                            @if (ledger.Equity.Count > 1)
                             {
                                 <div class="equity__stage" @ref="equityChart" role="img"
                                      aria-label="Стоимость портфеля агента @InstanceName во времени"></div>
                             }
                             else
                             {
-                                @* Плоская линия на одном уровне занимала бы площадь
-                                   наравне с содержательной кривой и ничего бы не
-                                   сообщала (раздел 7.2). Это говорится словами. *@
-                                <p class="equity__note">Капитал не менялся: сделок не было.</p>
+                                <p class="equity__note">Истории цен ещё нет — кривая появится после первых шагов торгов.</p>
                             }
                         </ChildContent>
                     </Panel>
                 </div>
 
-                @* ─── ПРАВЫЙ РЕЛЬС · состояние на сейчас (раздел 13) ─── *@
-                <div class="rail rail--right">
-                    <Panel Title="P/L" Class="rise rise-2">
-                        <MetaContent>от стоимости портфеля на входе</MetaContent>
+                @* ─── Правый рельс — состояние: P/L по активам и портфель ─── *@
+                <div class="rail">
+                    <Panel Title="P/L по активам" Class="rise rise-2" Flush="true">
+                        <MetaContent>с начала сессии</MetaContent>
                         <ChildContent>
-                            <div class="kv-row kv-row--lead">
-                                <span class="kv__key">Общий</span>
-                                <span class="num-lg @DeltaTone(TotalPnl)">@Pnl2(TotalPnl)</span>
-                            </div>
-                            <div class="kv-group hairline-top">
-                                <div class="kv-row">
-                                    <span class="kv__key">Реализованный</span>
-                                    <span class="num-sm @DeltaTone(Realized)">@Pnl2(Realized)</span>
+                            <div class="pl">
+                                <div class="kv-row kv-row--lead">
+                                    <span class="kv__key">Общий</span>
+                                    <span class="num-lg @DeltaTone(ledger.Pnl)">@Pnl2(ledger.Pnl)</span>
                                 </div>
-                                <div class="kv-row">
-                                    <span class="kv__key">Нереализованный</span>
-                                    <span class="num-sm @DeltaTone(Unrealized)">@Pnl2(Unrealized)</span>
+                                @* Итог раскладывается на две части: что агент уже
+                                   зафиксировал продажами и что висит в открытой
+                                   позиции. Средняя цена — точка отсчёта обеих. *@
+                                <div class="pltable" role="table" aria-label="P/L по активам">
+                                    <div class="pltable__row" role="row">
+                                        <span class="label" role="columnheader">Актив</span>
+                                        @* Рельс 300–340 px: полные названия не помещаются,
+                                           сокращения расшифрованы в подсказке и под таблицей. *@
+                                        <span class="label right pltable__head" role="columnheader" title="Средняя цена покупки">Ср. цена</span>
+                                        <span class="label right pltable__head" role="columnheader" title="Закрытый P/L — зафиксирован продажами">Закр.</span>
+                                        <span class="label right pltable__head" role="columnheader" title="Открытый P/L — позиция по текущей цене">Откр.</span>
+                                        <span class="label right" role="columnheader">Итого</span>
+                                    </div>
+                                    @{ var maxPnl = Math.Max(0.01m, ledger.Assets.Max(asset => Math.Abs(asset.Pnl))); }
+                                    @foreach (var asset in ledger.Assets)
+                                    {
+                                        <div class="pltable__row" role="row">
+                                            <span role="cell"><Ticker Symbol="@asset.Symbol" /></span>
+                                            <span class="num-xs t2 right" role="cell">@(asset.AverageEntryPrice is { } average ? Price2(average) : "—")</span>
+                                            <span class="num-xs right @DeltaTone(asset.Realized)" role="cell">@Pnl2(asset.Realized)</span>
+                                            <span class="num-xs right @DeltaTone(asset.Unrealized)" role="cell">@Pnl2(asset.Unrealized)</span>
+                                            <span class="num-sm right @DeltaTone(asset.Pnl)" role="cell">@Pnl2(asset.Pnl)</span>
+                                            @* Полоса итога растёт от оси посередине: вправо прибыль, влево убыток. *@
+                                            <span class="plbar__track pltable__bar" aria-hidden="true">
+                                                <span class="plbar__axis"></span>
+                                                <span class="plbar__fill plbar__fill--@(asset.Pnl >= 0m ? "up" : "down")" style="@PlBarStyle(asset.Pnl, maxPnl)"></span>
+                                            </span>
+                                        </div>
+                                    }
                                 </div>
                             </div>
-                            @if (TradeCount == 0 && CurrentPosition == 0m)
-                            {
-                                <p class="panel-note">
-                                    Позиции нет и сделок не было — переоценивать нечего.
-                                    Это не отсутствие данных.
-                                </p>
-                            }
+                            <p class="pl__note">Закр. — P/L, зафиксированный продажами: проданные бумаги против средней цены покупки. Откр. — позиция по текущей цене против той же средней. Стартовый запас считается купленным по цене открытия.</p>
                         </ChildContent>
                     </Panel>
 
-                    <Panel Title="Покупки и продажи" Class="rise rise-3">
-                        <MetaContent>
-                            @if (TradeCount > 0)
-                            {
-                                <text><span class="num-sm">@TradeCount</span> @Plural(TradeCount, "сделка", "сделки", "сделок")</text>
-                            }
-                            else
-                            {
-                                <span class="num-sm">0</span>
-                            }
-                        </MetaContent>
-                        <ChildContent>
-                            <div class="split">
-                                <div class="split__half">
-                                    <span class="label">Покупок</span>
-                                    <span class="num-lg">@Buys</span>
-                                </div>
-                                <div class="split__half">
-                                    <span class="label">Продаж</span>
-                                    <span class="num-lg">@Sells</span>
-                                </div>
-                            </div>
-
-                            <div class="hairline-top split__foot">
-                                @if (TradeCount > 0)
-                                {
-                                    @* Полоса баланса — раздел 9.18: половины различаются
-                                       светлотой, зелёный и красный заняты движением цены. *@
-                                    <div class="balance" role="img"
-                                         aria-label="@($"Куплено {Quantity1(BuyQuantity)}, продано {Quantity1(SellQuantity)}")">
-                                        <span class="balance__buy" style="@BuyShareStyle"></span>
-                                        <span class="balance__sell"></span>
-                                    </div>
-                                }
-                                <div class="split">
-                                    <div class="split__half">
-                                        <span class="num-sm">@(BuyQuantity > 0m ? Quantity1(BuyQuantity) : "—")</span>
-                                        <span class="split__note">куплено</span>
-                                    </div>
-                                    <div class="split__half split__half--end">
-                                        <span class="num-sm">@(SellQuantity > 0m ? Quantity1(SellQuantity) : "—")</span>
-                                        <span class="split__note">продано</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </ChildContent>
-                    </Panel>
-
-                    <Panel Title="Состояние на сейчас" Class="rise rise-4">
-                        <MetaContent><span class="num-sm">@UpdatedAtLabel</span></MetaContent>
+                    <Panel Title="Портфель" Class="rise rise-3">
+                        <MetaContent><span class="num-xs">@DateTimeOffset.Now.ToString("HH:mm:ss")</span></MetaContent>
                         <ChildContent>
                             <div class="kv-group">
-                                <div class="kv-row">
-                                    <span class="kv__key">Деньги</span>
-                                    <span class="num-sm">@Money0(CurrentCash)</span>
-                                </div>
-                                <div class="kv-row">
-                                    <span class="kv__key">Позиция</span>
-                                    <span class="num-sm @DeltaTone(CurrentPosition)">@Position0(CurrentPosition)</span>
-                                </div>
-                                <div class="kv-row">
-                                    <span class="kv__key">Стоимость портфеля</span>
-                                    <span class="num-sm">@Money0(CurrentPortfolio)</span>
-                                </div>
+                                <div class="kv-row"><span class="kv__key">Деньги</span><span class="num-sm">@Money0(account.Cash)</span></div>
+                                @foreach (var asset in ledger.Assets)
+                                {
+                                    <div class="kv-row">
+                                        <span class="kv__key holding">
+                                            <Ticker Symbol="@asset.Symbol" />
+                                            <span class="num-xs t2">@Quantity1(asset.Quantity) шт</span>
+                                            <span class="num-xs @DeltaTone(asset.Change)">@Position1(asset.Change)</span>
+                                        </span>
+                                        <span class="num-sm">@Money0(asset.Value)</span>
+                                    </div>
+                                }
+                            </div>
+                            <div class="kv-group hairline-top">
+                                <div class="kv-row"><span class="kv__key t1">Стоимость портфеля</span><span class="num-sm">@Money0(ledger.Portfolio)</span></div>
                             </div>
                         </ChildContent>
+                    </Panel>
+
+                    <Panel Quiet="true" Class="rise rise-4">
+                        <div class="split">
+                            <span class="split__half"><span class="split__note">покупок</span><span class="num-lg">@ledger.Assets.Sum(asset => asset.Buys)</span></span>
+                            <span class="split__half split__half--end"><span class="split__note">продаж</span><span class="num-lg">@ledger.Assets.Sum(asset => asset.Sells)</span></span>
+                        </div>
                     </Panel>
                 </div>
             </div>
@@ -387,9 +283,11 @@
 </div>
 
 @code {
-    [Parameter] public string Name { get; set; } = "";
+    /// <summary>Строк в ленте сделок: дальше никто не листает, а рельс не растёт.</summary>
+    private const int MaxTapeRows = 200;
 
-    private const int MaxChartPoints = 400;
+    /// <summary>Как часто перечитывается история агента: тики идут раз в секунду, а это запросы к базе.</summary>
+    private static readonly TimeSpan ReloadInterval = TimeSpan.FromSeconds(2);
 
     private static readonly SegmentedItem<string>[] TimeframeItems =
     [
@@ -399,493 +297,186 @@
 
     private static readonly Dictionary<string, int> TimeframeSeconds = new()
     {
-        ["10s"] = 10,
-        ["30s"] = 30,
-        ["1m"] = 60,
-        ["5m"] = 300,
-        ["15m"] = 900,
-        ["1h"] = 3600,
+        ["10s"] = 10, ["30s"] = 30, ["1m"] = 60, ["5m"] = 300, ["15m"] = 900, ["1h"] = 3600
     };
 
+    [Parameter] public string Name { get; set; } = string.Empty;
+
     /// <summary>
-    /// Стартовый таймфрейм мельче, чем на «Торгах»: здесь важно, где именно
-    /// агент входил относительно движения, а на крупной корзине его сделки
-    /// схлопываются в одну свечу и связка «сделка ↔ маркер» теряет смысл.
+    /// Мельче, чем на «Торгах»: здесь важно, где агент входил относительно
+    /// движения, а на крупной свече сделки схлопываются в одну.
     /// </summary>
     private string selectedTimeframe = "10s";
+    private string? chartSymbol;
 
-    private ElementReference equityChart;
     private ElementReference priceChart;
+    private ElementReference equityChart;
     private IJSObjectReference? chartModule;
     private DotNetObjectReference<AgentDetail>? selfRef;
 
-    private AgentStatisticsReport? report;
-    private AgentSnapshot? liveAgent;
-    private decimal liveLastPrice;
-    private DateTimeOffset lastUpdate = DateTimeOffset.Now;
+    private Dictionary<Guid, AgentStatisticsReport?> reports = [];
+    private DateTimeOffset lastReload = DateTimeOffset.MinValue;
+    private LedgerView? ledgerCache;
+    private string renderedKey = string.Empty;
 
-    private int? selectedTrade;
-    private int? hoveredTrade;
+    private AgentAccountSnapshot? Account =>
+        Markets.Accounts.FirstOrDefault(account => string.Equals(account.AgentName, Name, StringComparison.Ordinal));
 
-    private int renderedTradeCount = -1;
-    private int renderedPriceCount = -1;
-    private string renderedTimeframe = "";
-    private int renderedActiveTrade = -2;
-
-    private int IntervalSeconds => TimeframeSeconds.GetValueOrDefault(selectedTimeframe, 30);
-
-    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
-
-    /// <summary>
-    /// Состав сессии: из текущего тика, а когда тиков больше нет — из истории
-    /// прогона. Раннер в finally своего цикла обнуляет Current, и страница,
-    /// читающая только его, после остановки гасла целиком — ни P/L, ни сделок,
-    /// ни капитала, хотя разбирать решения агента приходят как раз после конца
-    /// сессии. «Агенты» это уже пережили (коммит 3fe4516), детальная — нет:
-    /// пункт 89 docs/ui-backlog.md.
-    /// </summary>
-    private IReadOnlyList<AgentSnapshot> SessionAgents =>
-        SimulationRunner.Current?.Agents is { Count: > 0 } agents ? agents : EquityHistory.LastAgents;
-
-    private IReadOnlyList<AgentDecision> SessionDecisions =>
-        SimulationRunner.Current?.Agents is { Count: > 0 } ? SimulationRunner.Current.Decisions : EquityHistory.LastDecisions;
-
-    /// <summary>Прогон есть: идущий — или закончившийся, но со сделками агента.</summary>
-    private bool HasSession => SessionAgents.Count > 0 || Trades.Count > 0;
-
-    /// <summary>
-    /// Агент существует, если он есть в составе сессии или у него есть сделки.
-    /// Ряд цен в отчёте сюда не годится: он принадлежит прогону, а не агенту,
-    /// и приходит непустым на любое имя из адреса — с ним несуществующий агент
-    /// показывался полной страницей нулей вместо «не найден».
-    /// </summary>
-    private bool IsKnownAgent => liveAgent is not null || Trades.Count > 0;
-
-    /// <summary>
-    /// Человеческое имя экземпляра. Номер считается тем же методом, что и на
-    /// списке, — иначе один и тот же агент назывался бы там и здесь по-разному.
-    /// </summary>
-    private string InstanceName => AgentDisplay.GetInstanceName(SessionAgents, Name);
-
-    private string CompositionSentence
+    /// <summary>«Трендовый 1» — та же нумерация, что на «Агентах».</summary>
+    private string InstanceName
     {
         get
         {
-            var parts = SessionAgents
-                .GroupBy(agent => agent.Type)
-                .OrderBy(group => group.Key)
-                .Select(group => $"{AgentDisplay.GetTypeLabel(group.Key)} ×{group.Count()}");
+            var account = Account;
 
-            return $"В сессии {SessionAgents.Count} " +
-                   $"{Plural(SessionAgents.Count, "экземпляр", "экземпляра", "экземпляров")}: " +
-                   $"{string.Join(", ", parts)}.";
-        }
-    }
-
-    private void SetTimeframe(string timeframe)
-    {
-        if (timeframe == selectedTimeframe)
-        {
-            return;
-        }
-
-        selectedTimeframe = timeframe;
-        renderedTimeframe = ""; // заставляет перерисовать ряд на следующем рендере
-    }
-
-    private AgentType AgentTypeValue => liveAgent?.Type ?? AgentType.MarketMaker;
-
-    /// <summary>Ключ типа для js-модуля: цвет маркеров берётся по нему.</summary>
-    private string ToneKey => AgentTypeValue switch
-    {
-        AgentType.TrendFollowing => "trend",
-        AgentType.CounterTrend => "counter",
-        AgentType.MarketMaker => "mm",
-        _ => "news"
-    };
-
-    private int TradeCount => report?.Trades.Count ?? 0;
-
-    /// <summary>
-    /// Сколько строк ленты видно без прокрутки. Тринадцать — по артборду 02,
-    /// где панель «Сделки агента» нарисована фиксированной высоты. Список во
-    /// всю страницу растягивал бы экран под число сделок, и правый рельс
-    /// уезжал бы от графика, к которому он относится (раздел 9.8).
-    /// </summary>
-    private const int TapeRowsVisible = 13;
-
-    /// <summary>Агент в сессии есть, но ещё ничего не сделал.</summary>
-    private bool IsIdle => TradeCount == 0;
-
-    private string IdleStateLabel => AgentTypeValue == AgentType.NewsDriven
-        ? "ожидает сигнала"
-        : "заявок не выставлял";
-
-    private string NoTradesReason => AgentTypeValue == AgentType.NewsDriven
-        ? "Агент не выставлял заявок: новость в сессию не поступала, сигнала для решения нет."
-        : "Агент ещё не совершал сделок в этой сессии.";
-
-    private string? StartedAtLabel => report?.PriceSeries.Count > 0
-        ? report.PriceSeries[0].Time.ToLocalTime().ToString("HH:mm")
-        : null;
-
-    private string UpdatedAtLabel => lastUpdate.ToString("HH:mm:ss");
-
-    private string MarkersLabel => TradeCount > 0
-        ? $"сделки: {InstanceName}"
-        : $"сделок {InstanceName} нет";
-
-    // ── Полоса связи ────────────────────────────────────────────────────────
-
-    private AgentDecision? LastDecision => SessionDecisions
-        .LastOrDefault(decision => string.Equals(decision.AgentName, Name, StringComparison.Ordinal));
-
-    private string DecisionLabel
-    {
-        get
-        {
-            var decision = LastDecision;
-            if (decision is null)
+            if (account is null)
             {
-                return "—";
+                return Name;
             }
 
-            var order = decision.Orders.FirstOrDefault();
-            return decision.Action switch
-            {
-                TradeAction.Buy when order is not null =>
-                    $"покупает {Quantity1(order.Quantity)} по {Price2(order.Price ?? EffectiveLastPrice)}",
-                TradeAction.Sell when order is not null =>
-                    $"продаёт {Quantity1(order.Quantity)} по {Price2(order.Price ?? EffectiveLastPrice)}",
-                TradeAction.Buy => "покупает",
-                TradeAction.Sell => "продаёт",
-                _ when decision.Orders.Count > 0 => "держит спред",
-                _ => "бездействует"
-            };
+            var index = Markets.Accounts
+                .Where(item => item.AgentType == account.AgentType)
+                .Select((item, position) => (item.AgentName, position))
+                .First(item => item.AgentName == account.AgentName).position;
+
+            return $"{AgentDisplay.GetTypeLabel(account.AgentType)} {index + 1}";
         }
     }
 
-    private string ExplanationLabel =>
-        string.IsNullOrWhiteSpace(LastDecision?.Explanation) ? "—" : LastDecision!.Explanation.Trim();
+    private IReadOnlyList<LedgerMarket> LedgerMarkets =>
+        Markets.Markets
+            .Select(market => (Market: market, Asset: Registry.Find(market.AssetId)))
+            .Where(item => item.Asset is not null)
+            .Select(item => new LedgerMarket(item.Market.AssetId, item.Asset!.Symbol, item.Market.Open,
+                item.Market.LastPrice, reports.GetValueOrDefault(item.Market.AssetId)))
+            .ToArray();
 
-    private string OrderLabel
-    {
-        get
-        {
-            var orders = LastDecision?.Orders;
-            if (orders is null || orders.Count == 0)
-            {
-                return "—";
-            }
+    private LedgerView? Ledger => ledgerCache;
 
-            var order = orders[0];
-            var side = order.Side == OrderSide.Buy ? "покупка" : "продажа";
-            var price = order.Price is { } value ? Price2(value) : "по рынку";
-            var tail = orders.Count > 1 ? $" · всего заявок {orders.Count}" : "";
+    private IReadOnlyList<AgentTradeRecord> ChartTrades =>
+        ChartMarket?.Report?.Trades ?? [];
 
-            return $"{side} {Quantity1(order.Quantity)} по {price}{tail}";
-        }
-    }
+    private LedgerMarket? ChartMarket => LedgerMarkets.FirstOrDefault(market => market.Symbol == chartSymbol);
 
-    private string LastTradeLabel
-    {
-        get
-        {
-            if (Trades.Count == 0)
-            {
-                return "—";
-            }
+    private sealed record TrendRow(string Symbol, decimal Change);
 
-            var trade = Trades[^1];
-            return $"{trade.ExecutedAt.ToLocalTime():HH:mm:ss} · {Price2(trade.Price)} · {Quantity1(trade.Quantity)}";
-        }
-    }
-
-    // ── Связка «сделка ↔ маркер» ────────────────────────────────────────────
+    /// <summary>Ход активов с открытия, от сильнейшего роста к сильнейшему падению.</summary>
+    private IReadOnlyList<TrendRow> TrendRows =>
+        Markets.Markets
+            .Select(market => new TrendRow(Registry.Find(market.AssetId)?.Symbol ?? "—", market.ChangePercent))
+            .OrderByDescending(row => row.Change)
+            .ToArray();
 
     /// <summary>
-    /// Наведение — предпросмотр, клик — стойкий выбор. Действует то из них,
-    /// что сейчас ближе к курсору.
+    /// Последнее решение с заявкой — по всем рынкам. Агент решает по каждому
+    /// активу на каждом шаге; объяснимо то решение, после которого он купил
+    /// или продал.
     /// </summary>
-    private int? ActiveTrade => hoveredTrade ?? selectedTrade;
-
-    private TradeView? ActiveTradeView =>
-        ActiveTrade is { } index && index >= 0 && index < Trades.Count
-            ? BuildTradeView(index)
-            : null;
-
-    private void SelectTrade(int index)
+    private (string Symbol, AgentDecision Decision)? LastTradeDecision
     {
-        selectedTrade = selectedTrade == index ? null : index;
-        _ = PushActiveTradeAsync();
-    }
-
-    private void HoverTrade(int? index)
-    {
-        if (hoveredTrade == index)
+        get
         {
-            return;
-        }
+            foreach (var market in Markets.Markets.OrderByDescending(market => market.Last.Tick))
+            {
+                var decision = market.Last.Decisions.FirstOrDefault(item =>
+                    item.AgentName == Name && item.Action is TradeAction.Buy or TradeAction.Sell);
 
-        hoveredTrade = index;
-        _ = PushActiveTradeAsync();
-    }
+                if (decision is not null && Registry.Find(market.AssetId) is { } asset)
+                {
+                    return (asset.Symbol, decision);
+                }
+            }
 
-    /// <summary>Обратная сторона связки: клик по маркеру выбирает строку.</summary>
-    [JSInvokable]
-    public Task SelectTradeFromChart(int index)
-    {
-        selectedTrade = index;
-        hoveredTrade = null;
-        StateHasChanged();
-        return Task.CompletedTask;
-    }
-
-    private async Task PushActiveTradeAsync()
-    {
-        if (chartModule is null)
-        {
-            return;
-        }
-
-        try
-        {
-            renderedActiveTrade = ActiveTrade ?? -1;
-            await chartModule.InvokeVoidAsync("setActiveTrade", priceChart, renderedActiveTrade);
-        }
-        catch (JSDisconnectedException)
-        {
+            return null;
         }
     }
 
-    // ── Жизненный цикл ──────────────────────────────────────────────────────
+    /// <summary>Время последнего шага: шаг симуляции — ровно секунда от начала сессии.</summary>
+    private DateTimeOffset DecisionTime => (Markets.StartedAt ?? DateTimeOffset.Now).AddSeconds(Markets.Tick);
+
+    private string? FocusSymbol((string Symbol, AgentDecision Decision)? decision) =>
+        decision?.Symbol ?? ledgerCache?.Trades.FirstOrDefault()?.Symbol ?? chartSymbol;
+
+    private static string Verb(AgentDecision decision) =>
+        decision.Action == TradeAction.Buy ? "покупает" : "продаёт";
+
+    private static string OrderNote(AgentDecision decision)
+    {
+        var order = decision.Orders.FirstOrDefault();
+        return order is null
+            ? "заявка не выставлена"
+            : order.Type == OrderType.Market
+                ? $"{Quantity1(order.Quantity)} шт по рынку"
+                : $"{Quantity1(order.Quantity)} шт по {Price2(order.Price ?? 0m)}";
+    }
+
+    private static string NoTradesReason(AgentType type) => type == AgentType.NewsDriven
+        ? "Новостной агент ждёт новость — до неё он не торгует."
+        : "Сделок пока не было: заявки агента ещё не встретили встречных.";
+
+    private static string Position1(decimal value) => Sign(value) + Quantity1(Math.Abs(value));
+
+    /// <summary>Полоса P/L растёт от середины: вправо прибыль, влево убыток.</summary>
+    private static string PlBarStyle(decimal pnl, decimal max)
+    {
+        var width = Math.Abs(pnl) / max * 50m;
+        var left = pnl >= 0m ? 50m : 50m - width;
+        return $"left:{left.ToString("0.#", CultureInfo.InvariantCulture)}%;width:{width.ToString("0.#", CultureInfo.InvariantCulture)}%";
+    }
 
     protected override void OnInitialized()
     {
-        SimulationRunner.OnTick += HandleTick;
-        SimulationRunner.OnStateChanged += HandleStateChanged;
-        LoadData();
+        Markets.Changed += HandleChanged;
+        Reload(force: true);
     }
 
-    protected override void OnParametersSet()
+    protected override void OnParametersSet() => Reload(force: true);
+
+    private void HandleChanged() => _ = InvokeAsync(() =>
     {
-        // Другой агент в адресе — прежний выбор сделки к нему не относится.
-        selectedTrade = null;
-        hoveredTrade = null;
-        LoadData();
-    }
+        Reload(force: false);
+        StateHasChanged();
+    });
 
-    private void HandleTick(SimulationTickResult tickResult) =>
-        _ = InvokeAsync(() =>
+    /// <summary>История агента по каждому прогону: сделки и ряд цен — не чаще раза в две секунды.</summary>
+    private void Reload(bool force)
+    {
+        var now = DateTimeOffset.Now;
+
+        if (!force && now - lastReload < ReloadInterval && ledgerCache is not null)
         {
-            LoadData();
-            StateHasChanged();
-        });
-
-    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
-
-    /// <summary>
-    /// Прогон, о котором страница рассказывает: идущий — или последний
-    /// закончившийся. Раннер обнуляет CurrentRunId в finally своего цикла, и
-    /// отчёт по агенту после остановки запрашивался у пустого идентификатора:
-    /// сделок не находилось, и страница объявляла агента несуществующим.
-    /// </summary>
-    private Guid SessionRunId =>
-        SimulationRunner.CurrentRunId != Guid.Empty ? SimulationRunner.CurrentRunId : EquityHistory.RunId;
-
-    private void LoadData()
-    {
-        var current = SimulationRunner.Current;
-        var runId = SessionRunId;
-
-        liveAgent = SessionAgents.FirstOrDefault(a => string.Equals(a.Name, Name, StringComparison.Ordinal));
-        report = AgentStatisticsReader.GetReport(runId, Name);
-
-        // Цена нужна, чтобы переоценить позицию. Пока прогон идёт — из тика;
-        // после остановки — цена закрытия из сводки прогона. Ноль здесь врал бы
-        // сильнее всего: он обнулял бы нереализованный P/L, а не помечал его
-        // неизвестным.
-        liveLastPrice = current?.Snapshot.LastPrice
-            ?? (runId == Guid.Empty ? 0m : SimulationHistoryReader.GetRun(runId)?.LastPrice ?? 0m);
-
-        lastUpdate = DateTimeOffset.Now;
-    }
-
-    // ── Восстановленное состояние агента ────────────────────────────────────
-    //    Расчёты перенесены как были: страница меняет оформление, не арифметику.
-
-    private IReadOnlyList<AgentTradeRecord> Trades => report?.Trades ?? [];
-
-    private decimal NetCashFlow => Trades.Sum(t => t.Side == OrderSide.Sell ? t.Price * t.Quantity : -t.Price * t.Quantity);
-
-    private decimal NetPositionFlow => Trades.Sum(t => t.Side == OrderSide.Buy ? t.Quantity : -t.Quantity);
-
-    private decimal CurrentCash => liveAgent?.Cash ?? (InitialCash + NetCashFlow);
-    private decimal CurrentPosition => liveAgent?.Position ?? (InitialPosition + NetPositionFlow);
-    private decimal CurrentPortfolio => liveAgent?.PortfolioValue ?? (CurrentCash + CurrentPosition * EffectiveLastPrice);
-
-    private decimal EffectiveLastPrice => liveLastPrice > 0m
-        ? liveLastPrice
-        : (report?.PriceSeries.Count > 0 ? report.PriceSeries[^1].Price : 0m);
-
-    // Стартовое состояние не хранится — восстанавливается из живого снимка и
-    // потока сделок.
-    private decimal InitialCash => liveAgent is not null ? liveAgent.Cash - NetCashFlow : 0m;
-    private decimal InitialPosition => liveAgent is not null ? liveAgent.Position - NetPositionFlow : 0m;
-
-    private decimal InitialPrice => report?.PriceSeries.Count > 0
-        ? report.PriceSeries[0].Price
-        : (Trades.Count > 0 ? Trades[0].Price : EffectiveLastPrice);
-
-    private decimal InitialPortfolio => InitialCash + InitialPosition * InitialPrice;
-
-    private decimal TotalPnl => CurrentPortfolio - InitialPortfolio;
-
-    private decimal OpenPrice => report?.PriceSeries.Count > 0 ? report.PriceSeries[0].Price : EffectiveLastPrice;
-    private decimal HighPrice => report?.PriceSeries.Count > 0 ? report.PriceSeries.Max(p => p.Price) : EffectiveLastPrice;
-    private decimal LowPrice => report?.PriceSeries.Count > 0 ? report.PriceSeries.Min(p => p.Price) : EffectiveLastPrice;
-    /// <summary>
-    /// Объём за сессию — то же число и в том же смысле, что «объём» в строке
-    /// показателей «Торгов»: накопленный итог с начала прогона. Соседи по
-    /// строке (откр, макс, мин) тоже считаются по всей сессии, а не по
-    /// последней свече, — период у всей строки один (раздел 10).
-    /// </summary>
-    private decimal SessionVolume =>
-        report?.PriceSeries.Count > 0 ? report.PriceSeries[^1].TotalVolume : 0m;
-
-    private decimal PriceChange => EffectiveLastPrice - OpenPrice;
-    private decimal PriceChangePercent => OpenPrice != 0m ? PriceChange / OpenPrice * 100m : 0m;
-
-    private (decimal Realized, decimal Unrealized) PnlBreakdown
-    {
-        get
-        {
-            decimal realized = 0m;
-            decimal pos = InitialPosition;
-            decimal avg = InitialPrice;
-
-            foreach (var trade in Trades)
-            {
-                var signed = trade.Side == OrderSide.Buy ? trade.Quantity : -trade.Quantity;
-
-                if (pos == 0m || Math.Sign(pos) == Math.Sign(signed))
-                {
-                    var totalAbs = Math.Abs(pos) + trade.Quantity;
-                    avg = totalAbs == 0m ? trade.Price : (avg * Math.Abs(pos) + trade.Price * trade.Quantity) / totalAbs;
-                    pos += signed;
-                }
-                else
-                {
-                    var closing = Math.Min(trade.Quantity, Math.Abs(pos));
-                    realized += (trade.Price - avg) * closing * Math.Sign(pos);
-                    var remaining = trade.Quantity - closing;
-                    pos += signed;
-                    if (remaining > 0m)
-                    {
-                        avg = trade.Price;
-                    }
-                }
-            }
-
-            var unrealized = (EffectiveLastPrice - avg) * pos;
-            return (realized, unrealized);
+            return;
         }
+
+        lastReload = now;
+        reports = Markets.Markets.ToDictionary(
+            market => market.AssetId,
+            market => market.RunId == Guid.Empty ? null : AgentStatistics.GetReport(market.RunId, Name));
+
+        var markets = LedgerMarkets;
+        chartSymbol ??= FocusSymbol(LastTradeDecision) ?? markets.FirstOrDefault()?.Symbol;
+        ledgerCache = Account is { } account ? AgentLedger.Build(account, markets) : null;
     }
 
-    private decimal Realized => PnlBreakdown.Realized;
-    private decimal Unrealized => PnlBreakdown.Unrealized;
-    private int Buys => Trades.Count(t => t.Side == OrderSide.Buy);
-    private int Sells => Trades.Count(t => t.Side == OrderSide.Sell);
-    private decimal BuyQuantity => Trades.Where(t => t.Side == OrderSide.Buy).Sum(t => t.Quantity);
-    private decimal SellQuantity => Trades.Where(t => t.Side == OrderSide.Sell).Sum(t => t.Quantity);
+    private void SelectChartSymbol(string symbol) => chartSymbol = symbol;
 
-    private string BuyShareStyle
-    {
-        get
-        {
-            var total = BuyQuantity + SellQuantity;
-            var share = total > 0m ? BuyQuantity / total * 100m : 50m;
-            return $"width:{share.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%";
-        }
-    }
+    private void SetTimeframe(string timeframe) => selectedTimeframe = timeframe;
 
-    /// <summary>Хронология идёт сверху вниз от свежей сделки к старой.</summary>
-    private TradeView[] TradeViews => Enumerable
-        .Range(0, Trades.Count)
-        .Reverse()
-        .Select(BuildTradeView)
-        .ToArray();
-
-    private TradeView BuildTradeView(int index)
-    {
-        var trade = Trades[index];
-        return new TradeView(
-            index,
-            trade.ExecutedAt.ToLocalTime().ToString("HH:mm:ss"),
-            trade.Side == OrderSide.Buy,
-            trade.Price,
-            trade.Quantity);
-    }
+    [JSInvokable]
+    public Task SelectTradeFromChart(int index) => Task.CompletedTask;
 
     // ── Ряды для графиков ───────────────────────────────────────────────────
 
-    private List<ChartPoint> BuildEquitySeries()
-    {
-        var series = report?.PriceSeries;
-        if (series is null || series.Count == 0)
-        {
-            return [];
-        }
-
-        var trades = Trades;
-        var points = new List<ChartPoint>(series.Count);
-        var tradeIndex = 0;
-        var cash = InitialCash;
-        var position = InitialPosition;
-
-        foreach (var pricePoint in series)
-        {
-            while (tradeIndex < trades.Count && trades[tradeIndex].ExecutedAt <= pricePoint.Time)
-            {
-                var trade = trades[tradeIndex];
-                var value = trade.Price * trade.Quantity;
-                if (trade.Side == OrderSide.Buy)
-                {
-                    cash -= value;
-                    position += trade.Quantity;
-                }
-                else
-                {
-                    cash += value;
-                    position -= trade.Quantity;
-                }
-
-                tradeIndex++;
-            }
-
-            var equity = cash + position * pricePoint.Price;
-            points.Add(new ChartPoint(pricePoint.Time.ToUnixTimeSeconds(), equity));
-        }
-
-        return ChartSeries.Downsample(
-            ChartSeries.BucketByInterval(ChartSeries.DedupeBySecond(points), IntervalSeconds),
-            MaxChartPoints);
-    }
+    private int IntervalSeconds => TimeframeSeconds.GetValueOrDefault(selectedTimeframe, 10);
 
     /// <summary>
-    /// Свечи собираются из ряда цен группировкой по интервалу таймфрейма:
-    /// открытие — первая цена корзины, закрытие — последняя. Это оформление
-    /// уже имеющегося ряда, а не новый расчёт.
-    ///
-    /// Объём свечи — разность накопленного объёма на концах корзины: рынок
-    /// хранит его нарастающим итогом, и «объём за свечу» получается только
-    /// вычитанием. У первой свечи предыдущей корзины нет, и точкой отсчёта
-    /// берётся её собственный первый тик — то есть первая свеча показывает
-    /// объём, набранный после открытия, а не весь объём от начала времён.
+    /// Свечи выбранного актива из ряда цен его прогона: открытие — первая цена
+    /// корзины, закрытие — последняя, объём — разность накопленного объёма.
     /// </summary>
     private List<Candle> BuildCandles()
     {
-        var series = report?.PriceSeries;
+        var series = ChartMarket?.Report?.PriceSeries;
+
         if (series is null || series.Count == 0)
         {
             return [];
@@ -895,129 +486,86 @@
         var candles = new List<Candle>();
         decimal? previousTotalVolume = null;
 
-        foreach (var bucket in series
-            .GroupBy(point => point.Time.ToUnixTimeSeconds() / interval)
-            .OrderBy(bucket => bucket.Key))
+        foreach (var bucket in series.GroupBy(point => point.Time.ToUnixTimeSeconds() / interval).OrderBy(bucket => bucket.Key))
         {
             var points = bucket.OrderBy(point => point.Time).ToArray();
             var prices = points.Select(point => point.Price).ToArray();
+            var openTotal = previousTotalVolume ?? points[0].TotalVolume;
+            previousTotalVolume = points[^1].TotalVolume;
 
-            var openTotalVolume = previousTotalVolume ?? points[0].TotalVolume;
-            var closeTotalVolume = points[^1].TotalVolume;
-            previousTotalVolume = closeTotalVolume;
-
-            candles.Add(new Candle(
-                bucket.Key * interval,
-                prices[0],
-                prices.Max(),
-                prices.Min(),
-                prices[^1],
-                Math.Max(0m, closeTotalVolume - openTotalVolume)));
+            candles.Add(new Candle(bucket.Key * interval, prices[0], prices.Max(), prices.Min(), prices[^1],
+                Math.Max(0m, points[^1].TotalVolume - openTotal)));
         }
 
         return candles;
     }
 
     /// <summary>
-    /// Маркер на каждую сделку — один к одному со строками рельса (раздел 10.1).
-    /// Время подтягивается к сетке свечей: библиотека рисует маркер на баре, и
-    /// маркер вне сетки просто не появился бы.
+    /// Метки сделок агента в выбранном активе — не больше одной на свечу и
+    /// сторону: иначе сотни сделок закрывают свечи решёткой точек.
     /// </summary>
     private List<TradeMarker> BuildMarkers(List<Candle> candles)
     {
-        if (candles.Count == 0 || Trades.Count == 0)
+        var trades = ChartTrades;
+
+        if (candles.Count == 0 || trades.Count == 0)
         {
             return [];
         }
 
         var grid = candles.Select(candle => candle.Time).ToArray();
-
-        // Не больше одной отметки на свечу и сторону. Без прореживания сотни
-        // сделок складываются в решётку точек, под которой свечей не видно
-        // вовсе: у трендового агента их бывает за две минуты больше двухсот
-        // (пункт 77 docs/ui-backlog.md). График — главная панель экрана
-        // (раздел 9.11), и отметки не должны его закрывать.
-        //
-        // Выбранная сделка своей отметки не теряет никогда: она вытесняет
-        // соседку по слоту, иначе клик по строке ленты подсвечивал бы пустоту.
         var chosen = new Dictionary<(long Slot, bool IsBuy), TradeMarker>();
 
-        for (var index = 0; index < Trades.Count; index++)
+        for (var index = 0; index < trades.Count; index++)
         {
-            var trade = Trades[index];
-            var seconds = trade.ExecutedAt.ToUnixTimeSeconds();
+            var trade = trades[index];
+            var slot = Array.BinarySearch(grid, trade.ExecutedAt.ToUnixTimeSeconds());
 
-            var slot = Array.BinarySearch(grid, seconds);
             if (slot < 0)
             {
                 slot = ~slot - 1;
             }
 
             slot = Math.Clamp(slot, 0, grid.Length - 1);
-
             var isBuy = trade.Side == OrderSide.Buy;
-            var key = (grid[slot], isBuy);
-            var marker = new TradeMarker(grid[slot], index, isBuy, trade.Price, trade.Quantity);
-
-            if (!chosen.TryGetValue(key, out var existing) || index == ActiveTrade)
-            {
-                chosen[key] = marker;
-            }
-            else if (existing.Index == ActiveTrade)
-            {
-                // Слот уже занят выбранной — она сильнее любой соседки.
-            }
+            chosen.TryAdd((grid[slot], isBuy), new TradeMarker(grid[slot], index, isBuy, trade.Price, trade.Quantity));
         }
 
-        return chosen.Values.OrderBy(marker => marker.Time).ThenBy(marker => marker.Index).ToList();
+        return chosen.Values.OrderBy(marker => marker.Time).ToList();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!HasSession || !IsKnownAgent)
+        if (ledgerCache is null)
         {
             return;
         }
 
-        var priceCount = report?.PriceSeries.Count ?? 0;
-        var tradeCount = TradeCount;
-        var active = ActiveTrade ?? -1;
+        var key = $"{chartSymbol}|{selectedTimeframe}|{ChartMarket?.Report?.PriceSeries.Count}|{ChartTrades.Count}|{ledgerCache.Equity.Count}";
 
-        if (!firstRender
-            && priceCount == renderedPriceCount
-            && tradeCount == renderedTradeCount
-            && selectedTimeframe == renderedTimeframe
-            && active == renderedActiveTrade)
+        if (!firstRender && key == renderedKey)
         {
             return;
         }
 
-        renderedPriceCount = priceCount;
-        renderedTradeCount = tradeCount;
-        renderedTimeframe = selectedTimeframe;
-        renderedActiveTrade = active;
+        renderedKey = key;
 
         try
         {
             chartModule ??= await JS.InvokeAsync<IJSObjectReference>(
                 "import", ResolveModulePath("Components/Pages/AgentDetail.razor.js"));
-
             selfRef ??= DotNetObjectReference.Create(this);
 
+            var tone = ToneKey(Account?.AgentType);
             var candles = BuildCandles();
 
-            await chartModule.InvokeVoidAsync("renderPrice", priceChart, new
-            {
-                candles,
-                trades = BuildMarkers(candles),
-                tone = ToneKey
-            }, selfRef);
+            await chartModule.InvokeVoidAsync("renderPrice", priceChart, new { candles, trades = BuildMarkers(candles), tone }, selfRef);
 
-            await chartModule.InvokeVoidAsync("setActiveTrade", priceChart, active);
-
-            if (tradeCount > 0)
+            if (ledgerCache.Equity.Count > 1)
             {
-                await chartModule.InvokeVoidAsync("renderEquity", equityChart, BuildEquitySeries(), ToneKey);
+                var points = ChartSeries.Downsample(
+                    ChartSeries.BucketByInterval([.. ledgerCache.Equity], IntervalSeconds), 400);
+                await chartModule.InvokeVoidAsync("renderEquity", equityChart, points, tone);
             }
         }
         catch (JSDisconnectedException)
@@ -1025,13 +573,17 @@
         }
         catch (InvalidOperationException)
         {
-            // Элемент ещё не в разметке — следующая отрисовка повторит попытку.
-            renderedPriceCount = -1;
-            renderedTradeCount = -1;
-            renderedTimeframe = "";
-            renderedActiveTrade = -2;
+            renderedKey = string.Empty;
         }
     }
+
+    private static string ToneKey(AgentType? type) => type switch
+    {
+        AgentType.TrendFollowing => "trend",
+        AgentType.CounterTrend => "counter",
+        AgentType.NewsDriven => "news",
+        _ => "mm"
+    };
 
     private string ResolveModulePath(string asset)
     {
@@ -1046,8 +598,7 @@
 
     public void Dispose()
     {
-        SimulationRunner.OnTick -= HandleTick;
-        SimulationRunner.OnStateChanged -= HandleStateChanged;
+        Markets.Changed -= HandleChanged;
         selfRef?.Dispose();
     }
 
@@ -1069,13 +620,7 @@
         }
     }
 
-    private sealed record TradeView(int Index, string Time, bool IsBuy, decimal Price, decimal Quantity);
-    private sealed record Candle(
-        long Time,
-        decimal Open,
-        decimal High,
-        decimal Low,
-        decimal Close,
-        decimal Volume);
+    private sealed record Candle(long Time, decimal Open, decimal High, decimal Low, decimal Close, decimal Volume);
+
     private sealed record TradeMarker(long Time, int Index, bool IsBuy, decimal Price, decimal Quantity);
 }

@@ -1,0 +1,230 @@
+@using System.Globalization
+@using ABStock.Shared
+@using ABStock.UI.Services
+@using static ABStock.UI.Services.NumberFormat
+
+@* Веер силы влияния — раздел 9.26, главный объект «Новостей». Одна
+   новость слева, строки активов справа, между ними связи: толщина связи —
+   сила влияния для этого актива, посчитанная от самого задетого в веере.
+   Незадетый актив — тонкий пунктир, а не пропуск: его проверяли. *@
+
+<div class="ui-fan">
+    <span></span><span></span>
+    <div class="ui-fan__rowhead">
+        <span class="label">Актив</span>
+        <span class="ui-fan__names">
+            @foreach (var zone in Zones)
+            {
+                <span class="ui-fan__name" style="flex:@zone.Share 1 0">@zone.Name</span>
+            }
+        </span>
+        <span class="label right">Цена после</span>
+    </div>
+
+    <div class="ui-fan__card">
+        <span class="ui-fan__card-head">
+            <Badge Tone="@Badge.ForPolarity(Fan.Polarity)">@Badge.LabelOf(Fan.Polarity)</Badge>
+            <span class="caption">уверенность <span class="num-xs t1">@Fan.Confidence.ToString("F2")</span></span>
+        </span>
+        <p class="ui-fan__text">@News.Text</p>
+        <span class="caption">введена вами в <span class="num-xs">@News.At.ToString("HH:mm")</span> · <span class="num-xs">@News.Text.Length</span> @Plural(News.Text.Length, "символ", "символа", "символов")</span>
+    </div>
+
+    <svg class="ui-fan__links" width="96" height="@LinksHeight" viewBox="0 0 96 @LinksHeight"
+         preserveAspectRatio="none" aria-hidden="true">
+        @for (var i = 0; i < Rows.Count; i++)
+        {
+            var row = Rows[i];
+            var y = F(RowHeight * i + RowHeight / 2m);
+            var mid = F(LinksHeight / 2m);
+            <path class="ui-fan__link @LinkClass(row)" d="M0 @mid C48 @mid 48 @y 96 @y"
+                  stroke-width="@LinkWidth(row)" vector-effect="non-scaling-stroke" />
+        }
+    </svg>
+
+    <div class="ui-fan__rows" role="listbox" aria-label="Активы, которые разбирала новость">
+        @foreach (var row in Rows)
+        {
+            var selected = string.Equals(row.Signal.Symbol, SelectedSymbol, StringComparison.OrdinalIgnoreCase);
+            var position = Position(row);
+
+            <div class="ui-fan__row @(selected ? "is-selected" : null) @(row.Signal.WasAnalyzed ? null : "is-muted")"
+                 role="option" tabindex="0" aria-selected="@(selected ? "true" : "false")"
+                 @onclick="() => Select(row)" @onkeydown="@(args => HandleKey(args, row))">
+                <AssetCell Symbol="@row.Signal.Symbol" Name="@row.Name" Sub="@row.Type" Muted="@(!row.Signal.IsHit)" />
+
+                <span class="ui-fan__scale">
+                    <span class="ui-fan__head">
+                        <span class="ui-fan__value @(position > 75m ? "ui-fan__value--end" : null)" style="left:@Percent(position)">
+                            @if (row.Signal.Strength is { } strength)
+                            {
+                                <span class="num-lg">@(ImpactScale.IsBelow(strength) ? $"< {ImpactScale.Min:F2}" : strength.ToString("F2"))</span>
+                                @if (!ImpactScale.IsBelow(strength))
+                                {
+                                    <span class="caption">@ImpactScale.Word(strength)</span>
+                                }
+                                <Badge Tone="@(row.Signal.Direction > 0 ? "up" : "down")">@(row.Signal.Direction > 0 ? "вверх" : "вниз")</Badge>
+                            }
+                            else
+                            {
+                                <span class="caption">@(row.Signal.WasAnalyzed ? "не задет" : "не в торгах")</span>
+                            }
+                        </span>
+                    </span>
+                    <span class="ui-fan__track @(row.Signal.IsHit ? null : "ui-fan__track--off")">
+                        @foreach (var zone in Zones)
+                        {
+                            <span class="ui-fan__zone" style="flex:@zone.Share 1 0"></span>
+                        }
+                        @if (row.Signal.Strength is { } value)
+                        {
+                            <span class="ui-fan__mark @(ImpactScale.IsBelow(value) ? "ui-fan__mark--below" : null)" style="left:@Percent(position)"></span>
+                        }
+                    </span>
+                    <span class="caption ui-fan__factors" title="@FactorsText(row)">@FactorsText(row)</span>
+                </span>
+
+                <span class="ui-fan__after">
+                    @if (PriceAfter(row) is { } after)
+                    {
+                        <span class="num-sm @DeltaTone(after.To - after.From)">@Sign(after.Percent)@Percent2(Math.Abs(after.Percent)) %</span>
+                        <span class="num-xs quiet">@Price2(after.From) → @Price2(after.To)</span>
+                    }
+                    else
+                    {
+                        <span class="nodata">—</span>
+                    }
+                </span>
+            </div>
+        }
+    </div>
+
+    <span></span><span></span>
+    <div class="ui-fan__rowhead ui-fan__rowhead--foot">
+        <span></span>
+        <span class="ui-fan__ticks">
+            <span class="ui-fan__tick ui-fan__tick--first">@ImpactScale.Min.ToString("F2")</span>
+            @foreach (var zone in ImpactScale.Zones.SkipLast(1))
+            {
+                <span class="ui-fan__tick" style="left:@Percent((zone.To - ImpactScale.Min) / (ImpactScale.Max - ImpactScale.Min) * 100m)">@zone.To.ToString("F2")</span>
+            }
+            <span class="ui-fan__tick ui-fan__tick--last">@ImpactScale.Max.ToString("F2")</span>
+        </span>
+        <span></span>
+    </div>
+</div>
+
+@code {
+    /// <summary>Высота строки веера: шкала с подписью значения и строкой факторов.</summary>
+    private const decimal RowHeight = 80m;
+
+    [Parameter, EditorRequired] public SessionEvent News { get; set; } = default!;
+
+    /// <summary>Актив, разобранный в «Разборе» и «Реакции рынка».</summary>
+    [Parameter] public string? SelectedSymbol { get; set; }
+
+    [Parameter] public EventCallback<string> SelectedSymbolChanged { get; set; }
+
+    /// <summary>Имя и тип актива по тикеру — веер помнит только тикеры.</summary>
+    [Parameter, EditorRequired] public Func<string, SessionAsset?> FindAsset { get; set; } = _ => null;
+
+    /// <summary>Текущая цена актива: «цена после» — от цены на момент новости до неё.</summary>
+    [Parameter, EditorRequired] public Func<string, decimal?> CurrentPrice { get; set; } = _ => null;
+
+    private NewsFan Fan => News.Fan!;
+
+    private sealed record Row(AssetSignal Signal, string Name, string Type);
+
+    private IReadOnlyList<Row> Rows =>
+        Fan.Assets
+            .Select(signal =>
+            {
+                var asset = FindAsset(signal.Symbol);
+                return new Row(signal, asset?.Name ?? signal.Symbol,
+                    asset is null ? "удалён" : AgentDisplay.GetAssetTypeLabel(asset.AssetType));
+            })
+            .ToArray();
+
+    private decimal LinksHeight => Math.Max(1, Rows.Count) * RowHeight;
+
+    private static IEnumerable<(string Name, string Share)> Zones
+    {
+        get
+        {
+            var from = ImpactScale.Min;
+
+            foreach (var zone in ImpactScale.Zones)
+            {
+                yield return (zone.Name, F((zone.To - from) / (ImpactScale.Max - ImpactScale.Min) * 100m));
+                from = zone.To;
+            }
+        }
+    }
+
+    /// <summary>Позиция маркера, % шкалы. Честная: (значение − минимум) / (максимум − минимум).</summary>
+    private static decimal Position(Row row) =>
+        row.Signal.Strength is { } strength
+            ? Math.Clamp((strength - ImpactScale.Min) / (ImpactScale.Max - ImpactScale.Min), 0m, 1m) * 100m
+            : 0m;
+
+    /// <summary>
+    /// Толщина связи — от самого задетого актива в веере: он всегда толще
+    /// всех, даже когда абсолютные значения малы (ревью Н-2).
+    /// </summary>
+    private string LinkWidth(Row row)
+    {
+        if (row.Signal.Strength is not { } strength || Fan.MaxImpact <= 0m)
+        {
+            return "1";
+        }
+
+        return F(1.2m + 3.3m * strength / Fan.MaxImpact);
+    }
+
+    private string LinkClass(Row row) =>
+        !row.Signal.WasAnalyzed ? "ui-fan__link--off"
+        : !row.Signal.IsHit ? "ui-fan__link--miss"
+        : row.Signal.Symbol == Fan.Lead?.Symbol ? "ui-fan__link--lead"
+        : null!;
+
+    private static string FactorsText(Row row)
+    {
+        if (!row.Signal.WasAnalyzed)
+        {
+            return "не в торгах — новость не разбиралась";
+        }
+
+        var factors = row.Signal.Signal!.Factors;
+
+        if (!row.Signal.IsHit || factors.Count == 0)
+        {
+            return "совпадений с профилем нет — сигнала нет";
+        }
+
+        return $"{factors.Count} {Plural(factors.Count, "пункт", "пункта", "пунктов")}: "
+            + string.Join(", ", factors.Select(factor => factor.Text.ToLowerInvariant()));
+    }
+
+    private (decimal From, decimal To, decimal Percent)? PriceAfter(Row row)
+    {
+        if (!row.Signal.WasAnalyzed
+            || News.PricesAtNews?.TryGetValue(row.Signal.Symbol, out var from) != true
+            || CurrentPrice(row.Signal.Symbol) is not { } to
+            || from == 0m)
+        {
+            return null;
+        }
+
+        return (from, to, (to - from) / from * 100m);
+    }
+
+    private Task Select(Row row) => SelectedSymbolChanged.InvokeAsync(row.Signal.Symbol);
+
+    private Task HandleKey(KeyboardEventArgs args, Row row) =>
+        args.Key is "Enter" or " " ? Select(row) : Task.CompletedTask;
+
+    /// <summary>Только InvariantCulture: число уезжает в CSS и SVG.</summary>
+    private static string F(decimal value) => value.ToString("0.##", CultureInfo.InvariantCulture);
+
+    private static string Percent(decimal value) => F(value) + "%";
+}

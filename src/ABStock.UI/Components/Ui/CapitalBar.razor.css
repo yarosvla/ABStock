@@ -1,0 +1,17 @@
+/* Полоса капитала — раздел 9.28. */
+
+.ui-capbar {
+    display: flex;
+    gap: 2px;
+}
+
+.ui-capbar__part {
+    display: block;
+    height: 6px;
+    border-radius: 2px;
+}
+
+.ui-capbar__part--agent-trend   { background: var(--agent-trend); }
+.ui-capbar__part--agent-counter { background: var(--agent-counter); }
+.ui-capbar__part--agent-mm      { background: var(--agent-mm); }
+.ui-capbar__part--agent-news    { background: var(--agent-news); }

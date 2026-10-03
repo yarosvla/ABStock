@@ -1,0 +1,26 @@
+@using ABStock.Shared
+
+@* Перечень факторов профиля. Свойство актива, а не сигнал: без цвета, с
+   точкой-маркером (раздел 3 — «свойство без цвета, сработавшее в сигнале —
+   с цветом»). Вес фактора — в подсказке. *@
+
+@if (Factors.Count > 0)
+{
+    <ul class="ui-factors">
+        @foreach (var factor in Factors)
+        {
+            <li class="ui-factors__item">
+                <span class="ui-factors__dot" aria-hidden="true"></span>
+                <span class="ui-factors__text" title="@($"{factor.Name} · вес {factor.Importance:F2}")">@factor.Name</span>
+            </li>
+        }
+    </ul>
+}
+else
+{
+    <p class="ui-factors__empty">—</p>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AssetFactor> Factors { get; set; } = [];
+}

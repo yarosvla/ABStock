@@ -28,107 +28,64 @@
 }
 
 /* ============================================================================
-   Полоса связи — содержимое шагов.
-   Сама полоса и стрелки живут в ките (раздел 9.19).
+   Раскладка: левый рельс — хронология (раздел 13), справа — разбор новости.
    ============================================================================ */
-.strip__idle { font: var(--t-body-sm); color: var(--text-quiet); }
-.strip__dash { color: var(--text-4); }
-.strip__value { color: var(--text-1); }
-.strip__impact { color: var(--text-1); }
-.strip__was { color: var(--text-3); }
-
-/* Полоса связи не растёт в высоту (раздел 9.19): пояснение шага сокращается
-   до двух строк, целиком оно остаётся в подсказке. Селектор с именем тега —
-   чтобы правило выигрывало у одноимённого правила кита детерминированно,
-   а не по порядку сборки стилей. */
-main.news-page ::deep .ui-causality__note {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-}
-
-.strip__agent {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    font: var(--t-body-sm);
-    color: var(--text-1);
-}
-
-/* Бейдж-состояние — раздел 9.6. Окрашен только то, что предсказывает
-   направление цены: тональность новости и сработавший фактор (раздел 3). */
-.badge {
-    display: inline-flex;
-    align-items: center;
-    align-self: flex-start;
-    height: var(--s-5);
-    padding: 0 var(--s-2);
-    border-radius: var(--r-pill);
-    font: var(--t-caption);
-    white-space: nowrap;
-}
-
-.badge--up   { background: var(--up-soft);   color: var(--up-400); }
-.badge--down { background: var(--down-soft); color: var(--down-400); }
-.badge--warn { background: var(--warn-soft); color: var(--warn-500); }
-
-.num-sm--bright { color: var(--text-1); }
-
-/* ============================================================================
-   Рабочая область: левый рельс 280 · центр fluid · правый рельс 340
-   ============================================================================ */
-.workspace {
-    flex: 1;
+.news-layout {
     display: grid;
-    grid-template-columns: var(--rail-left) minmax(var(--center-min), 1fr) var(--rail-right);
+    grid-template-columns: var(--rail-left) minmax(0, 1fr);
     gap: var(--gutter);
-    /* Раздел 7.1: колонки выравниваются по верху, панель не растягивается
-       пустотой ради ровного нижнего края. */
     align-items: start;
 }
 
-.rail,
-.center {
+.news-main {
     display: flex;
     flex-direction: column;
     gap: var(--gutter);
     min-width: 0;
 }
 
-/* Брейкпоинты. ВНИМАНИЕ: var() в условии @media невалиден по спецификации CSS,
-   поэтому здесь единственные литералы в файле. Значения обязаны совпадать
-   с --bp-md (1440) и --bp-sm (1280) из design-system.css. */
-
-/* < --bp-md: правый рельс --rail-right-md */
-@media (max-width: 1439px) {
-    .news-page { padding: var(--s-5); }
-    .workspace { grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right-md); }
-}
-
-/* < --bp-sm: первым сворачивается левый рельс, а не появляется скролл */
-@media (max-width: 1279px) {
-    .workspace { grid-template-columns: minmax(0, 1fr) var(--rail-right-md); }
-    .rail--left {
-        grid-column: 1 / -1;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-    }
-}
-
-/* ============================================================================
-   Левый рельс — хронология событий сессии
-   ============================================================================ */
+/* Хронология прокручивается внутри панели, а не страницей (раздел 9.8). */
 .events {
     display: flex;
     flex-direction: column;
-    max-height: calc(var(--h-row-tall) * 8);
+    max-height: calc(var(--h-row-tall) * 14);
     overflow-y: auto;
 }
 
+.events__row { cursor: pointer; }
+.events__row:focus-visible { outline-offset: -2px; }
+
+.news-title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.news-title h2 {
+    margin: 0;
+    font: var(--t-h2);
+    letter-spacing: -0.015em;
+    color: var(--text-1);
+}
+
+/* «Разбор» и «Реакция рынка» — пара равной ширины под веером. */
+.news-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--gutter);
+    align-items: start;
+}
+
+.news-note {
+    margin: 0;
+    padding: var(--s-5);
+    font: var(--t-body-sm);
+    color: var(--text-3);
+    text-wrap: pretty;
+}
+
 /* ============================================================================
-   Центр — ввод новости
+   Ввод новости
    ============================================================================ */
 .composer { display: flex; flex-direction: column; gap: var(--s-3); }
 
@@ -190,125 +147,119 @@ main.news-page ::deep .ui-causality__note {
 .composer__actions { display: flex; align-items: center; gap: var(--s-4); }
 .composer__count { color: var(--text-3); }
 
-/* ---------- строка новостного агента ---------- */
-.agent-line {
+/* ============================================================================
+   Разбор: формула одной строкой и сработавшие факторы
+   ============================================================================ */
+.formula {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-5);
+}
+
+.formula__term {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+}
+
+.formula__term--result {
+    padding-left: var(--s-3);
+    border-left: 1px solid var(--line-2);
+}
+
+.formula__op { font: var(--n-lg); color: var(--text-quiet); }
+
+.factors-head {
     display: flex;
     align-items: center;
-    gap: var(--s-3);
-    min-width: 0;
-}
-
-.agent-line__label { flex: none; }
-.agent-line__name { flex: none; }
-.agent-line__name { font: var(--t-body-sm); color: var(--text-1); white-space: nowrap; }
-
-/* Объяснение решения агента здесь главное, поэтому пишется целиком:
-   обрезка живёт в шаге полосы связи, а не в этом блоке. */
-.agent-line__state {
-    flex: 1;
-    min-width: 0;
-    font: var(--t-body-sm);
-    color: var(--text-3);
-    text-wrap: pretty;
-}
-
-.agent-line__metric {
-    flex: none;
-    font: var(--t-caption);
-    color: var(--text-3);
-}
-.agent-line__metric .num-sm { color: var(--text-1); }
-
-/* ============================================================================
-   Центр — разбор
-   ============================================================================ */
-.news-text__head {
-    display: flex;
-    align-items: baseline;
     justify-content: space-between;
-    gap: var(--s-4);
-    margin-bottom: var(--s-3);
+    padding: var(--s-3) var(--s-5) var(--s-2);
+    border-top: 1px solid var(--line-1);
 }
-
-.news-text__meta { flex: none; font: var(--t-caption); color: var(--text-3); white-space: nowrap; }
-.news-text__meta .num-sm { color: var(--text-2); }
-
-.news-text__body {
-    margin: 0;
-    font: var(--t-body);
-    color: var(--text-1);
-    text-wrap: pretty;
-}
-
-.explanation {
-    margin: 0;
-    font: var(--t-body-sm);
-    color: var(--text-2);
-    text-wrap: pretty;
-}
-
-/* ---------- сработавшие факторы ---------- */
-.factors { display: flex; flex-direction: column; }
 
 .factor {
     display: flex;
-    align-items: center;
-    gap: var(--s-4);
-    min-height: var(--h-row-tall);
-    padding: 0 var(--s-4);
-    border-bottom: 1px solid var(--line-1);
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-5);
+    border-top: 1px solid var(--line-1);
 }
 
-.factor:last-child { border-bottom: 0; }
-/* align-self: center возвращает бейдж на середину строки: у .badge стоит
-   flex-start — он нужен ему в колонках, — и в строке высотой --h-row-tall
-   бейдж прижимался к верхней линии. */
-.factor__kind { flex: none; align-self: center; justify-content: center; min-width: calc(var(--s-18) + var(--s-8)); }
-
 .factor__text {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     min-width: 0;
+}
+
+.factor__name { font: var(--t-body-sm); color: var(--text-1); }
+
+.agent-name {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    flex: none;
+    width: 120px;
     font: var(--t-body-sm);
     color: var(--text-1);
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.factor__excerpt { flex: none; font: var(--t-caption); color: var(--text-3); }
+/* ============================================================================
+   Реакция рынка: ход цены с отметкой новости
+   ============================================================================ */
+.reaction { padding: var(--s-4) var(--s-5) var(--s-2); }
 
-/* Список формулировок анализатор пока не отдаёт — на его месте сводка
-   по количествам, а не выдуманные строки. */
-.factors-summary {
+.reaction__head {
     display: flex;
-    flex-direction: column;
+    align-items: baseline;
     gap: var(--s-3);
-    padding: var(--s-4);
+    margin-bottom: var(--s-3);
 }
 
-.factors-summary__note {
-    margin: 0;
-    font: var(--t-caption);
-    color: var(--text-3);
-    text-wrap: pretty;
+.reaction__plot {
+    position: relative;
+    height: 96px;
 }
 
-.factors-summary__note .num-sm { color: var(--text-2); }
+.reaction__plot svg { position: absolute; inset: 0; overflow: visible; }
 
-/* ---------- загрузка ---------- */
-.loading { display: flex; flex-direction: column; gap: var(--s-4); }
+.reaction__open { fill: none; stroke: var(--line-3); stroke-width: 1; stroke-dasharray: 2 3; }
+.reaction__news { fill: none; stroke: var(--chart-news); stroke-width: 1; stroke-dasharray: 3 3; }
+.reaction__line { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.reaction__line--up   { stroke: var(--up-fill); }
+.reaction__line--down { stroke: var(--down-fill); }
+.reaction__line--flat { stroke: var(--text-3); }
 
-.loading__block {
+.reaction__label {
+    position: absolute;
+    top: 0;
+    margin-left: var(--s-1);
+    font: var(--n-xs);
+    color: var(--text-2);
+    white-space: nowrap;
+}
+
+.reaction__axis {
     display: flex;
-    flex-direction: column;
-    gap: var(--s-2);
+    justify-content: space-between;
+    margin-top: var(--s-1);
+    color: var(--text-quiet);
 }
 
-.loading__block.hairline-top { padding-top: var(--s-4); }
-.loading__row { display: flex; justify-content: space-between; }
+/* ============================================================================
+   Загрузка и ошибка разбора
+   ============================================================================ */
+.news-loading { display: flex; flex-direction: column; gap: var(--s-5); }
 
-/* ---------- ошибка анализа ---------- */
-.center ::deep .news-error { overflow: hidden; }
+.news-loading__row {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr) 80px;
+    gap: var(--s-6);
+    align-items: center;
+}
 
 .error-bar {
     display: flex;
@@ -338,38 +289,11 @@ main.news-page ::deep .ui-causality__note {
     color: var(--text-3);
 }
 
-/* ============================================================================
-   Правый рельс — состояние на сейчас
-   ============================================================================ */
-.profile { display: flex; flex-direction: column; gap: var(--s-4); }
+.caption { font: var(--t-caption); color: var(--text-3); }
+.num-md { font: var(--n-md); font-variant-numeric: tabular-nums; }
+.t2 { color: var(--text-2); }
+.t3 { color: var(--text-3); }
 
-.profile__block {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-3);
-    padding-top: var(--s-4);
+@media (max-width: 1439px) {
+    .news-page { padding: var(--s-5); }
 }
-
-.profile__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--s-3);
-}
-
-.profile__meta { font: var(--t-caption); color: var(--text-3); }
-
-/* ---------- рынок ---------- */
-.market { display: flex; flex-direction: column; gap: var(--s-3); }
-
-
-.kv__row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--s-3);
-    min-height: var(--h-row-dense);
-}
-
-.kv dt { font: var(--t-caption); color: var(--text-3); }
-.kv dd { margin: 0; color: var(--text-1); }

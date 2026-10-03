@@ -7,8 +7,8 @@
 @using static ABStock.UI.Services.NumberFormat
 @implements IDisposable
 @inject ISimulationHistoryReader SimulationHistoryReader
-@inject IActiveAssetContext ActiveAssetContext
-@inject ISimulationRunner SimulationRunner
+@inject IAssetRegistry Registry
+@inject ISessionMarkets Markets
 @inject IUserPreferences Preferences
 
 <PageTitle>Профиль</PageTitle>
@@ -22,12 +22,7 @@
 
         @* Крошки — раздел 13. Чипа сессии на этой странице нет: «Профиль»
            не про прогон, а про настройки. *@
-        <Breadcrumbs Items="@(new Crumb[]
-                     {
-                         new("Активы", Href: "/create-asset"),
-                         new(CurrentAsset.Draft.Name, IsAsset: true),
-                         new("Профиль")
-                     })" />
+        <Breadcrumbs Items="@(new Crumb[] { new("Активы", Href: "/assets"), new("Профиль") })" />
 
         <PageHead Title="Профиль">
             <Context>Настройки интерфейса и итоги работы</Context>
@@ -163,7 +158,7 @@
 
                                         <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
 
-                                        <TextField Value="@CurrentAsset.Draft.Name"
+                                        <TextField Value="@SampleName"
                                                    Label="Пример поля в фокусе"
                                                    Class="preview__field" />
 
@@ -211,7 +206,7 @@
 
                                         <AppButton Variant="primary" Size="32">Запустить торги</AppButton>
 
-                                        <TextField Value="@CurrentAsset.Draft.Name"
+                                        <TextField Value="@SampleName"
                                                    Label="Пример поля без акцента"
                                                    Class="preview__field" />
 
@@ -325,43 +320,34 @@
             @* ── Правая колонка: состояние на сейчас и итоги (раздел 13). ── *@
             <div class="profile-col profile-col--side">
 
-                <Panel Title="Текущий контекст" Class="rise rise-2">
+                <Panel Title="Сессия" Class="rise rise-2">
                     <ChildContent>
                         <dl class="kv">
                             <div class="kv__row">
-                                <dt>Актив</dt>
-                                <dd>@CurrentAsset.Draft.Name</dd>
-                            </div>
-                            <div class="kv__row">
-                                <dt>Символ</dt>
-                                <dd class="num-sm">@CurrentAsset.Symbol</dd>
-                            </div>
-                            <div class="kv__row">
-                                <dt>Тип</dt>
-                                @* Отрасль приписывается через разделитель, только
-                                   если она задана: иначе в строке остаётся
-                                   висячая точка «Акция ·». *@
-                                <dd>
-                                    @AgentDisplay.GetAssetTypeLabel(CurrentAsset.Draft.AssetType)@(string.IsNullOrWhiteSpace(CurrentAsset.Draft.Industry) ? null : $" · {CurrentAsset.Draft.Industry}")
-                                </dd>
+                                <dt>Активы</dt>
+                                <dd class="num-sm">@(Registry.Assets.Count == 0 ? "—" : string.Join(" · ", Registry.Assets.Select(asset => asset.Symbol)))</dd>
                             </div>
                             <div class="kv__row">
                                 <dt>Торги</dt>
                                 <dd class="kv__state">
                                     <StatusDot Tone="@(IsRunning ? "up" : "muted")" Live="IsRunning" />
-                                    @if (IsRunning && SessionStartedAt is not null)
+                                    @if (IsRunning && Markets.StartedAt is { } started)
                                     {
-                                        <text>идут с <span class="num-sm">@SessionStartedAt.Value.ToString("HH:mm")</span></text>
+                                        <text>идут с <span class="num-sm">@started.ToString("HH:mm")</span></text>
                                     }
-                                    else if (IsRunning)
-                                    {
-                                        <text>идут</text>
-                                    }
-                                    else
+                                    else if (Markets.HasSession)
                                     {
                                         <text>остановлены</text>
                                     }
+                                    else
+                                    {
+                                        <text>не запускались</text>
+                                    }
                                 </dd>
+                            </div>
+                            <div class="kv__row">
+                                <dt>Агентов</dt>
+                                <dd class="num-sm">@(Markets.Accounts.Count == 0 ? "—" : Count0(Markets.Accounts.Count))</dd>
                             </div>
                         </dl>
                     </ChildContent>
@@ -440,7 +426,7 @@
                                         Title="События ещё не записаны"
                                         Description="Создайте актив и запустите торги — здесь появится хронология сессии.">
                                 <Action>
-                                    <AppButton Variant="primary" Size="32" Href="/create-asset">Создать актив</AppButton>
+                                    <AppButton Variant="primary" Size="32" Href="/assets/new">Создать актив</AppButton>
                                 </Action>
                             </EmptyState>
                         }
@@ -496,8 +482,10 @@
     /// </summary>
     private readonly ElementReference[] swatchRefs = new ElementReference[UserPreferences.Accents.Count];
 
-    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
-    private bool IsRunning => SimulationRunner.IsRunning;
+    private bool IsRunning => Markets.IsRunning;
+
+    /// <summary>Пример текста в предпросмотре поля — название первого актива, если он есть.</summary>
+    private string SampleName => Registry.Assets.FirstOrDefault()?.Name ?? "Гелиос Энерго";
     private string Initials => UserPreferences.GetInitials(Preferences.OperatorName);
     private bool HasRuns => historyOverview.RunCount > 0;
 
@@ -527,33 +515,6 @@
             .Select(option => new SegmentedItem<string>(option.Key, option.Label))
             .ToArray();
 
-    /// <summary>
-    /// Время начала сессии — из той же сводки прогона, что у чипа сессии на
-    /// «Торгах» и «Агентах». Четвёртого счётчика здесь нет: два источника
-    /// одного и того же времени расходятся по построению.
-    /// </summary>
-    private DateTimeOffset? SessionStartedAt
-    {
-        get
-        {
-            var runId = SimulationRunner.CurrentRunId;
-
-            if (runId == Guid.Empty)
-            {
-                return null;
-            }
-
-            try
-            {
-                return SimulationHistoryReader.GetRun(runId)?.StartedAt.ToLocalTime();
-            }
-            catch (Exception)
-            {
-                return null;
-            }
-        }
-    }
-
     private TotalRow[] Totals =>
     [
         new("Сессий", Format(historyOverview.RunCount)),
@@ -573,8 +534,7 @@
     protected override void OnInitialized()
     {
         LoadHistory();
-        SimulationRunner.OnTick += HandleSimulationTick;
-        SimulationRunner.OnStateChanged += HandleStateChanged;
+        Markets.Changed += HandleStateChanged;
         Preferences.Changed += HandlePreferencesChanged;
     }
 
@@ -588,8 +548,7 @@
 
     public void Dispose()
     {
-        SimulationRunner.OnTick -= HandleSimulationTick;
-        SimulationRunner.OnStateChanged -= HandleStateChanged;
+        Markets.Changed -= HandleStateChanged;
         Preferences.Changed -= HandlePreferencesChanged;
     }
 
@@ -618,22 +577,20 @@
         LoadHistory();
     }
 
-    private void HandleSimulationTick(SimulationTickResult tickResult)
+    /// <summary>
+    /// Шаг сессии: статус торгов перерисовывается сразу, итоги из хранилища
+    /// перечитываются не на каждом шаге — это несколько запросов к базе.
+    /// </summary>
+    private void HandleStateChanged() => _ = InvokeAsync(() =>
     {
-        if (++ticksSinceHistoryRefresh < HistoryRefreshTickInterval)
+        if (++ticksSinceHistoryRefresh >= HistoryRefreshTickInterval || !Markets.IsRunning)
         {
-            return;
+            ticksSinceHistoryRefresh = 0;
+            LoadHistory();
         }
 
-        ticksSinceHistoryRefresh = 0;
-        _ = InvokeAsync(() =>
-        {
-            LoadHistory();
-            StateHasChanged();
-        });
-    }
-
-    private void HandleStateChanged() => _ = InvokeAsync(StateHasChanged);
+        StateHasChanged();
+    });
 
     private void HandlePreferencesChanged() => _ = InvokeAsync(StateHasChanged);
 

@@ -1,0 +1,32 @@
+@using ABStock.Shared
+
+@* Бейдж-состояние — раздел 9.6. Окрашен только то, что предсказывает
+   направление цены: тональность новости и сработавший фактор (раздел 3).
+   Остальные состояния — нейтральные: flat (тип, «нейтральная») и wait
+   (контурный: «не торговался», «ждёт»). *@
+
+<span class="ui-badge ui-badge--@Tone @Class">@ChildContent</span>
+
+@code {
+    /// <summary>up · down · warn · flat · wait</summary>
+    [Parameter] public string Tone { get; set; } = "flat";
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    [Parameter] public string? Class { get; set; }
+
+    /// <summary>Тон бейджа тональности новости.</summary>
+    public static string ForPolarity(SignalPolarity polarity) => polarity switch
+    {
+        SignalPolarity.Positive => "up",
+        SignalPolarity.Negative => "down",
+        _ => "flat"
+    };
+
+    public static string LabelOf(SignalPolarity polarity) => polarity switch
+    {
+        SignalPolarity.Positive => "Позитивная",
+        SignalPolarity.Negative => "Негативная",
+        _ => "Нейтральная"
+    };
+}

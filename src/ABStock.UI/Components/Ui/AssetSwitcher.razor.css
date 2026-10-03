@@ -1,0 +1,159 @@
+/* Свитчер актива — раздел 9.24. */
+
+.ui-switch {
+    position: relative;
+    display: inline-flex;
+
+    /* Размеры поповера: ширина и колонки цены и изменения. Не системные
+       величины, но объявлены один раз здесь (раздел 8). */
+    --w-switch: 420px;
+    --w-switch-price: 72px;
+    --w-switch-delta: 64px;
+}
+
+/* Кнопка в крошках: 13px --text-1, тикер 11px --text-2, высота --h-crumbs.
+   Заметнее остального пути: при переключении меняется именно она. */
+.ui-switch__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s-1);
+    height: var(--h-crumbs);
+    padding: 0 var(--s-1);
+    margin: 0 calc(var(--s-1) * -1);
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    font: 500 var(--fs-dense)/1 var(--font-ui);
+    color: var(--text-1);
+    cursor: pointer;
+    transition: background-color var(--d-fast) var(--e-out);
+}
+
+.ui-switch__trigger:hover,
+.ui-switch__trigger.is-open { background: var(--fill-soft); }
+
+.ui-switch__ticker {
+    font: var(--n-xs);
+    letter-spacing: 0.02em;
+    color: var(--text-2);
+}
+
+/* Клик мимо поповера закрывает его. Слой прозрачный: затемнять экран ради
+   выпадающего списка — это модалка, а не список. */
+.ui-switch__layer {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-dropdown);
+}
+
+.ui-switch__popover {
+    position: absolute;
+    top: calc(var(--h-crumbs) + var(--s-2));
+    left: calc(var(--s-3) * -1);
+    z-index: calc(var(--z-dropdown) + 1);
+    display: flex;
+    flex-direction: column;
+    width: var(--w-switch);
+    border-radius: var(--r-lg);
+    animation: ui-switch-in var(--d-base) var(--e-enter) both;
+}
+
+@keyframes ui-switch-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+.ui-switch__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--s-10);
+    padding: 0 var(--s-4);
+    border-bottom: 1px solid var(--line-1);
+}
+
+.ui-switch__summary,
+.ui-switch__sub {
+    font: var(--t-caption);
+    color: var(--text-3);
+}
+
+.ui-switch__list {
+    display: flex;
+    flex-direction: column;
+    padding: var(--s-1);
+}
+
+.ui-switch__row {
+    display: grid;
+    grid-template-columns: var(--w-ticker) minmax(0, 1fr) var(--w-switch-price) var(--w-switch-delta) var(--s-4);
+    align-items: center;
+    column-gap: var(--s-3);
+    min-height: var(--s-10);
+    padding: var(--s-1) var(--s-3);
+    border-radius: var(--r-sm);
+    color: var(--text-1);
+    text-decoration: none;
+}
+
+.ui-switch__row:hover,
+.ui-switch__row:focus-visible { background: var(--gph-750); }
+
+/* Выбранная строка — как в 9.4: подложка выбранного, галочка справа. */
+.ui-switch__row.is-current { background: var(--acc-soft); }
+
+.ui-switch__name {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.ui-switch__title {
+    font: var(--t-body-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ui-switch__title.is-muted { color: var(--text-2); }
+
+.ui-switch__price {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.ui-switch__start { color: var(--text-3); }
+
+.ui-switch__delta {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.ui-switch__check {
+    display: flex;
+    color: var(--text-1);
+}
+
+.ui-switch__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--s-10);
+    padding: 0 var(--s-2) 0 var(--s-4);
+    border-top: 1px solid var(--line-1);
+}
+
+.ui-switch__all {
+    font: var(--t-caption);
+    color: var(--text-2);
+    text-decoration: none;
+}
+
+.ui-switch__all:hover { color: var(--text-1); }
+
+@media (prefers-reduced-motion: reduce) {
+    .ui-switch__popover { animation: none; }
+}

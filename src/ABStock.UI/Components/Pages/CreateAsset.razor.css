@@ -17,6 +17,7 @@
 }
 
 .create-page {
+    --w-create-rail: 380px;  /* рельс «Что получится» и слоты, артборд — 380 */
     flex: 1;
     /* min-height: 0 — пара к height у оболочки. Без него флекс-элемент не даёт
        себя сжать ниже содержимого, и ограничение оболочки не работает. */
@@ -35,7 +36,7 @@
    не растягивается пустотой ради ровного нижнего края (раздел 7.1). */
 .layout {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: minmax(0, 1fr) var(--w-create-rail);
     gap: var(--gutter);
     align-items: start;
 }
@@ -56,67 +57,6 @@
 .create-page ::deep .ui-page-head__title { gap: var(--s-2); min-width: 0; }
 .create-page ::deep .ui-page-head__context { font: var(--t-body-sm); }
 .create-page ::deep .ui-page-head__actions { flex: none; }
-
-.page-foot {
-    margin: 0;
-    padding-top: var(--s-3);
-    font: var(--t-body-sm);
-    color: var(--text-3);
-}
-
-/* ---------- имя актива и тикер ---------- */
-.asset {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: var(--s-4);
-    min-width: 0;
-}
-
-.asset__rule {
-    align-self: center;
-    width: 1px;
-    height: var(--h-ctl-sm);
-    background: var(--line-3);
-}
-
-.asset__ticker {
-    font: var(--n-hero);
-    font-weight: 500;
-    color: var(--text-2);
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-/* ---------- чипы и бейджи (9.6) ---------- */
-.chip {
-    align-self: center;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--s-1);
-    height: 22px;
-    padding: 0 var(--s-2);
-    border-radius: var(--r-pill);
-    background: var(--fill-soft);
-    font: var(--t-caption);
-    color: var(--text-2);
-}
-
-.chip .num-sm { color: var(--text-1); }
-
-.badge {
-    align-self: center;
-    display: inline-flex;
-    align-items: center;
-    height: 20px;
-    padding: 0 var(--s-2);
-    border-radius: var(--r-pill);
-    font: var(--t-caption);
-    font-weight: 500;
-}
-
-.badge--warn { background: var(--warn-soft); color: var(--warn-500); }
-
 
 /* ============================================================================
    Форма
@@ -224,8 +164,13 @@
 .type strong { font: var(--t-h3); color: var(--text-1); }
 .type small  { font: var(--t-caption); color: var(--text-3); }
 
-.type:hover { background: var(--gph-750); border-color: var(--line-3); }
-.type:hover small { color: var(--text-2); }
+.type:hover:not(:disabled) { background: var(--gph-750); border-color: var(--line-3); }
+.type:hover:not(:disabled) small { color: var(--text-2); }
+
+/* Правка описания: тип актива не меняется, остальные плитки выключены. */
+.type:disabled { cursor: not-allowed; }
+.type:disabled strong,
+.type:disabled small { color: var(--text-4); }
 
 /* Выбранная плитка. В белой теме (раздел 19) выбор читается формой, а не
    оттенком: кромка 1,5px (--selected-ring добирает полпикселя inset-тенью,
@@ -380,7 +325,7 @@
     padding: var(--s-4) var(--s-6);
 }
 
-.form__note { margin: 0; font: var(--t-caption); color: var(--text-3); }
+.form__note { display: flex; align-items: center; gap: var(--s-2); margin: 0; font: var(--t-caption); color: var(--text-3); }
 .form__actions { display: flex; align-items: center; gap: var(--s-2); flex: none; }
 
 .form__verdict {
@@ -418,102 +363,6 @@
     color: var(--text-3);
     text-wrap: pretty;
 }
-
-/* ============================================================================
-   Профиль
-   ============================================================================ */
-.profile {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-4);
-    min-width: 0;
-}
-
-.balance { display: flex; flex-direction: column; gap: var(--s-2); }
-
-.balance__head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--s-3);
-}
-
-.balance__meta { font: var(--t-caption); color: var(--text-3); }
-.balance__meta .num-sm { color: var(--text-1); }
-
-.factors {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--gutter);
-    align-items: start;
-}
-
-.factors__empty { margin: 0; padding: var(--s-4) var(--s-5); color: var(--text-quiet); }
-
-.factor-list {
-    margin: 0;
-    padding: 0 var(--s-4) var(--s-2);
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-}
-
-/* Маркер прижат к ПЕРВОЙ строке, а не к центру блока: у фактора в две строки
-   он уезжал на середину и переставал читаться как начало пункта. Отступ сверху
-   доводит его до базовой линии первой строки — align-items: baseline тут не
-   годится, у точки нет своей базовой линии. Пункт 84 docs/ui-backlog.md. */
-.factor {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--s-2);
-    padding: var(--s-3) 0;
-    min-height: var(--h-row-tall);
-    border-bottom: 1px solid var(--line-1);
-}
-
-.factor:last-child { border-bottom: 0; }
-
-.factor__dot {
-    flex: none;
-    margin-top: calc((20px - 4px) / 2);  /* половина интерлиньяжа --t-body минус радиус */
-    width: 4px;
-    height: 4px;
-    border-radius: var(--r-pill);
-    background: var(--text-3);
-}
-
-.factor__text {
-    min-width: 0;
-    font: var(--t-body);
-    color: var(--text-1);
-    text-wrap: pretty;
-}
-
-/* ---------- исходное описание ---------- */
-.source__text {
-    margin: 0;
-    font: var(--t-body-sm);
-    color: var(--text-2);
-    text-wrap: pretty;
-}
-
-.source__spec {
-    margin: var(--s-4) 0 0;
-    padding-top: var(--s-3);
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-2);
-}
-
-.source__row {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--s-3);
-}
-
-.source__spec dt { font: var(--t-body-sm); color: var(--text-3); }
-.source__spec dd { margin: 0; font: var(--t-body-sm); color: var(--text-1); }
 
 /* ============================================================================
    Загрузка — скелетон по форме будущего профиля (9.16)
@@ -570,59 +419,45 @@
 }
 
 /* ============================================================================
-   Подтверждение (9.12)
+   Тикер до создания и слоты сессии (DESIGN.md 16.1)
    ============================================================================ */
-.overlay { display: flex; align-items: center; justify-content: center; }
+.ticker-preview {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
 
-.confirm {
-    width: var(--w-modal);
-    max-width: calc(100vw - var(--s-10));
-    padding: var(--s-6);
+.create-rail {
     display: flex;
     flex-direction: column;
-    gap: var(--s-3);
-    border-radius: var(--r-xl);
-    isolation: isolate;
-    animation: rise var(--d-base) var(--e-enter) both;
+    gap: var(--gutter);
+    min-width: 0;
 }
 
-.confirm h2 { font: var(--t-h2); }
-.confirm__text { margin: 0; font: var(--t-body-sm); color: var(--text-2); text-wrap: pretty; }
+/* Восемь слотов — предел сессии: занятые с тикером и состоянием, свободные
+   пунктиром. Видно, сколько места осталось, без счёта в уме. */
+.slots {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-2);
+    padding: var(--s-4);
+}
 
-.confirm__meta {
+.slot {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: var(--s-5);
+    gap: var(--s-1);
+    min-height: var(--s-14);
+    padding: var(--s-2) var(--s-1);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-md);
+}
+
+.slot--new { border-color: var(--line-3); background: var(--gph-750); }
+.slot--free { border-style: dashed; border-color: var(--line-2); }
+
+.slot__state {
     font: var(--t-caption);
     color: var(--text-3);
-}
-
-.confirm__meta .num-sm { color: var(--text-1); }
-
-.confirm__actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--s-2);
-    margin-top: var(--s-1);
-}
-
-/* ============================================================================
-   Брейкпоинты. var() в условии @media невалиден по спецификации CSS, поэтому
-   здесь единственные литералы в файле. Значения обязаны совпадать с --bp-md
-   (1440) и --bp-sm (1280) из design-system.css.
-   ============================================================================ */
-@media (max-width: 1439px) {
-    .create-page { padding: var(--s-5); }
-    .field { padding: var(--s-4) var(--s-5) 0; }
-    .form__foot { margin-top: var(--s-4); padding: var(--s-4) var(--s-5); }
-    .form__verdict { padding: var(--s-3) var(--s-5) var(--s-4); }
-}
-
-@media (max-width: 1279px) {
-    /* Правая колонка уходит под контент: горизонтальный скролл важнее
-       формального сохранения двух колонок (раздел 8). */
-    .layout { grid-template-columns: minmax(0, 1fr); }
-    .params { grid-template-columns: 1fr 1fr; }
-    .asset { gap: var(--s-3); }
 }

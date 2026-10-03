@@ -1,0 +1,305 @@
+/* ============================================================================
+   Активы — пульт сессии (DESIGN.md 16.0). Слева список активов, справа
+   пульт: время, состав агентов, запуск. Здесь только раскладка; всё
+   оформление — через var(--...) из design-system.css (раздел 18.3).
+   ============================================================================ */
+
+.assets-shell {
+    position: relative;
+    z-index: var(--z-content);
+    display: flex;
+    flex-direction: column;
+    /* Оболочка — ровно один экран (раздел 13, «Модель оболочки»). */
+    height: 100vh;
+    overflow-y: auto;
+}
+
+.assets-page {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    max-width: var(--page-max);
+    margin-inline: auto;
+    padding: var(--page-pad);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-5);
+
+    /* ---------- размеры этой страницы ----------
+       Колонки одной таблицы — не системные величины, но и рассыпаться по
+       правилам они не должны: объявлены здесь один раз (раздел 8). */
+    --w-col-asset: 220px;
+    --w-col-price: 104px;
+    --w-col-volume: 84px;
+    --w-col-news: 148px;
+    --w-col-sens: 200px;
+    --w-col-go: 28px;
+    /* Компактный степпер: две кнопки по 22 и число между ними. */
+    --w-col-count: 56px;
+    --w-col-capital: 84px;
+}
+
+@media (max-width: 1439px) {
+    .assets-page { padding: var(--s-5); }
+}
+
+/* Колонки выравниваются по верху; панели — по содержимому (раздел 7.1). */
+.assets-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--rail-right);
+    gap: var(--gutter);
+    align-items: start;
+}
+
+@media (max-width: 1439px) {
+    .assets-layout { grid-template-columns: minmax(0, 1fr) var(--rail-right-md); }
+}
+
+.assets-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gutter);
+    min-width: 0;
+}
+
+.assets-empty {
+    padding: var(--s-18) var(--s-6);
+}
+
+/* ============================================================================
+   Строка актива — раздел 9.25. Высота 64: 8 строк на 1280 × 900.
+   ============================================================================ */
+.arow {
+    display: grid;
+    align-items: center;
+    column-gap: var(--s-6);
+    min-height: var(--h-asset-row);
+    padding: var(--s-2) var(--s-5);
+    border-bottom: 1px solid var(--line-1);
+    color: inherit;
+    text-decoration: none;
+    transition: background-color var(--d-fast) var(--e-out);
+}
+
+.arow:last-child { border-bottom: 0; }
+
+a.arow:hover { background: var(--gph-750); }
+
+.arow--live {
+    grid-template-columns:
+        var(--w-col-asset) var(--w-col-price) minmax(0, 1fr)
+        var(--w-col-volume) var(--w-col-news) var(--w-col-go);
+}
+
+.arow--idle {
+    grid-template-columns:
+        var(--w-col-asset) var(--w-col-price) var(--w-col-sens) minmax(0, 1fr) var(--w-col-go);
+}
+
+/* Шапка таблицы: заголовок числовой колонки выровнен как её значения (9.8). */
+.arow--head {
+    min-height: var(--h-thead);
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.arow__price {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.arow__stat {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--s-1);
+}
+
+.arow__go {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    color: var(--text-3);
+}
+
+/* ============================================================================
+   Последняя новость — текст слева, ответ агентов справа, через хайрлайн.
+   ============================================================================ */
+.assets-news__title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+}
+
+.assets-news__title h2 {
+    margin: 0;
+    font: var(--t-h2);
+    letter-spacing: -0.015em;
+    color: var(--text-1);
+}
+
+.assets-news__link {
+    color: var(--text-3);
+    text-decoration: none;
+}
+
+.assets-news__link:hover { color: var(--text-1); }
+
+.assets-news {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+}
+
+.assets-news__rule { background: var(--line-1); }
+
+.assets-news__text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    min-width: 0;
+    padding: var(--s-4) var(--s-5);
+}
+
+/* Текст новости — две строки с многоточием, целиком в подсказке. */
+.assets-news__body {
+    margin: 0;
+    font: var(--t-body);
+    color: var(--text-1);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.assets-news__agents {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font: var(--t-body-sm);
+    color: var(--text-1);
+}
+
+/* ============================================================================
+   Пульт сессии — правый рельс.
+   ============================================================================ */
+.console__hero {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    padding: var(--s-5) var(--s-5) var(--s-4);
+}
+
+/* Время сессии — число-герой пульта (раздел 4, --n-hero). */
+.console__timer {
+    font: var(--n-hero);
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-1);
+}
+
+.console__title {
+    font: var(--t-h1);
+    letter-spacing: -0.015em;
+    color: var(--text-1);
+}
+
+.console__section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--s-4) var(--s-5) var(--s-2);
+    border-top: 1px solid var(--line-1);
+}
+
+.console__section--first { border-top: 0; }
+
+.assets-page ::deep .console__capbar {
+    padding: 0 var(--s-5) var(--s-3);
+}
+
+.console__roster {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--w-col-count) var(--w-col-capital);
+    align-items: center;
+    column-gap: var(--s-3);
+    min-height: var(--s-10);
+    padding: var(--s-1) var(--s-5);
+    border-top: 1px solid var(--line-1);
+}
+
+.console__roster--head { min-height: var(--h-thead); }
+
+.console__roster.is-off .console__type { color: var(--text-3); }
+
+.console__type {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+    font: var(--t-body-sm);
+    color: var(--text-1);
+    white-space: nowrap;
+}
+
+.console__note {
+    margin: 0;
+    padding: var(--s-3) var(--s-5) var(--s-4);
+    border-top: 1px solid var(--line-1);
+}
+
+.console__foot {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3);
+    padding: var(--s-4) var(--s-5) var(--s-5);
+    border-top: 1px solid var(--line-1);
+}
+
+.console__foot p { margin: 0; }
+
+.assets-page ::deep .console__action { width: 100%; }
+
+.console__warn {
+    display: flex;
+    align-items: center;
+    gap: var(--s-1);
+    color: var(--warn-500);
+}
+
+.is-error ::deep .ui-stepper-c { border-color: var(--down-500); }
+
+/* ============================================================================
+   Подписи и выравнивание — только в границах этой страницы.
+   ============================================================================ */
+.caption { font: var(--t-caption); color: var(--text-3); }
+.num-md  { font: var(--n-md); font-variant-numeric: tabular-nums; }
+.t1 { color: var(--text-1); }
+.t2 { color: var(--text-2); }
+.t3 { color: var(--text-3); }
+.quiet { color: var(--text-quiet); }
+.nowrap { white-space: nowrap; }
+.right  { text-align: right; justify-self: end; }
+.center { text-align: center; justify-self: center; }
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+/* Узкий экран: рельс на 40px уже, поля пульта ужимаются, чтобы имя
+   стратегии («Маркет-мейкер») не обрезалось многоточием. Стоит в конце
+   файла: иначе базовые правила пульта выше перекрыли бы его. */
+@media (max-width: 1439px) {
+    .console__roster,
+    .console__section,
+    .console__hero,
+    .console__note,
+    .console__foot { padding-inline: var(--s-4); }
+
+    .assets-page ::deep .console__capbar { padding-inline: var(--s-4); }
+}

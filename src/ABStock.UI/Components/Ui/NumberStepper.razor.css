@@ -41,3 +41,58 @@
     border-color: var(--acc-line);
     box-shadow: 0 0 0 2px var(--acc-soft);
 }
+
+/* ---------- компактная форма ---------- */
+.ui-stepper-c {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) 22px;
+    align-items: center;
+    height: var(--h-ctl-sm);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-sm);
+    background: var(--gph-800);
+}
+
+.ui-stepper-c--field { grid-template-columns: minmax(0, 1fr); }
+
+.ui-stepper-c:focus-within { border-color: var(--acc-line); }
+
+.ui-stepper-c__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: color var(--d-fast) var(--e-out);
+}
+
+.ui-stepper-c__btn:hover:not(:disabled) { color: var(--text-1); }
+.ui-stepper-c__btn:disabled { color: var(--text-4); cursor: default; }
+
+.ui-stepper-c__value {
+    font: var(--n-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    color: var(--text-1);
+}
+
+.ui-stepper-c__input {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    padding: 0 var(--s-2);
+    border: 0;
+    background: transparent;
+    font: var(--n-sm);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--text-1);
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+.ui-stepper-c__input:focus-visible { outline: none; }

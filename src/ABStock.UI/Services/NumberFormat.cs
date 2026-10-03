@@ -47,7 +47,7 @@ public static class NumberFormat
         value > 0m ? "tone-up" : value < 0m ? "tone-down" : "tone-flat";
 
     /// <summary>Счётная форма: 1 агент · 2 агента · 5 агентов.</summary>
-    public static string Plural(int count, string one, string few, string many)
+    public static string Plural(long count, string one, string few, string many)
     {
         var mod100 = count % 100;
         if (mod100 is >= 11 and <= 14)

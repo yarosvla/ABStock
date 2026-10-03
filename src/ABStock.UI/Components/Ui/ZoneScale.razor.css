@@ -60,12 +60,12 @@
 .ui-scale__zone {
     height: 100%;
     border-radius: var(--r-xs);
-    background: var(--gph-700);
+    background: var(--zone-1);
 }
 
-.ui-scale__zone:nth-child(2) { background: var(--gph-600); }
-.ui-scale__zone:nth-child(3) { background: var(--gph-500); }
-.ui-scale__zone:nth-child(4) { background: var(--gph-400); }
+.ui-scale__zone:nth-child(2) { background: var(--zone-2); }
+.ui-scale__zone:nth-child(3) { background: var(--zone-3); }
+.ui-scale__zone:nth-child(4) { background: var(--zone-4); }
 
 .ui-scale__marker {
     position: absolute;

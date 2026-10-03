@@ -1,5 +1,3 @@
-using ABStock.Application.MarketHistory;
-using ABStock.Application.Simulation;
 
 namespace ABStock.UI.Services;
 
@@ -31,10 +29,9 @@ public interface INotificationFeed
     event Action? Changed;
 
     /// <summary>
-    /// Актив создан. Зовётся со страницы, а не ловится подпиской: у
-    /// <see cref="IActiveAssetContext"/> нет события об изменении, и заводить
-    /// его ради одной записи в ленту незачем — так же, как «Новости»
-    /// сообщают ленте о введённой новости.
+    /// Актив создан. Зовётся со страницы, а не ловится подпиской на реестр:
+    /// колокольчик — про то, что сделал человек, а не про любое изменение
+    /// каталога.
     /// </summary>
     void NoteAssetCreated(string assetName, string symbol);
 
@@ -45,13 +42,10 @@ public interface INotificationFeed
 
 /// <summary>
 /// Singleton и создаётся при старте приложения — тем же рассуждением, что и
-/// <see cref="IAgentEquityHistory"/>: сюда пишет тик, значит подписка на
-/// OnTick должна существовать до первого тика. Ленивое создание отдало бы
-/// сервису первый тик только после того, как кто-то откроет страницу, и
-/// начало сессии было бы потеряно.
+/// <see cref="ISessionMarkets"/>: сюда пишет шаг сессии, значит подписка
+/// должна существовать до первого шага, иначе начало сессии было бы потеряно.
 ///
-/// Сброс по смене прогона — как у <see cref="ISessionNewsFeed"/>: новый
-/// прогон — новая хронология, иначе рядом окажутся события прошлого запуска
+/// Новая сессия — новая лента: иначе рядом окажутся события прошлого запуска
 /// и счётчики нынешнего (раздел 10, «один период»).
 /// </summary>
 public sealed class NotificationFeed : INotificationFeed, IDisposable
@@ -60,39 +54,27 @@ public sealed class NotificationFeed : INotificationFeed, IDisposable
     private const int Capacity = 50;
 
     private readonly Lock _sync = new();
-    private readonly ISimulationRunner _runner;
-    private readonly ISessionNewsFeed _news;
-    private readonly ISimulationHistoryReader _history;
-
+    private readonly ISessionMarkets _markets;
+    private readonly ISessionEvents _events;
+    private readonly IAssetRegistry _assets;
     private readonly List<Item> _items = [];
 
-    /// <summary>Позиция агента на прошлом тике — по ней ловится переход через ноль.</summary>
-    private readonly Dictionary<string, decimal> _positions = new(StringComparer.Ordinal);
+    /// <summary>Позиция агента в активе на прошлом шаге — по ней ловится переход через ноль.</summary>
+    private readonly Dictionary<(string Agent, Guid Asset), decimal> _positions = [];
 
-    /// <summary>Уже показанные новости: лента новостей отдаёт весь список целиком.</summary>
-    private readonly HashSet<(DateTimeOffset At, string Text)> _seenNews = [];
+    /// <summary>Уже показанные новости: хронология отдаёт весь список целиком.</summary>
+    private readonly HashSet<DateTimeOffset> _seenNews = [];
 
-    private Guid _runId = Guid.Empty;
-    private DateTimeOffset? _startedAt;
+    private Guid _sessionId = Guid.Empty;
+    private bool _wasRunning;
 
-    /// <summary>
-    /// Торги запущены, но состава ещё не видели. Число агентов и капитал
-    /// приходят с первым тиком, а не с событием смены состояния.
-    /// </summary>
-    private bool _awaitingStartDetails;
-
-    public NotificationFeed(
-        ISimulationRunner runner,
-        ISessionNewsFeed news,
-        ISimulationHistoryReader history)
+    public NotificationFeed(ISessionMarkets markets, ISessionEvents events, IAssetRegistry assets)
     {
-        _runner = runner;
-        _news = news;
-        _history = history;
-
-        _runner.OnTick += HandleTick;
-        _runner.OnStateChanged += HandleStateChanged;
-        _news.Changed += HandleNewsChanged;
+        _markets = markets;
+        _events = events;
+        _assets = assets;
+        _markets.Changed += HandleMarketsChanged;
+        _events.Changed += HandleEventsChanged;
     }
 
     public IReadOnlyList<NotificationEntry> Entries
@@ -102,7 +84,7 @@ public sealed class NotificationFeed : INotificationFeed, IDisposable
             lock (_sync)
             {
                 return _items
-                    .Select(item => new NotificationEntry(item.At, item.Kind, item.Title, item.Detail, item.IsRead))
+                    .Select(item => new NotificationEntry(item.At, item.Kind, item.Title, item.Detail, item.IsRead, item.Symbol))
                     .ToArray();
             }
         }
@@ -112,15 +94,12 @@ public sealed class NotificationFeed : INotificationFeed, IDisposable
 
     public void Dispose()
     {
-        _runner.OnTick -= HandleTick;
-        _runner.OnStateChanged -= HandleStateChanged;
-        _news.Changed -= HandleNewsChanged;
+        _markets.Changed -= HandleMarketsChanged;
+        _events.Changed -= HandleEventsChanged;
     }
 
-    public void NoteAssetCreated(string assetName, string symbol)
-    {
-        Add(NotificationKind.System, "Создан актив", $"{assetName} · {symbol}");
-    }
+    public void NoteAssetCreated(string assetName, string symbol) =>
+        Add([(NotificationKind.System, "Создан актив", _markets.IsRunning ? $"{assetName} · вступил в торги" : assetName, symbol)]);
 
     public void MarkAllRead()
     {
@@ -158,192 +137,155 @@ public sealed class NotificationFeed : INotificationFeed, IDisposable
         Changed?.Invoke();
     }
 
-    // ────────────────────────────── системные ──────────────────────────────
+    // ─────────────────────────── шаг сессии ───────────────────────────
 
-    private void HandleStateChanged()
+    private void HandleMarketsChanged()
     {
-        if (_runner.IsRunning)
+        var pending = new List<(NotificationKind, string, string, string?)>();
+
+        lock (_sync)
         {
-            lock (_sync)
+            var running = _markets.IsRunning;
+
+            if (running && _markets.SessionId != _sessionId)
             {
-                DropOtherRunLocked();
-                _startedAt = DateTimeOffset.Now;
-                _awaitingStartDetails = true;
+                _sessionId = _markets.SessionId;
+                _items.Clear();
+                _positions.Clear();
+                _seenNews.Clear();
             }
 
-            return;
-        }
-
-        // Остановка. Длительность и число сделок относятся к одному периоду —
-        // к только что закончившейся сессии (раздел 10).
-        DateTimeOffset? startedAt;
-        Guid runId;
-
-        lock (_sync)
-        {
-            startedAt = _startedAt;
-            runId = _runId;
-            _startedAt = null;
-            _awaitingStartDetails = false;
-            _positions.Clear();
-        }
-
-        if (startedAt is null)
-        {
-            return;
-        }
-
-        var elapsed = (DateTimeOffset.Now - startedAt.Value).ToString(@"hh\:mm\:ss");
-        var trades = TryReadTradeCount(runId);
-
-        var detail = trades is null
-            ? $"сессия {elapsed}"
-            : $"сессия {elapsed} · сделок {NumberFormat.Count0(trades.Value)}";
-
-        Add(NotificationKind.System, "Торги остановлены", detail);
-    }
-
-    /// <summary>
-    /// Число сделок берётся из той же сводки прогона, что у «Торгов» и
-    /// «Агентов». Обращение к хранилищу может не удаться — тогда событие
-    /// выходит без счётчика, но выходит: пропавшая остановка торгов хуже,
-    /// чем остановка без числа.
-    /// </summary>
-    private int? TryReadTradeCount(Guid runId)
-    {
-        if (runId == Guid.Empty)
-        {
-            return null;
-        }
-
-        try
-        {
-            return _history.GetRun(runId)?.TradeCount;
-        }
-        catch (Exception)
-        {
-            return null;
-        }
-    }
-
-    // ──────────────────────────────── тик ────────────────────────────────
-
-    private void HandleTick(SimulationTickResult tick)
-    {
-        var pending = new List<(NotificationKind Kind, string Title, string Detail)>();
-
-        lock (_sync)
-        {
-            DropOtherRunLocked();
-
-            if (_awaitingStartDetails && tick.Agents.Count > 0)
+            if (running && !_wasRunning)
             {
-                _awaitingStartDetails = false;
-
-                var capital = tick.Agents.Sum(agent => agent.InitialCash);
+                var accounts = _markets.Accounts;
+                var assets = _assets.Assets.Count;
                 pending.Add((
                     NotificationKind.System,
                     "Торги запущены",
-                    $"{NumberFormat.Count0(tick.Agents.Count)} " +
-                    $"{NumberFormat.Plural(tick.Agents.Count, "агент", "агента", "агентов")} · " +
-                    $"капитал {NumberFormat.Money0(capital)} ₽"));
+                    $"{assets} {NumberFormat.Plural(assets, "актив", "актива", "активов")} · " +
+                    $"{accounts.Count} {NumberFormat.Plural(accounts.Count, "агент", "агента", "агентов")} · " +
+                    $"капитал {NumberFormat.Money0(accounts.Sum(account => account.InitialCash))} ₽",
+                    null));
+            }
+            else if (!running && _wasRunning)
+            {
+                // Длительность и число сделок — об одном периоде: о только что
+                // закончившейся сессии (раздел 10).
+                var trades = _markets.Markets.Sum(market => market.TradeCount);
+                pending.Add((
+                    NotificationKind.System,
+                    "Торги остановлены",
+                    $"сессия {SessionClock.Format(_markets) ?? "—"} · сделок {NumberFormat.Count0(trades)}",
+                    null));
+                _positions.Clear();
             }
 
-            CollectPositionCrossingsLocked(tick, pending);
+            _wasRunning = running;
+
+            if (running)
+            {
+                CollectPositionCrossingsLocked(pending);
+            }
         }
 
-        foreach (var (kind, title, detail) in pending)
-        {
-            Add(kind, title, detail);
-        }
+        Add(pending);
     }
 
     /// <summary>
-    /// Событие возникает, когда позиция агента переходит через ноль, то есть
-    /// когда он открывает, закрывает или разворачивает позицию.
+    /// Событие возникает, когда позиция агента в активе переходит через ноль:
+    /// агент открыл, закрыл или развернул позицию в этом активе.
     ///
-    /// Не каждая сделка: за сессию их порядка полутора сотен, и колокольчик
-    /// с числом 148 бесполезен. Переходов через ноль за сессию единицы, и
-    /// каждый из них осмыслен.
+    /// Не каждая сделка: их за сессию сотни, и колокольчик с числом 148
+    /// бесполезен. Переходов через ноль — единицы, и каждый осмыслен. Точка
+    /// отсчёта — стартовый запас: агент, вышедший в сессию с бумагами,
+    /// ничего не «открывал».
     /// </summary>
-    private void CollectPositionCrossingsLocked(
-        SimulationTickResult tick,
-        List<(NotificationKind, string, string)> pending)
+    private void CollectPositionCrossingsLocked(List<(NotificationKind, string, string, string?)> pending)
     {
-        var names = AgentDisplay.BuildInstanceNames(tick.Agents);
+        var accounts = _markets.Accounts;
+        var names = AgentNames(accounts);
 
-        foreach (var agent in tick.Agents)
+        foreach (var account in accounts)
         {
-            var current = agent.Position;
-
-            if (!_positions.TryGetValue(agent.Name, out var previous))
+            foreach (var (assetId, position) in account.Positions)
             {
-                // Первый тик агента. Взять за точку отсчёта то, что видно
-                // сейчас, нельзя: агенты открывают позицию на первом же тике,
-                // и самое интересное событие сессии — первое открытие — было
-                // бы проглочено вместе с точкой отсчёта.
-                //
-                // Агент, вышедший в сессию пустым (портфель равен деньгам),
-                // начинал с нуля, и точка отсчёта — ноль: переход поймается
-                // тут же. Агент, заведённый сразу с позицией, ничего не
-                // открывал — для него отсчёт от того, что есть.
-                previous = agent.InitialPortfolioValue == agent.InitialCash
-                    ? 0m
-                    : current;
-            }
+                var key = (account.AgentName, assetId);
+                var current = position.Quantity;
+                var previous = _positions.TryGetValue(key, out var known) ? known : position.InitialQuantity;
+                _positions[key] = current;
 
-            _positions[agent.Name] = current;
+                var was = Math.Sign(previous);
+                var now = Math.Sign(current);
 
-            var was = Math.Sign(previous);
-            var now = Math.Sign(current);
-
-            if (was == now)
-            {
-                continue;
-            }
-
-            var name = names.GetValueOrDefault(agent.Name, agent.Name);
-
-            var (title, detail) = (was, now) switch
-            {
-                (0, > 0) => ("Агент открыл позицию", $"{name} · длинная {NumberFormat.Position0(current)}"),
-                (0, < 0) => ("Агент открыл позицию", $"{name} · короткая {NumberFormat.Position0(current)}"),
-                (_, 0) => ("Агент закрыл позицию", $"{name} · было {NumberFormat.Position0(previous)}"),
-                _ => ("Агент развернул позицию", $"{name} · {NumberFormat.Position0(previous)} → {NumberFormat.Position0(current)}")
-            };
-
-            pending.Add((NotificationKind.Trade, title, detail));
-        }
-    }
-
-    // ─────────────────────────────── новости ───────────────────────────────
-
-    private void HandleNewsChanged()
-    {
-        var pending = new List<(DateTimeOffset At, string Title, string Detail)>();
-
-        lock (_sync)
-        {
-            DropOtherRunLocked();
-
-            foreach (var entry in _news.Entries.Reverse())
-            {
-                if (!_seenNews.Add((entry.At, entry.Text)))
+                if (was == now)
                 {
                     continue;
                 }
 
-                pending.Add((
-                    entry.At,
-                    "Введена новость",
-                    $"{PolarityName(entry.Polarity)} · влияние {entry.ImpactScore:F2} · {Shorten(entry.Text)}"));
+                var symbol = _assets.Find(assetId)?.Symbol;
+                var name = names.GetValueOrDefault(account.AgentName, account.AgentName);
+                var (title, detail) = (was, now) switch
+                {
+                    (0, > 0) => ("Агент открыл позицию", $"{name} · длинная {NumberFormat.Position0(current)}"),
+                    (0, < 0) => ("Агент открыл позицию", $"{name} · короткая {NumberFormat.Position0(current)}"),
+                    (_, 0) => ("Агент закрыл позицию", $"{name} · было {NumberFormat.Position0(previous)}"),
+                    _ => ("Агент развернул позицию", $"{name} · {NumberFormat.Position0(previous)} → {NumberFormat.Position0(current)}")
+                };
+
+                pending.Add((NotificationKind.Trade, title, detail, symbol));
+            }
+        }
+    }
+
+    /// <summary>«Трендовый 1» — та же нумерация, что на «Агентах»: тип, затем порядок счёта.</summary>
+    private static Dictionary<string, string> AgentNames(IReadOnlyList<ABStock.Shared.AgentAccountSnapshot> accounts)
+    {
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var group in accounts.GroupBy(account => account.AgentType).OrderBy(group => group.Key))
+        {
+            var index = 1;
+
+            foreach (var account in group)
+            {
+                names[account.AgentName] = $"{AgentDisplay.GetTypeLabel(group.Key)} {index++}";
             }
         }
 
-        foreach (var (at, title, detail) in pending)
+        return names;
+    }
+
+    // ─────────────────────────────── новости ───────────────────────────────
+
+    private void HandleEventsChanged()
+    {
+        var pending = new List<(NotificationKind, string, string, string?)>();
+
+        lock (_sync)
         {
-            Add(NotificationKind.News, title, detail, at);
+            foreach (var entry in _events.News.Reverse())
+            {
+                if (entry.Fan is not { } fan || !_seenNews.Add(entry.At))
+                {
+                    continue;
+                }
+
+                var analyzed = fan.Assets.Count(row => row.WasAnalyzed);
+                var hit = fan.Hit.Count();
+                var lead = fan.Lead;
+                var reach = lead is null
+                    ? "не задела ни один актив"
+                    : $"задела {hit} из {analyzed} · сильнее всего {lead.Symbol} {lead.Strength:F2}";
+
+                pending.Add((
+                    NotificationKind.News,
+                    "Введена новость",
+                    $"{PolarityName(fan.Polarity)} · {reach} · {Shorten(entry.Text)}",
+                    lead?.Symbol));
+            }
         }
+
+        Add(pending);
     }
 
     private static string PolarityName(ABStock.Shared.SignalPolarity polarity) => polarity switch
@@ -354,27 +296,31 @@ public sealed class NotificationFeed : INotificationFeed, IDisposable
     };
 
     /// <summary>
-    /// Текст новости в строке уведомления — одной строкой. Обрезает разметка,
-    /// но многоточие в самом конце длинного текста лучше поставить здесь:
-    /// строка уведомления узкая (360px), и CSS-обрезка съела бы и тональность.
+    /// Текст новости — одной строкой. Многоточие ставится здесь: строка
+    /// уведомления узкая (360px), и CSS-обрезка съела бы и тональность.
     /// </summary>
     private static string Shorten(string text)
     {
         const int Limit = 80;
         var single = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
-
         return single.Length <= Limit ? single : single[..Limit].TrimEnd() + "…";
     }
 
     // ─────────────────────────────── общее ───────────────────────────────
 
-    private void Add(NotificationKind kind, string title, string detail, DateTimeOffset? at = null)
+    private void Add(IReadOnlyList<(NotificationKind Kind, string Title, string Detail, string? Symbol)> pending)
     {
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
         lock (_sync)
         {
-            DropOtherRunLocked();
-
-            _items.Insert(0, new Item(at ?? DateTimeOffset.Now, kind, title, detail));
+            foreach (var (kind, title, detail, symbol) in pending)
+            {
+                _items.Insert(0, new Item(DateTimeOffset.Now, kind, title, detail, symbol));
+            }
 
             if (_items.Count > Capacity)
             {
@@ -385,39 +331,23 @@ public sealed class NotificationFeed : INotificationFeed, IDisposable
         Changed?.Invoke();
     }
 
-    /// <summary>
-    /// Новый прогон — новая лента. Событие отсюда не шлётся: метод зовётся
-    /// изнутри уже захваченного замка и из геттера во время отрисовки.
-    /// </summary>
-    private void DropOtherRunLocked()
-    {
-        var runId = _runner.CurrentRunId;
-
-        if (runId == _runId)
-        {
-            return;
-        }
-
-        _runId = runId;
-        _items.Clear();
-        _positions.Clear();
-        _seenNews.Clear();
-    }
-
-    private sealed class Item(DateTimeOffset at, NotificationKind kind, string title, string detail)
+    private sealed class Item(DateTimeOffset at, NotificationKind kind, string title, string detail, string? symbol)
     {
         public DateTimeOffset At { get; } = at;
         public NotificationKind Kind { get; } = kind;
         public string Title { get; } = title;
         public string Detail { get; } = detail;
+        public string? Symbol { get; } = symbol;
         public bool IsRead { get; set; }
     }
 }
 
 /// <param name="At">Когда событие произошло — время местное, то же, что в часах шапки.</param>
+/// <param name="Symbol">Актив события — тикером рядом с заголовком; null у событий всей сессии.</param>
 public sealed record NotificationEntry(
     DateTimeOffset At,
     NotificationKind Kind,
     string Title,
     string Detail,
-    bool IsRead);
+    bool IsRead,
+    string? Symbol = null);

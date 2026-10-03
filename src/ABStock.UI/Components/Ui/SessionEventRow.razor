@@ -1,0 +1,67 @@
+@using ABStock.Shared
+@using ABStock.UI.Services
+
+@* Строка события сессии — раздел 9.21. Один компонент на «Новостях» и
+   «Торгах»: человек видит одну хронологию, а не две.
+
+   Три вида. Новость — время, бейдж тональности, сила справа, текст и
+   мини-веер третьей строкой. Система и агенты — время, микро-лейбл вида,
+   текст; у события агентов перед текстом точка цвета стратегии. *@
+
+<article class="ui-event @(Current ? "is-current" : null)">
+    @if (Event.Kind == SessionEventKind.News && Event.Fan is { } fan)
+    {
+        var focus = Focus(fan);
+
+        <div class="ui-event__head">
+            <time class="ui-event__time" datetime="@Event.At.ToString("O")">@Event.At.ToString("HH:mm")</time>
+            <Badge Tone="@Badge.ForPolarity(fan.Polarity)">@Badge.LabelOf(fan.Polarity)</Badge>
+            @if (focus?.Strength is { } impact)
+            {
+                <span class="ui-event__impact num-sm">@impact.ToString("F2")</span>
+            }
+            else
+            {
+                <span class="ui-event__impact ui-event__impact--none">не задет</span>
+            }
+        </div>
+        <p class="ui-event__text" title="@Event.Text">@Event.Text</p>
+        <div class="ui-event__fan num-xs">
+            @foreach (var row in fan.Assets.Where(row => row.WasAnalyzed))
+            {
+                var isFocus = row.Symbol == focus?.Symbol;
+                <span class="@(isFocus ? "is-focus" : row.IsHit ? null : "is-miss")">@row.Symbol @(row.Strength is { } value ? value.ToString("F2") : "—")</span>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="ui-event__head">
+            <time class="ui-event__time" datetime="@Event.At.ToString("O")">@Event.At.ToString("HH:mm:ss")</time>
+            <span class="label">@(Event.Kind == SessionEventKind.Agents ? "агенты" : "система")</span>
+        </div>
+        <p class="ui-event__text" title="@Event.Text">
+            @if (Event.Strategy is { } strategy)
+            {
+                <StatusDot Tone="@AgentDisplay.GetTypeTone(strategy)" />
+            }
+            @Event.Text
+        </p>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired] public SessionEvent Event { get; set; } = default!;
+
+    /// <summary>
+    /// Чья сила стоит справа. На «Торгах» — выбранного актива; не задан
+    /// (на «Новостях») — самого задетого.
+    /// </summary>
+    [Parameter] public string? FocusSymbol { get; set; }
+
+    /// <summary>Разбор именно этого события открыт на экране.</summary>
+    [Parameter] public bool Current { get; set; }
+
+    private AssetSignal? Focus(NewsFan fan) =>
+        FocusSymbol is null ? fan.Lead : fan.For(FocusSymbol);
+}

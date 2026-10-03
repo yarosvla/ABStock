@@ -31,6 +31,20 @@ public static class AgentDisplay
         _ => "muted"
     };
 
+    /// <summary>
+    /// Стратегия как группа агентов — подлежащее события сессии: «Трендовые
+    /// нарастили GLEN». Множественное число, потому что агентов типа обычно
+    /// несколько, а событие — про стратегию, а не про экземпляр.
+    /// </summary>
+    public static string GetGroupLabel(AgentType type) => type switch
+    {
+        AgentType.TrendFollowing => "Трендовые",
+        AgentType.CounterTrend => "Контр-трендовые",
+        AgentType.MarketMaker => "Маркет-мейкеры",
+        AgentType.NewsDriven => "Новостные",
+        _ => "Агенты"
+    };
+
     /// <summary>Стратегия одной строкой — для чипа рядом с именем экземпляра.</summary>
     public static string GetStrategyKind(AgentType type) => type switch
     {

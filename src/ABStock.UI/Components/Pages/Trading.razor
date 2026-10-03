@@ -1,4 +1,5 @@
-﻿@page "/trading"
+@page "/trading"
+@page "/trading/{Symbol}"
 @rendermode InteractiveServer
 @using ABStock.Application.MarketHistory
 @using ABStock.Application.Simulation
@@ -8,43 +9,34 @@
 @using static ABStock.UI.Services.NumberFormat
 @implements IDisposable
 @implements IAsyncDisposable
-@inject ISimulationRunner SimulationRunner
+@inject IAssetRegistry Registry
+@inject ISessionMarkets Markets
+@inject ISessionEvents Events
+@inject IAgentComposition Composition
+@inject ISelectedAsset Selected
+@inject NavigationManager Navigation
 @inject IMarketCandleReader CandleReader
 @inject IJSRuntime JS
 @inject IUserPreferences Preferences
-@inject IActiveAssetContext ActiveAssetContext
-@inject ISessionNewsFeed NewsFeed
 @inject ISimulationHistoryReader SimulationHistoryReader
-@inject IAgentEquityHistory EquityHistory
 
-<PageTitle>Торги</PageTitle>
+<PageTitle>@(Asset is { } titled ? $"Торги {titled.Symbol}" : "Торги")</PageTitle>
 
 @{
-    // Локальные хелперы разметки. Бизнес-логика и форматирование живут в @code —
-    // здесь только сопоставление значения с токеном оформления.
-    var isRunning = SimulationRunner.IsRunning;
+    var asset = Asset;
+    var isRunning = Markets.IsRunning;
+    var market = Market;
     var snapshot = latestTick?.Snapshot;
     var chart = ChartSummary;
     var book = OrderBookData;
     var trades = RecentTrades;
-    var agents = SessionAgents;
-    var isStale = latestTick is not null && (DateTimeOffset.Now - lastChartUpdate).TotalSeconds > 5;
-    var startBlocked = !IsCompositionValid;
+    var isStale = isRunning && latestTick is not null && (DateTimeOffset.Now - lastChartUpdate).TotalSeconds > 5;
 
     static string Tone(string? changeClass) => changeClass switch
     {
         "positive" => "up",
         "negative" => "down",
         _ => "flat"
-    };
-
-    static string AgentTone(AgentType type) => type switch
-    {
-        AgentType.TrendFollowing => "agent-trend",
-        AgentType.CounterTrend => "agent-counter",
-        AgentType.MarketMaker => "agent-mm",
-        AgentType.NewsDriven => "agent-news",
-        _ => "muted"
     };
 
     static string NameTone(string agentName) =>
@@ -54,25 +46,6 @@
         : agentName.Contains("Maker", StringComparison.Ordinal) ? "agent-mm"
         : agentName.Contains("News", StringComparison.Ordinal) ? "agent-news"
         : "muted";
-
-    static string Kind(AgentType type) => type switch
-    {
-        AgentType.TrendFollowing => "трендовая стратегия",
-        AgentType.CounterTrend => "контр-трендовая стратегия",
-        AgentType.MarketMaker => "маркет-мейкинг",
-        AgentType.NewsDriven => "новостная стратегия",
-        _ => "стратегия"
-    };
-
-    // Разрядность, знак, тон и счётная форма — общие: Services/NumberFormat.
-    // Раньше страница объявляла свои копии Money0, Count0, Sign, Pnl2,
-    // Position0, DeltaTone и Plural, дословно совпадавшие с общими. Две копии
-    // одного правила расходятся при первой же правке — ровно так разошёлся
-    // .tone-flat (пункт 99 docs/ui-backlog.md).
-    //
-    // ActionLabel и ActionTone убраны вместе с ними: слово действия теперь даёт
-    // AgentRoster, и он различает «держит спред» и «ждёт», а ActionTone был
-    // мёртв — .agents__why-act перебивает тон специфичностью.
 }
 
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
@@ -82,702 +55,445 @@
 
     <main class="trading-page @(isRunning ? null : "is-stopped")">
 
-        @* ── Крошки · Активы › Актив › Раздел (раздел 13) ───────────────────── *@
-        <Breadcrumbs Items="@(new Crumb[]
-                     {
-                         new("Активы", Href: "/create-asset"),
-                         new(CurrentAsset.Draft.Name, IsAsset: true),
-                         new("Торги")
-                     })">
-            @* Чип состояния сессии — вне <nav>, справа от пути (раздел 13).
-               Тот же компонент и то же место, что на «Агентах»: длительность
-               сессии обязана читаться одинаково на всех экранах, где сессия
-               идёт. Здесь его не было вовсе — шапка ссылалась на него, чтобы
-               не дублировать длительность, а показывать её было нечему. *@
-            <Aside>
-                <SessionChip Running="isRunning" Elapsed="@Elapsed" />
-            </Aside>
-        </Breadcrumbs>
+        @if (asset is null)
+        {
+            @* Адрес без тикера или с тикером, которого нет: страница либо
+               перенаправит на выбранный актив, либо объяснит, что торговать
+               нечем. Пока выбор читается из браузера — ничего не мигает. *@
+            <Breadcrumbs Items="@(new Crumb[] { new("Активы", Href: "/assets"), new("Торги") })" />
+            <PageHead Title="Торги" />
 
-        @* ── PageHeader: H1 + одна строка контекста · до двух действий ───────── *@
-        <PageHead Title="Торги">
-            <Context>
-                @* Формулировки из артбордов 01–03. Длительность идущей сессии здесь
-                   не повторяется: её показывает чип сессии рядом с крошками, и
-                   второе такое же число — дубль по разделу 9.0 (пункт 31). *@
-                @if (isRunning)
-                {
-                    <text>Сессия открыта <span class="num-sm">@SessionOpenedAt</span> · агентов в работе <span class="num-sm">@agents.Count</span></text>
-                }
-                else if (SessionTick is not null)
-                {
-                    <text>Сессия закрыта · агентов в работе <span class="num-sm">0</span> · состав задаётся до запуска</text>
-                }
-                else
-                {
-                    <text>Торги не запущены · состав агентов задаётся до запуска</text>
-                }
-            </Context>
-            <Actions>
-                @* «Добавить новость» — только при идущей сессии: новость вводится
-                   «в любой момент ПОСЛЕ старта» (раздел 16.3), а при остановленных
-                   торгах вводить её некуда. Артборд 03 показывает одно действие. *@
-                @if (isRunning)
-                {
-                    <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
-                    <AppButton Variant="primary" OnClick="SimulationRunner.StopAsync">Остановить торги</AppButton>
-                }
-                else
-                {
-                    <AppButton Variant="primary" Icon="play"
-                               Disabled="startBlocked"
-                               OnClick="EnsureSimulationAsync">Запустить торги</AppButton>
-                }
-            </Actions>
-        </PageHead>
+            @if (Registry.Assets.Count == 0)
+            {
+                <Panel Class="rise rise-1">
+                    <EmptyState IconName="plus" Title="Торговать пока нечем"
+                                Description="Торги идут по активам сессии. Создайте первый актив — и запустите торги на «Активах».">
+                        <Action>
+                            <AppButton Variant="primary" Href="/assets/new">Создать актив</AppButton>
+                        </Action>
+                    </EmptyState>
+                </Panel>
+            }
+        }
+        else
+        {
+            @* ── Крошки: Активы › актив со свитчером › Торги (раздел 13) ── *@
+            <Breadcrumbs Items="@(new Crumb[]
+                         {
+                             new("Активы", Href: "/assets"),
+                             new(asset.Name, IsAsset: true, Symbol: asset.Symbol),
+                             new("Торги")
+                         })">
+                <Aside>
+                    <SessionChip Running="isRunning" Elapsed="@Elapsed" />
+                </Aside>
+            </Breadcrumbs>
 
-        @* ── Рабочая область: рельс 280 · центр · рельс 340 ──────────────────── *@
-        <div class="workspace">
+            @* Заголовок экрана — актив: при переключении меняется крупное, а не мелкое. *@
+            <PageHead>
+                <TitleContent>
+                    <span class="trading-title">
+                        <h1>@asset.Name</h1>
+                        <Ticker Symbol="@asset.Symbol" Large="true" />
+                        @* Пара к «Открыть торги» в карточке актива: строка идущего
+                           рынка на «Активах» ведёт сюда, и без этой кнопки в профиль
+                           из торгов не попасть. Стоит у названия, а не среди
+                           действий справа: она про актив, а те — про сессию. *@
+                        <AppButton Variant="secondary" Icon="book" Href="@($"/assets/{asset.Symbol}")" Class="trading-title__profile">Профиль актива</AppButton>
+                    </span>
+                </TitleContent>
+                <Context>@PageContext</Context>
+                <Actions>
+                    @if (isRunning)
+                    {
+                        <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
+                        <AppButton Variant="primary" Icon="square" OnClick="StopAsync" Loading="isBusy">Остановить торги</AppButton>
+                    }
+                    else
+                    {
+                        <AppButton Variant="primary" Icon="play" OnClick="StartAsync" Loading="isBusy"
+                                   Disabled="@(!Composition.IsValid)">Запустить торги</AppButton>
+                    }
+                </Actions>
+            </PageHead>
 
-            @* ─────────── ЛЕВЫЙ РЕЛЬС ─────────── *@
-            <div class="rail rail--left">
-                @* После остановки левый рельс меняется по артборду 03: профиль актива
-                   и итоги закончившейся сессии вместо счётчиков идущей. Раздел 13
-                   закрепил за левым рельсом хронологию, и она остаётся ниже — панель
-                   «События сессии» никуда не уходит. *@
-                @if (isRunning)
-                {
-                    <Panel Title="Сессия" Class="rise rise-1">
-                        <MetaContent><span class="num-sm">@CurrentAsset.Symbol</span></MetaContent>
-                        <ChildContent>
-                            <dl class="kv">
-                                <div class="kv__row">
-                                    <dt>Сделок</dt>
-                                    <dd class="num-sm">@Count0(SessionTradeCount)</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Шаг симуляции</dt>
-                                    <dd class="num-sm">@(SessionTick is { } tick ? Count0(tick) : "—")</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Новостей</dt>
-                                    <dd class="num-sm">@Count0(NewsFeed.Entries.Count)</dd>
-                                </div>
-                            </dl>
-                        </ChildContent>
-                    </Panel>
-                }
-                else
-                {
-                    <Panel Title="Актив" Class="rise rise-1">
-                        <MetaContent>один в сессии</MetaContent>
-                        <ChildContent>
-                            <dl class="kv">
-                                <div class="kv__row">
-                                    <dt>Название</dt>
-                                    <dd>@CurrentAsset.Draft.Name</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Тикер</dt>
-                                    <dd class="num-sm">@CurrentAsset.Symbol</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Сектор</dt>
-                                    <dd>@(string.IsNullOrWhiteSpace(CurrentAsset.Draft.Industry) ? "—" : CurrentAsset.Draft.Industry)</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Чувствительность к новостям</dt>
-                                    <dd>@SensitivityScale.Word(CurrentAsset.Profile.NewsSensitivity)</dd>
-                                </div>
-                            </dl>
-                            @* «Стартовая цена» из артборда 03 здесь НЕ показана: на этом же
-                               экране она стоит в строке показателей как «откр», и раздел 9.0
-                               называет такой дубль поимённо — «цена открытия — строке
-                               показателей, а не панели сессии». *@
-                            <p class="rail__note">Профиль задан при создании актива и в сессии не меняется</p>
-                        </ChildContent>
-                    </Panel>
+            <div class="workspace">
 
-                    <Panel Title="Завершённая сессия" Class="rise rise-1">
-                        <MetaContent>итоги</MetaContent>
-                        <ChildContent>
-                            <dl class="kv">
-                                <div class="kv__row">
-                                    <dt>Длительность</dt>
-                                    <dd class="num-sm">@SessionDuration</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Сделок</dt>
-                                    <dd class="num-sm">@Count0(SessionTradeCount)</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Шаг симуляции</dt>
-                                    <dd class="num-sm">@(SessionTick is { } tick ? Count0(tick) : "—")</dd>
-                                </div>
-                                <div class="kv__row">
-                                    <dt>Новостей</dt>
-                                    <dd class="num-sm">@Count0(NewsFeed.Entries.Count)</dd>
-                                </div>
-                            </dl>
-                        </ChildContent>
-                    </Panel>
-                }
-
-                <Panel Title="События сессии" Class="rise rise-2" Flush="true">
-                    <MetaContent><span class="num-sm">@Count0(NewsFeed.Entries.Count)</span></MetaContent>
+                @* ─────────── ЛЕВЫЙ РЕЛЬС — только хронология (раздел 13) ─────────── *@
+                <Panel Title="События сессии" Class="events-panel rise rise-1" Flush="true">
+                    <MetaContent><span class="num-sm">@Count0(Events.Entries.Count)</span></MetaContent>
                     <ChildContent>
-                        @if (NewsFeed.Entries.Count > 0)
+                        @if (Events.Entries.Count > 0)
                         {
                             <div class="events">
-                                @foreach (var entry in NewsFeed.Entries)
+                                @foreach (var entry in Events.Entries)
                                 {
-                                    var isCurrent = entry.At == SelectedNewsAt;
-                                    <div class="events__row" role="button" tabindex="0"
-                                         aria-pressed="@(isCurrent ? "true" : "false")"
-                                         @onclick="() => SelectNews(entry.At)"
-                                         @onkeydown="@(args => HandleNewsKey(args, entry.At))">
-                                        <NewsEventRow At="entry.At" Text="@entry.Text"
-                                                      Polarity="entry.Polarity" ImpactScore="entry.ImpactScore"
-                                                      Current="isCurrent" />
-                                    </div>
+                                    if (entry.Kind == SessionEventKind.News)
+                                    {
+                                        var isCurrent = entry.At == SelectedNews?.At;
+                                        <div class="events__row" role="button" tabindex="0"
+                                             aria-pressed="@(isCurrent ? "true" : "false")"
+                                             @onclick="() => SelectNews(entry.At)"
+                                             @onkeydown="@(args => HandleNewsKey(args, entry.At))">
+                                            <SessionEventRow Event="entry" FocusSymbol="@asset.Symbol" Current="isCurrent" />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <SessionEventRow Event="entry" />
+                                    }
                                 }
                             </div>
                         }
+                        else if (isRunning)
+                        {
+                            <EmptyState IconName="news"
+                                        Title="Событий пока нет"
+                                        Description="Здесь появятся новости и заметные сделки агентов." />
+                        }
                         else
                         {
-                            @* Два текста, а не один: при остановленных торгах рынок
-                               никуда не идёт, агентов в работе ноль и ждать сигнала
-                               некому. Пункт 19 docs/ui-backlog.md, раздел 14. *@
-                            @if (isRunning)
+                            <EmptyState IconName="news"
+                                        Title="Сессии ещё не было"
+                                        Description="Хронология начнётся с запуска торгов." />
+                        }
+                    </ChildContent>
+                </Panel>
+
+                @* ─────────── ЦЕНТР — цена и график, главный объект экрана ─────────── *@
+                <div class="center">
+                    <section class="quote rise rise-1" aria-label="Текущая цена и показатели">
+                        <div class="quote__price">
+                            <div class="num-hero @(isStale ? "is-stale" : null)">@chart.Close <span class="unit">₽</span></div>
+                            <div class="quote__delta tone-@Tone(chart.ChangeClass)">
+                                @if (market is not null)
+                                {
+                                    <span class="num-sm">@(market.Change > 0 ? "↗" : market.Change < 0 ? "↘" : "·") @Sign(market.Change)@Price2(Math.Abs(market.Change)) ₽</span>
+                                    <span class="num-sm quote__percent">@Sign(market.ChangePercent)@Percent2(Math.Abs(market.ChangePercent)) %</span>
+                                }
+                                @if (isStale)
+                                {
+                                    <span class="quote__stale">нет обновлений</span>
+                                }
+                                else if (!isRunning && market is not null)
+                                {
+                                    <span class="quote__stale">цена закрытия</span>
+                                }
+                            </div>
+                        </div>
+
+                        @* Объём и сделки — по этому активу: их место в строке у цены (ревью Т-2). *@
+                        <div class="strip">
+                            <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@(snapshot is { } s ? Count0(s.Volume) : "—")</span><span class="strip__label">шт</span></div>
+                            <span class="strip__sep" aria-hidden="true"></span>
+                            <div class="strip__item"><span class="strip__label">сделок</span><span class="num-sm">@(market is null ? "—" : Count0(SessionTradeCount))</span></div>
+                        </div>
+                    </section>
+
+                    <Panel Class="chart-panel rise rise-2" Flush="true">
+                        <Head>
+                            <div class="strip">
+                                <div class="strip__item"><span class="strip__label">откр</span><span class="num-sm">@chart.Open</span></div>
+                                <span class="strip__sep" aria-hidden="true"></span>
+                                <div class="strip__item"><span class="strip__label">макс</span><span class="num-sm">@chart.High</span></div>
+                                <span class="strip__sep" aria-hidden="true"></span>
+                                <div class="strip__item"><span class="strip__label">мин</span><span class="num-sm">@chart.Low</span></div>
+                            </div>
+                            <Segmented TValue="string"
+                                       Label="Таймфрейм"
+                                       Items="@(Timeframes.All.Select(t => new SegmentedItem<string>(t.Key, t.Label)).ToArray())"
+                                       Value="@selectedTimeframe"
+                                       ValueChanged="SelectTimeframe" />
+                        </Head>
+                        <ChildContent>
+                            <div class="chart-body">
+                                <div class="chart-stage" @ref="chartViewport" tabindex="0"
+                                     aria-label="Свечной график цены @asset.Name">
+                                    <div class="chart-surface" role="img"
+                                         aria-label="Биржевой график цены @asset.Name"></div>
+
+                                    <div class="chart-hover-legend glass" aria-live="polite">
+                                        <span class="chart-hover-time num-xs" data-role="time">Нет данных</span>
+                                        <div class="chart-hover-values">
+                                            <span><small>откр</small><strong class="num-sm" data-role="open">—</strong></span>
+                                            <span><small>макс</small><strong class="num-sm" data-role="high">—</strong></span>
+                                            <span><small>мин</small><strong class="num-sm" data-role="low">—</strong></span>
+                                            <span><small>закр</small><strong class="num-sm" data-role="close">—</strong></span>
+                                        </div>
+                                    </div>
+
+                                    <button class="chart-live-reset" type="button" hidden>
+                                        <Icon Name="activity" Size="14" />
+                                        <span>К текущей цене</span>
+                                    </button>
+
+                                    <div class="chart-empty-state">Нет данных</div>
+                                </div>
+
+                                <footer class="chart-foot">
+                                    <a class="chart-foot__credit" href="https://www.tradingview.com/"
+                                       target="_blank" rel="noreferrer noopener">
+                                        TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc.
+                                    </a>
+                                    <span class="num-xs">@chart.UpdatedAt</span>
+                                </footer>
+                            </div>
+                        </ChildContent>
+                    </Panel>
+                </div>
+
+                @* ─────────── Полоса связи — сразу под графиком (раздел 9.19) ───────────
+                   Цепочка для ЭТОГО актива. Если новостные агенты торговали
+                   другим активом, цепочка честно обрывается разрывом: стрелка
+                   утверждала бы, что новость двинула эту цену. *@
+                @if (SelectedNews is { Fan: { } fan } news)
+                {
+                    var here = fan.For(asset.Symbol);
+                    var lead = fan.Lead;
+                    var reaction = Events.ReactionTo(news);
+                    var reactedHere = reaction?.Symbol == asset.Symbol;
+
+                    <CausalityStrip Class="causal-strip rise rise-3" Label="Как новость сдвинула цену">
+                        <CausalityStep Label="@($"Новость · {news.At:HH:mm}")" Weight="1.4"
+                                       Value="@news.Text" Truncate="true"
+                                       Note="@($"введена вами · разобрана по {fan.Assets.Count(row => row.WasAnalyzed)} {Plural(fan.Assets.Count(row => row.WasAnalyzed), "активу", "активам", "активам")}")" />
+
+                        <CausalityStep Label="Тональность">
+                            <span><Badge Tone="@Badge.ForPolarity(fan.Polarity)">@Badge.LabelOf(fan.Polarity)</Badge></span>
+                            <span class="ui-causality__note">уверенность модели <span class="num-xs">@fan.Confidence.ToString("F2")</span></span>
+                        </CausalityStep>
+
+                        <CausalityStep Label="@($"Сила для {asset.Symbol}")">
+                            @if (here?.Strength is { } impact)
                             {
-                                <EmptyState IconName="news"
-                                            Title="Новостей ещё не было"
-                                            Description="Рынок идёт на решениях трендового, контр-трендового агентов и маркет-мейкера. Новостной агент ждёт сигнала.">
-                                    <Action>
-                                        <AppButton Variant="secondary" Icon="plus" Href="/news">Добавить новость</AppButton>
-                                    </Action>
-                                </EmptyState>
+                                <span class="nowrap">
+                                    <span class="num-lg">@impact.ToString("F2")</span>
+                                    <span class="ui-causality__note">@ImpactScale.Word(impact) · @(here.Direction > 0 ? "вверх" : "вниз")</span>
+                                </span>
                             }
                             else
                             {
-                                <EmptyState IconName="news"
-                                            Title="Новостей не было"
-                                            Description="Новость вводится во время сессии: сигналу нужен рынок, который на него отреагирует." />
+                                <span class="ui-causality__value">не задет</span>
                             }
-                        }
-
-                        @if (NewsFeed.Entries.Count > 0)
-                        {
-                            <p class="events__hint">Выбранная новость отмечена на графике и разобрана в полосе под ним</p>
-                        }
-                    </ChildContent>
-                </Panel>
-            </div>
-
-            @* ─────────── ЦЕНТР ─────────── *@
-            <div class="center">
-
-                @* Одна главная метрика + компактная строка показателей (раздел 9.1) *@
-                <section class="quote rise rise-1" aria-label="Текущая цена и показатели">
-                    <div class="quote__price">
-                        <div class="num-hero @(isStale ? "is-stale" : null)">@chart.Close <span class="unit">₽</span></div>
-                        <div class="quote__delta tone-@Tone(chart.ChangeClass)">
-                            @* Пока данных нет, дельты нет тоже: стрелка рядом с прочерком
-                               ничего не значит, а прочерк уже сказал «неизвестно». *@
-                            @if (chart.ChangeAbsolute != "—")
+                            @if (lead is not null && lead.Symbol != asset.Symbol)
                             {
-                                <span class="num-sm">
-                                    @(chart.ChangeClass == "positive" ? "↗" : chart.ChangeClass == "negative" ? "↘" : "·") @chart.ChangeAbsolute
+                                <span class="ui-causality__note">@lead.Symbol задет сильнее — <span class="num-xs">@lead.Strength?.ToString("F2")</span></span>
+                            }
+                        </CausalityStep>
+
+                        <CausalityStep Label="Новостные" Weight="1.2">
+                            @if (reaction is null)
+                            {
+                                <span class="ui-causality__value">пока не ответили</span>
+                            }
+                            else if (reactedHere)
+                            {
+                                <span class="ui-causality__value causal-agents"><StatusDot Tone="agent-news" />@(reaction.Action == TradeAction.Buy ? "покупают" : "продают") @asset.Symbol</span>
+                            }
+                            else
+                            {
+                                <span class="ui-causality__value causal-agents"><StatusDot Tone="agent-news" />торговали @reaction.Symbol, не @asset.Symbol</span>
+                                <a class="ui-causality__note causal-link" href="@($"/trading/{reaction.Symbol}")">цепочка @reaction.Symbol →</a>
+                            }
+                        </CausalityStep>
+
+                        <CausalityStep Label="@($"Цена {asset.Symbol}")" Break="@(!reactedHere)">
+                            <span class="num-lg">@(market is null ? "—" : Price2(market.LastPrice))</span>
+                            @if (market is not null && news.PricesAtNews?.TryGetValue(asset.Symbol, out var from) == true)
+                            {
+                                var percent = from == 0m ? 0m : (market.LastPrice - from) / from * 100m;
+                                <span class="ui-causality__note">
+                                    с <span class="num-xs">@Price2(from)</span> ·
+                                    <span class="num-xs @DeltaTone(percent)">@Sign(percent)@Percent2(Math.Abs(percent)) %</span>@(reactedHere ? null : " · движение не новостное")
                                 </span>
-                                <span class="num-sm quote__percent">@chart.ChangePercent</span>
                             }
-                            @if (isStale)
-                            {
-                                <span class="quote__stale">нет обновлений</span>
-                            }
-                            else if (!isRunning && SessionTick is not null)
-                            {
-                                @* Артборд 03 подписывает герой-число словами. «закр» отдельной
-                                   метрикой в строку не добавлен: он равен герою, а раздел 9.0
-                                   запрещает показывать одну метрику дважды на экране. *@
-                                <span class="quote__stale">цена закрытия</span>
-                            }
-                        </div>
-                    </div>
-
-                    <div class="strip">
-                        <div class="strip__item"><span class="strip__label">откр</span><span class="num-sm">@chart.Open</span></div>
-                        <span class="strip__sep strip--optional" aria-hidden="true"></span>
-                        <div class="strip__item strip--optional"><span class="strip__label">макс</span><span class="num-sm">@chart.High</span></div>
-                        <span class="strip__sep strip--optional" aria-hidden="true"></span>
-                        <div class="strip__item strip--optional"><span class="strip__label">мин</span><span class="num-sm">@chart.Low</span></div>
-                        <span class="strip__sep" aria-hidden="true"></span>
-                        @* Объём известен только из снимка рынка. После остановки снимка нет, а
-                               в сводке прогона объём не хранится — значит «—», а не ноль:
-                               раздел 10, «Нет данных — —. Не „0“, не „N/A“». *@
-                        <div class="strip__item"><span class="strip__label">объём</span><span class="num-sm">@(snapshot is { } s ? Count0(s.Volume) : "—")</span></div>
-                        @if (TradesPerMinute is { } rate)
-                        {
-                            <span class="strip__sep" aria-hidden="true"></span>
-                            <div class="strip__item"><span class="strip__label">сделок в минуту</span><span class="num-sm">@Count0(rate)</span></div>
-                        }
-                    </div>
-                </section>
-
-                @* Главная панель экрана — график *@
-                <Panel Class="chart-panel rise rise-2" Flush="true">
-                    <Head>
-                        <div class="chart-panel__id">
-                            <h2>@CurrentAsset.Draft.Name</h2>
-                            <span class="chip num-sm">@CurrentAsset.Symbol</span>
-                            <StatusDot Tone="@(isRunning ? "up" : "muted")" Live="isRunning">@(isRunning ? "Торги активны" : "Торги остановлены")</StatusDot>
-                        </div>
-                        <Segmented TValue="string"
-                                   Label="Таймфрейм"
-                                   Items="@(Timeframes.All.Select(t => new SegmentedItem<string>(t.Key, t.Label)).ToArray())"
-                                   Value="@selectedTimeframe"
-                                   ValueChanged="SelectTimeframe" />
-                    </Head>
-                    <ChildContent>
-                        <div class="chart-body">
-                            <div class="chart-stage" @ref="chartViewport" tabindex="0"
-                                 aria-label="Свечной график цены @CurrentAsset.Draft.Name">
-                                <div class="chart-surface" role="img"
-                                     aria-label="Биржевой график цены @CurrentAsset.Draft.Name"></div>
-
-                                <div class="chart-hover-legend glass" aria-live="polite">
-                                    <span class="chart-hover-time num-xs" data-role="time">Нет данных</span>
-                                    <div class="chart-hover-values">
-                                        <span><small>откр</small><strong class="num-sm" data-role="open">—</strong></span>
-                                        <span><small>макс</small><strong class="num-sm" data-role="high">—</strong></span>
-                                        <span><small>мин</small><strong class="num-sm" data-role="low">—</strong></span>
-                                        <span><small>закр</small><strong class="num-sm" data-role="close">—</strong></span>
-                                    </div>
-                                </div>
-
-                                <button class="chart-live-reset" type="button" hidden>
-                                    <Icon Name="activity" Size="14" />
-                                    <span>К текущей цене</span>
-                                </button>
-
-                                @* Одна формулировка на одно состояние (раздел 17). Раньше здесь стояло
-                                   «Нет данных», а в подвале панели — «Ожидание данных»: одно
-                                   и то же, названное дважды и по-разному (пункт 21). *@
-                                <div class="chart-empty-state">Нет данных</div>
-                            </div>
-
-                            <footer class="chart-foot">
-                                <a class="chart-foot__credit" href="https://www.tradingview.com/"
-                                   target="_blank" rel="noreferrer noopener">
-                                    TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc.
-                                </a>
-                                <span class="num-xs">@chart.UpdatedAt</span>
-                            </footer>
-                        </div>
-                    </ChildContent>
-                </Panel>
-
-                @* Разбор выбранной новости — полоса связи (раздел 9.19, артборд 02).
-                   Раздел 9.19 называет «разбор новости на „Торгах“» первым местом
-                   применения полосы, и до сих пор её здесь не было вовсе. На экране
-                   она одна: больше полос связи на «Торгах» нет. *@
-                @if (SelectedNews is { } news)
-                {
-                    <CausalityStrip Class="rise rise-3" Label="Как новость сдвинула цену">
-                        <CausalityStep Label="Новость" Weight="1.2"
-                                       Value="@news.Text" Truncate="true"
-                                       Note="@($"{news.At.ToLocalTime():HH:mm} · введена пользователем")" />
-
-                        <CausalityStep Label="Тональность и уверенность" Weight="1.15">
-                            <span class="badge badge--@PolarityTone(news.Polarity)">@PolarityName(news.Polarity)</span>
-                            <span class="ui-causality__note">уверенность <span class="num-sm">@Fixed2(news.Confidence)</span></span>
                         </CausalityStep>
-
-                        <CausalityStep Label="Сила влияния" Weight="2.1">
-                            <span class="num-lg">@Fixed2(news.ImpactScore)</span>
-                            <span class="ui-causality__note">уверенность × чувствительность актива × совпадение по теме</span>
-                        </CausalityStep>
-
-                        <CausalityStep Label="Новостной агент" Weight="1.3"
-                                       Value="@NewsAgentAction(news)" Truncate="true"
-                                       Note="@NewsAgentTradeNote(news)" />
-
-                        <CausalityStep Label="Сдвиг цены" Weight="1.05"
-                                       Value="@PriceShift(news)"
-                                       Note="@PriceShiftNote(news)" />
                     </CausalityStrip>
                 }
 
-                @* Торги остановлены — состав задаётся до старта (артборд 03, раздел 16.1) *@
-                @if (!isRunning)
+                @* ─────────── Агенты, свёрнутые по стратегиям ─────────── *@
+                @if (market is not null && Strategies.Count > 0)
                 {
-                    <Panel Title="Состав агентов перед запуском" Class="rise rise-3" Flush="true">
-                        <MetaContent><span class="num-sm">@agentComposition.Length</span> типа стратегий</MetaContent>
-                        <ChildContent>
-                            <div class="compose-wrap">
-                                <table class="compose">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col" class="label compose__c-type">Тип</th>
-                                            <th scope="col" class="label compose__c-count">Количество</th>
-                                            <th scope="col" class="label compose__c-cap">Капитал агента, ₽</th>
-                                            <th scope="col" class="label compose__c-total">Всего капитала</th>
-                                            <th scope="col" class="label compose__c-why">Поведение</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var row in agentComposition)
-                                        {
-                                            var isOff = row.Count == 0;
-                                            var capitalError = HasCapitalError(row);
-                                            var typeLabel = AgentDisplay.GetTypeLabel(row.Type);
-                                            var lessLabel = "Убрать агента: " + typeLabel;
-                                            var moreLabel = "Добавить агента: " + typeLabel;
-                                            var capitalLabel = "Капитал агента: " + typeLabel;
-                                            var countLabel = "Количество агентов: " + typeLabel;
-                                            var rowClass = isOff ? "is-off" : null;
-                                            var capitalCellClass = capitalError ? "is-error" : null;
-                                            <tr class="@rowClass">
-                                                <th scope="row" class="compose__c-type">
-                                                    <span class="compose__cell">
-                                                        <StatusDot Tone="@AgentTone(row.Type)" />
-                                                        <span class="compose__type-name">@typeLabel</span>
-                                                    </span>
-                                                </th>
-                                                <td class="compose__c-count">
-                                                    <NumberStepper Value="row.Count"
-                                                                   ValueChanged="@(value => ChangeAgentCount(row, (value ?? row.Count) - row.Count))"
-                                                                   Min="0" Max="MaxAgentsPerType"
-                                                                   Class="compose__stepper"
-                                                                   Label="@countLabel"
-                                                                   DecrementLabel="@lessLabel"
-                                                                   IncrementLabel="@moreLabel" />
-                                                </td>
-                                                <td class="compose__c-cap @capitalCellClass">
-                                                    <NumberStepper Value="@((int)row.Capital)"
-                                                                   ValueChanged="@(value => { row.Capital = value ?? 0m; })"
-                                                                   Min="0" Max="null" Step="1000"
-                                                                   Editable="true" Fill="true"
-                                                                   Class="compose__capital"
-                                                                   Label="@capitalLabel"
-                                                                   DecrementLabel="@("Уменьшить капитал: " + typeLabel)"
-                                                                   IncrementLabel="@("Увеличить капитал: " + typeLabel)" />
-                                                    @if (capitalError)
-                                                    {
-                                                        <span class="field__error">
-                                                            <Icon Name="alert" Size="14" />
-                                                            <span>Капитал должен быть больше нуля</span>
-                                                        </span>
-                                                    }
-                                                </td>
-                                                <td class="compose__c-total num-sm">@Money0(row.TotalCapital)</td>
-                                                <td class="compose__c-why" title="@row.Behaviour">@row.Behaviour</td>
-                                            </tr>
-                                        }
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <th scope="row" class="compose__c-type">Итого</th>
-                                            <td class="compose__c-count num-sm">@TotalAgentCount</td>
-                                            <td class="compose__c-cap"></td>
-                                            <td class="compose__c-total num-sm">@Money0(TotalCompositionCapital)</td>
-                                            @* Примечание стоит в колонке «Поведение» итоговой строки — так в
-                                               артборде 03. Предупреждения валидации туда не уезжают: они не
-                                               про колонку, а про весь состав, и остаются строкой под таблицей. *@
-                                            <td class="compose__c-why">
-                                                @if (TotalAgentCount >= MinTotalAgents && TotalAgentCount <= MaxTotalAgents)
-                                                {
-                                                    <text>Новостной агент активируется после первой новости в сессии</text>
-                                                }
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                    var rows = Strategies;
+                    var totals = StrategyTable.Totals(rows);
 
-                                @* Строка относится ко всему составу, а не к колонке,
-                                   поэтому стоит под таблицей, а не в ячейке подвала. *@
-                                @if (TotalAgentCount < MinTotalAgents || TotalAgentCount > MaxTotalAgents)
+                    <Panel Class="strategies-panel rise rise-3" Flush="true">
+                        <Head>
+                            <span class="strategies__title">
+                                <h2>Агенты</h2>
+                                <span class="caption">
+                                    <span class="num-xs">@rows.Count</span> @Plural(rows.Count, "стратегия", "стратегии", "стратегий") ·
+                                    <span class="num-xs">@rows.Sum(row => row.Count)</span> @Plural(rows.Sum(row => row.Count), "экземпляр", "экземпляра", "экземпляров")
+                                </span>
+                            </span>
+                            <span class="ui-panel__meta">позиция и доля — в @asset.Symbol</span>
+                        </Head>
+                        <ChildContent>
+                            <div class="strategies" role="table" aria-label="Агенты по стратегиям">
+                                <div class="strategies__row strategies__row--head" role="row">
+                                    <span class="label" role="columnheader">Стратегия</span>
+                                    <span class="label right" role="columnheader">@asset.Symbol, шт · за сессию</span>
+                                    <span class="label" role="columnheader" title="Доля актива в портфеле стратегии, шкала от 0 до 20 %">Доля @asset.Symbol</span>
+                                    <span class="label right strategies__sep" role="columnheader">P/L портфеля, ₽</span>
+                                    <span class="label" role="columnheader">Действие и объяснение</span>
+                                </div>
+                                @foreach (var row in rows)
                                 {
-                                    <p class="compose__note">
-                                        <span class="compose__warn">
-                                            <Icon Name="alert" Size="14" />
-                                            <span>
-                                                @(TotalAgentCount < MinTotalAgents
-                                                    ? "Нужен хотя бы один агент"
-                                                    : $"Не больше {MaxTotalAgents} агентов в сессии")
-                                            </span>
+                                    <div class="strategies__row" role="row">
+                                        <span class="strategies__name" role="cell">
+                                            <StatusDot Tone="@AgentDisplay.GetTypeTone(row.Type)" />
+                                            @AgentDisplay.GetTypeLabel(row.Type)
+                                            @if (row.Count > 1)
+                                            {
+                                                <span class="num-xs t3">×@row.Count</span>
+                                            }
                                         </span>
-                                    </p>
+                                        <span class="right nowrap" role="cell">
+                                            <span class="num-md t1">@Count0(row.Position)</span>
+                                            <span class="num-xs @DeltaTone(row.PositionChange)">@Position0(row.PositionChange)</span>
+                                        </span>
+                                        <span class="strategies__share" role="cell">
+                                            <span class="strategies__track"><span class="strategies__fill" style="width:@ShareWidth(row.Share)"></span></span>
+                                            <span class="num-sm t2">@row.Share.ToString("0.0") %</span>
+                                        </span>
+                                        <span class="num-sm right strategies__sep @DeltaTone(row.Pnl)" role="cell">@Pnl2(row.Pnl)</span>
+                                        <span class="strategies__why" role="cell">
+                                            @if (row.Action is null)
+                                            {
+                                                <span class="nodata">—</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="strategies__act @(row.TradesElsewhere ? "t2" : null)">@row.Action</span>
+                                                @if (row.Explanation is not null)
+                                                {
+                                                    <span class="strategies__reason" title="@row.Explanation">@row.Explanation</span>
+                                                }
+                                            }
+                                        </span>
+                                    </div>
                                 }
+                                <div class="strategies__row strategies__row--foot" role="row">
+                                    <span role="cell">Итого</span>
+                                    <span class="right nowrap" role="cell">
+                                        <span class="num-sm t1">@Count0(totals.Position)</span>
+                                        <span class="num-xs t3">@Position0(totals.PositionChange)</span>
+                                    </span>
+                                    <span class="caption" role="cell">@(totals.PositionChange == 0m ? "рынок замкнут" : null)</span>
+                                    <span class="num-sm right strategies__sep @DeltaTone(totals.Pnl)" role="cell">@Pnl2(totals.Pnl)</span>
+                                    <a class="caption strategies__more" href="/agents" role="cell">каждый экземпляр — на «Агентах» →</a>
+                                </div>
                             </div>
                         </ChildContent>
                     </Panel>
                 }
 
-                @* Агенты: действие и объяснение — то, ради чего выбрана эта компоновка.
-
-                   Только пока торги идут. После остановки центр занимает таблица
-                   состава, готовящая следующий запуск, и вместе они не помещаются
-                   в 1080 — а раздел 9.8 требует, чтобы экран помещался. Артборд 03
-                   показывает после остановки состав, график сессии и счётчики, но не
-                   разбор по агентам: он живёт на «Агентах», которые остановку
-                   переживают (коммит 3fe4516). *@
-                @if (isRunning && agents.Count > 0)
-                {
-                <Panel Title="Агенты" Class="agents-panel rise rise-3" Flush="true">
-                    <MetaContent>
-                        @if (isRunning)
-                        {
-                            <text>@agents.Count в работе · @chart.UpdatedAt.ToLowerInvariant()</text>
-                        }
-                        else
-                        {
-                            <text>@agents.Count @Plural(agents.Count, "агент", "агента", "агентов") · сессия завершена</text>
-                        }
-                    </MetaContent>
-                    <ChildContent>
-                        @if (agents.Count == 0)
-                        {
-                            <div class="agents__skeleton">
-                                @for (var i = 0; i < 4; i++)
-                                {
-                                    <div class="agents__skeleton-row">
-                                        <Skeleton Width="160px" Height="14px" />
-                                        <Skeleton Width="88px" Height="12px" />
-                                        <Skeleton Width="72px" Height="12px" />
-                                        <Skeleton Width="220px" Height="12px" />
-                                    </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            @* Таблица строится тем же построителем, что и на «Агентах»
-                               (Services/AgentRoster): раньше страница группировала
-                               агентов сама и рисовала строку группы всегда, включая
-                               «×1» — четыре строки «Маркет-мейкер ×1» подряд при
-                               четырёх агентах. Раздел 9.8: группа из одного экземпляра
-                               строки группы не получает, единственный экземпляр
-                               выводится обычной строкой. Пункт 10 docs/ui-backlog.md.
-
-                               «Торги» показывают только верхний уровень — строку типа:
-                               агрегат, когда экземпляров несколько, и сам экземпляр,
-                               когда он один. Разбор по экземплярам живёт на «Агентах»,
-                               и дублировать его здесь незачем (раздел 9.0). *@
-                            var roster = AgentRoster.Build(agents, SessionDecisions);
-                            var rows = roster.Rows
-                                .Where(row => row.Kind == AgentRowKind.Group || row.ShowTypeDot)
-                                .ToArray();
-
-                            <div class="agents-wrap">
-                            <table class="agents">
-                                <thead>
-                                    <tr>
-                                        <th scope="col" class="label agents__c-name">Агент</th>
-                                        <th scope="col" class="label agents__c-num">Деньги</th>
-                                        <th scope="col" class="label agents__c-num">Позиция</th>
-                                        <th scope="col" class="label agents__c-num">P/L</th>
-                                        <th scope="col" class="label agents__c-why">Действие и объяснение</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var row in rows)
-                                    {
-                                        <tr @key="row.Title">
-                                            <th scope="row" class="agents__c-name">
-                                                <span class="agents__cell">
-                                                <StatusDot Tone="@AgentTone(row.Type)" />
-                                                <span class="agents__name">
-                                                    <span class="agents__title">@row.Title</span>
-                                                    <span class="agents__kind">@Kind(row.Type)</span>
-                                                </span>
-                                                </span>
-                                            </th>
-                                            <td class="agents__c-num num-sm">@Money0(row.Cash)</td>
-                                            <td class="agents__c-num num-sm @DeltaTone(row.Position)">@Position0(row.Position)</td>
-                                            <td class="agents__c-num num-sm @DeltaTone(row.Pnl)">@Pnl2(row.Pnl)</td>
-                                            <td class="agents__c-why">
-                                                @if (row.Action is null && row.Explanation is null)
-                                                {
-                                                    <span class="nodata">—</span>
-                                                }
-                                                else
-                                                {
-                                                    <span class="agents__why">
-                                                        @if (row.Action is not null)
-                                                        {
-                                                            <span class="agents__why-act">@row.Action</span>
-                                                        }
-                                                        @if (row.Explanation is not null)
-                                                        {
-                                                            <span class="agents__why-reason" title="@row.Explanation">@row.Explanation</span>
-                                                        }
-                                                    </span>
-                                                }
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                                <tfoot>
-                                    <tr>
-                                        <th scope="row" class="agents__c-name">Итого · @roster.AgentCount @Plural(roster.AgentCount, "агент", "агента", "агентов")</th>
-                                        <td class="agents__c-num num-sm">@Money0(roster.TotalCash)</td>
-                                        <td class="agents__c-num num-sm @DeltaTone(roster.TotalPosition)">@Position0(roster.TotalPosition)</td>
-                                        <td class="agents__c-num num-sm @DeltaTone(roster.TotalPnl)">@Pnl2(roster.TotalPnl)</td>
-                                        @* Текстовая колонка итоговой строки пуста: раздел 9.8
-                                           запрещает служебное перечисление в колонке
-                                           «объяснение», а число агентов уже стоит в
-                                           заголовке строки. Пункт 11 docs/ui-backlog.md. *@
-                                        <td class="agents__c-why"></td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                            </div>
-                        }
-                    </ChildContent>
-                </Panel>
-
-                }
-            </div>
-
-            @* ─────────── ПРАВЫЙ РЕЛЬС ─────────── *@
-            <div class="rail rail--right">
-
-                <Panel Title="Стакан заявок" Class="rise rise-2" Flush="true">
-                    <MetaContent>
-                        @* Шаг агрегации уровней: цены в стакане округляются именно по нему
-                           (раздел 11), и до сих пор он на экране не назывался нигде. *@
-                        @if (BookStep is { } step)
-                        {
-                            <text>шаг <span class="num-sm">@FormatPrice(step)</span></text>
-                        }
-                    </MetaContent>
-                    <ChildContent>
-                        @if (!isRunning && latestTick is null)
-                        {
-                            @* Кнопки запуска здесь нет: она стоит в шапке страницы, экран
-                               помещается целиком, и раздел 17 запрещает дублировать
-                               основное действие сверху и снизу. Пункт 18. *@
-                            <EmptyState IconName="book"
-                                        Title="Заявок нет"
-                                        Description="Торги остановлены — агенты сняли открытые заявки. Стакан наполнится после запуска сессии." />
-                        }
-                        else
-                        {
-                            <div class="book">
-                                <div class="book__head">
-                                    <span class="label">Цена</span>
-                                    <span class="label book__c-vol">Объём</span>
-                                    <span class="label book__c-orders">Заявок</span>
-                                </div>
-
-                                <div class="book__side">
-                                    @foreach (var row in book.Asks.TakeLast(7))
-                                    {
-                                        <div class="book__row @(row.IsEmpty ? "is-empty" : null)">
-                                            <span class="book__bar book__bar--ask" style="@row.DepthStyle" aria-hidden="true"></span>
-                                            <span class="num-sm book__c-price tone-down">@row.Price</span>
-                                            <span class="num-sm book__c-vol">@row.Volume</span>
-                                            <span class="num-sm book__c-orders">@row.Orders</span>
-                                        </div>
-                                    }
-                                </div>
-
-                                @* Спред и мид считаются по ОТОБРАЖАЕМЫМ ценам стакана,
-                                   иначе строка спреда противоречит строкам над и под ней. *@
-                                <div class="book__spread">
-                                    <span>спред <span class="num-sm">@(book.BestAsk is { } ba && book.BestBid is { } bb ? FormatPrice(ba - bb) : "—") ₽</span></span>
-                                    <span>мид <span class="num-sm">@(book.BestAsk is { } ma && book.BestBid is { } mb ? FormatPrice((ma + mb) / 2m) : "—") ₽</span></span>
-                                </div>
-
-                                <div class="book__side">
-                                    @foreach (var row in book.Bids.Take(7))
-                                    {
-                                        <div class="book__row @(row.IsEmpty ? "is-empty" : null)">
-                                            <span class="book__bar book__bar--bid" style="@row.DepthStyle" aria-hidden="true"></span>
-                                            <span class="num-sm book__c-price tone-up">@row.Price</span>
-                                            <span class="num-sm book__c-vol">@row.Volume</span>
-                                            <span class="num-sm book__c-orders">@row.Orders</span>
-                                        </div>
-                                    }
-                                </div>
-
-                                @* Лучшие цены обеих сторон — подвал стакана (артборды 01–03).
-                                   Раздел 9.0: bid и ask принадлежат стакану, и это их место. *@
-                                <div class="book__best hairline-top">
-                                    <span>лучший bid <span class="num-sm tone-up">@(book.BestBid is { } bb2 ? FormatPrice(bb2) : "—")</span></span>
-                                    <span>ask <span class="num-sm tone-down">@(book.BestAsk is { } ba2 ? FormatPrice(ba2) : "—")</span></span>
-                                </div>
-                            </div>
-                        }
-                    </ChildContent>
-                </Panel>
-
-                <Panel Title="Лента сделок" Class="tape-panel rise rise-3" Flush="true">
-                    <MetaContent>
-                        @if (trades.Length > 0)
-                        {
-                            <text>последние <span class="num-sm">@trades.Length</span></text>
-                        }
-                        else if (!isRunning && SessionTick is not null)
-                        {
-                            <text>сессия завершена</text>
-                        }
-                    </MetaContent>
-                    <ChildContent>
-                        @if (trades.Length == 0)
-                        {
-                            @* Пустое состояние у ленты было единственным, которого не
-                               существовало: при пустом списке оставались заголовок,
-                               мета «нет сделок» и легенда четырёх типов агентов над
-                               пустым прямоугольником в четыреста пикселей высотой.
-                               Пункт 22 docs/ui-backlog.md, раздел 14. *@
-                            @if (isRunning)
+                @* ─────────── ПРАВЫЙ РЕЛЬС — состояние на сейчас ─────────── *@
+                <div class="rail rail--right">
+                    <Panel Title="Стакан заявок" Class="rise rise-2" Flush="true">
+                        <MetaContent>
+                            @if (BookStep is { } step)
                             {
-                                <EmptyState IconName="activity"
-                                            Title="Сделок пока нет"
-                                            Description="Агенты выставили заявки — сделка появится, как только цены сойдутся." />
+                                <text>шаг <span class="num-sm">@FormatPrice(step)</span></text>
+                            }
+                        </MetaContent>
+                        <ChildContent>
+                            @if (latestTick is null)
+                            {
+                                <EmptyState IconName="book"
+                                            Title="Заявок нет"
+                                            Description="Стакан наполнится после запуска торгов." />
                             }
                             else
                             {
-                                <EmptyState IconName="activity"
-                                            Title="Лента пуста"
-                                            Description="Здесь идут сделки текущей сессии. Сделки закончившейся сохранены и видны на странице агента." />
-                            }
-                        }
-                        else
-                        {
-                        <div class="tape">
-                            <div class="tape__list">
-                                @foreach (var trade in trades)
-                                {
-                                    <div class="tape__row" title="@trade.Buyer ← @trade.Seller">
-                                        <span class="num-xs tape__time">@trade.Time</span>
-                                        <span class="num-sm tape__price @(trade.SideClass == "buy" ? "tone-up" : "tone-down")">
-                                            @(trade.SideClass == "buy" ? "↗" : "↘") @trade.Price
-                                        </span>
-                                        <span class="num-sm tape__qty">@trade.Volume</span>
-                                        <span class="tape__pair">
-                                            <StatusDot Tone="@NameTone(trade.Buyer)" />
-                                            <span class="num-xs tape__arrow">←</span>
-                                            <StatusDot Tone="@NameTone(trade.Seller)" />
-                                        </span>
+                                <div class="book">
+                                    <div class="book__head">
+                                        <span class="label">Цена</span>
+                                        <span class="label book__c-vol">Объём</span>
+                                        <span class="label book__c-orders">Заявок</span>
                                     </div>
-                                }
-                            </div>
 
-                            <div class="tape__legend">
-                                <StatusDot Tone="agent-trend">Трендовый</StatusDot>
-                                <StatusDot Tone="agent-counter">Контр-тренд</StatusDot>
-                                <StatusDot Tone="agent-mm">Маркет-мейкер</StatusDot>
-                                <StatusDot Tone="agent-news">Новостной</StatusDot>
-                            </div>
-                        </div>
-                        }
-                    </ChildContent>
-                </Panel>
+                                    <div class="book__side">
+                                        @foreach (var row in book.Asks.TakeLast(7))
+                                        {
+                                            <div class="book__row @(row.IsEmpty ? "is-empty" : null)">
+                                                <span class="book__bar book__bar--ask" style="@row.DepthStyle" aria-hidden="true"></span>
+                                                <span class="num-sm book__c-price tone-down">@row.Price</span>
+                                                <span class="num-sm book__c-vol">@row.Volume</span>
+                                                <span class="num-sm book__c-orders">@row.Orders</span>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <div class="book__spread">
+                                        <span>спред <span class="num-sm">@(book.BestAsk is { } ba && book.BestBid is { } bb ? FormatPrice(ba - bb) : "—") ₽</span></span>
+                                        <span>мид <span class="num-sm">@(book.BestAsk is { } ma && book.BestBid is { } mb ? FormatPrice((ma + mb) / 2m) : "—") ₽</span></span>
+                                    </div>
+
+                                    <div class="book__side">
+                                        @foreach (var row in book.Bids.Take(7))
+                                        {
+                                            <div class="book__row @(row.IsEmpty ? "is-empty" : null)">
+                                                <span class="book__bar book__bar--bid" style="@row.DepthStyle" aria-hidden="true"></span>
+                                                <span class="num-sm book__c-price tone-up">@row.Price</span>
+                                                <span class="num-sm book__c-vol">@row.Volume</span>
+                                                <span class="num-sm book__c-orders">@row.Orders</span>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <div class="book__best hairline-top">
+                                        <span>лучший bid <span class="num-sm tone-up">@(book.BestBid is { } bb2 ? FormatPrice(bb2) : "—")</span></span>
+                                        <span>ask <span class="num-sm tone-down">@(book.BestAsk is { } ba2 ? FormatPrice(ba2) : "—")</span></span>
+                                    </div>
+                                </div>
+                            }
+                        </ChildContent>
+                    </Panel>
+
+                    <Panel Title="Лента сделок" Class="tape-panel rise rise-3" Flush="true">
+                        <MetaContent>покупатель ← продавец</MetaContent>
+                        <ChildContent>
+                            @if (trades.Length == 0)
+                            {
+                                <EmptyState IconName="activity"
+                                            Title="@(isRunning ? "Сделок пока нет" : "Лента пуста")"
+                                            Description="@(isRunning ? "Агенты выставили заявки — сделка появится, как только цены сойдутся." : "Здесь идут сделки по этому активу во время торгов.")" />
+                            }
+                            else
+                            {
+                                <div class="tape">
+                                    <div class="tape__list">
+                                        @foreach (var trade in trades)
+                                        {
+                                            <div class="tape__row" title="@trade.Buyer ← @trade.Seller">
+                                                <span class="num-xs tape__time">@trade.Time</span>
+                                                <span class="num-sm tape__price @(trade.SideClass == "buy" ? "tone-up" : "tone-down")">
+                                                    @(trade.SideClass == "buy" ? "↗" : "↘") @trade.Price
+                                                </span>
+                                                <span class="num-sm tape__qty">@trade.Volume</span>
+                                                <span class="tape__pair">
+                                                    <StatusDot Tone="@NameTone(trade.Buyer)" />
+                                                    <span class="num-xs tape__arrow">←</span>
+                                                    <StatusDot Tone="@NameTone(trade.Seller)" />
+                                                </span>
+                                            </div>
+                                        }
+                                    </div>
+
+                                    <div class="tape__legend">
+                                        <StatusDot Tone="agent-trend">Трендовый</StatusDot>
+                                        <StatusDot Tone="agent-counter">Контр-тренд</StatusDot>
+                                        <StatusDot Tone="agent-mm">Маркет-мейкер</StatusDot>
+                                        <StatusDot Tone="agent-news">Новостной</StatusDot>
+                                    </div>
+                                </div>
+                            }
+                        </ChildContent>
+                    </Panel>
+                </div>
             </div>
-        </div>
+        }
     </main>
 </div>
 
@@ -788,11 +504,24 @@
     private static readonly IReadOnlyDictionary<string, TimeframeOption> TimeframesByKey =
         Timeframes.All.ToDictionary(item => item.Key, StringComparer.Ordinal);
 
-    private const decimal DemoStartPrice = 124.35m;
     private const int MetricHistoryLimit = 72;
     private const int VisibleOrderBookDepth = 50;
 
-    private ActiveAssetView CurrentAsset => ActiveAssetContext.GetView();
+    /// <summary>Тикер из адреса: <c>/trading/GLEN</c>. Пусто — открыть последний выбранный.</summary>
+    [Parameter] public string? Symbol { get; set; }
+
+    private SessionAsset? Asset => Registry.Find(Symbol);
+
+    /// <summary>Рынок актива в сессии — идущей или только что остановленной.</summary>
+    private AssetMarket? Market => Asset is { } asset ? Markets.Market(asset.Id) : null;
+
+    /// <summary>Прогон рынка этого актива: по нему читаются свечи и сводка.</summary>
+    private Guid RunId => Market?.RunId ?? Guid.Empty;
+
+    private Guid shownAssetId;
+    private Guid shownRunId;
+    private int appliedTick = -1;
+    private bool isBusy;
     private OrderBookViewData OrderBookData => BuildOrderBookData(latestTick?.OrderBook);
 
     private TradeRow[] RecentTrades => BuildTradeRows(tradeHistory);
@@ -809,7 +538,7 @@
     /// страницу: иначе переход между экранами обнулял бы счётчик и сессия
     /// «начиналась заново» на каждой навигации.
     /// </summary>
-    private string? Elapsed => SessionClock.Format(SimulationRunner.IsRunning, currentRunSummary);
+    private string? Elapsed => SessionClock.Format(Markets);
     private ElementReference chartViewport;
     private IJSObjectReference? tradingChartModule;
     private bool isChartRegistered;
@@ -829,24 +558,64 @@
     private static readonly TimeSpan SummaryRefreshInterval = TimeSpan.FromSeconds(1);
 
     /// <summary>
-    /// Состав сессии: из текущего тика, а когда тиков больше нет — из истории
-    /// прогона. Пункт 13 docs/ui-backlog.md: после остановки страница
-    /// показывала «Сделок 0», «Шаг симуляции —» и пустую таблицу, хотя сессия
-    /// только что шла и в ней были сделки.
+    /// Агенты, свёрнутые по стратегиям, глазами этого актива. Решения
+    /// соседних рынков нужны, чтобы стратегия, которая здесь ждёт, сказала,
+    /// чем занята: «торгуют KVAN».
     /// </summary>
-    private IReadOnlyList<AgentSnapshot> SessionAgents =>
-        latestTick?.Agents is { Count: > 0 } agents ? agents : EquityHistory.LastAgents;
+    private IReadOnlyList<StrategyRow> Strategies
+    {
+        get
+        {
+            if (Asset is not { } asset || Market is not { } market)
+            {
+                return [];
+            }
 
-    private IReadOnlyList<AgentDecision> SessionDecisions =>
-        latestTick?.Agents is { Count: > 0 } ? latestTick.Decisions ?? [] : EquityHistory.LastDecisions;
+            var elsewhere = Markets.Markets
+                .Where(other => other.AssetId != asset.Id)
+                .Select(other => (Asset: Registry.Find(other.AssetId), other.Last.Decisions))
+                .Where(item => item.Asset is not null)
+                .ToDictionary(item => item.Asset!.Symbol, item => item.Decisions);
+
+            return StrategyTable.Build(asset.Id, asset.Symbol, market.LastPrice,
+                market.Last.Accounts, market.Last.Decisions, elsewhere);
+        }
+    }
+
+    /// <summary>Доля на дорожке 0–20 %: больше пятой части портфеля в одном активе не бывает.</summary>
+    private static string ShareWidth(decimal share) =>
+        (Math.Clamp(share / 20m, 0m, 1m) * 100m).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private string PageContext
+    {
+        get
+        {
+            var trading = Markets.Markets.Count;
+
+            if (Markets.IsRunning && Markets.StartedAt is { } started)
+            {
+                return Market is null
+                    ? "Торги идут · актив вступает в них"
+                    : $"Торги · сессия открыта в {started:HH:mm} · в торгах {trading} {Plural(trading, "актив", "актива", "активов")}";
+            }
+
+            if (Markets.HasSession && Markets.StartedAt is { } from)
+            {
+                return Market is null
+                    ? "Торги остановлены · актив в сессии не участвовал"
+                    : $"Торги остановлены · сессия {from:HH:mm}–{(Markets.EndedAt ?? from):HH:mm}";
+            }
+
+            return "Торги не запущены · состав агентов — на «Активах»";
+        }
+    }
 
     /// <summary>
-    /// Сделок за сессию — из сводки прогона, а не из локального счётчика
-    /// страницы: seenTradeIds считает только то, что увидел ЭТОТ экземпляр
-    /// компонента, и обнуляется при каждом заходе на страницу. Тот же источник,
-    /// что у «Агентов», — иначе две страницы называли бы разные числа.
+    /// Сделок за сессию — счётчик биржи по активу, тот же, что у «Активов» и
+    /// «Агентов»: иначе страницы называли бы разные числа. После остановки
+    /// рынка в сессии нет — тогда из сводки прогона.
     /// </summary>
-    private int SessionTradeCount => currentRunSummary?.TradeCount ?? seenTradeIds.Count;
+    private long SessionTradeCount => Market?.TradeCount ?? currentRunSummary?.TradeCount ?? seenTradeIds.Count;
 
     /// <summary>
     /// Сделок в минуту за сессию. Шаг симуляции — секунда, значит число тиков
@@ -920,62 +689,106 @@
 
     protected override void OnInitialized()
     {
-        SimulationRunner.OnTick += HandleTick;
-        NewsFeed.Changed += HandleNewsFeedChanged;
-        latestTick = SimulationRunner.Current;
-        if (latestTick is not null)
-        {
-            PrimeFromSnapshot(latestTick, DateTimeOffset.Now);
-        }
+        Markets.Changed += HandleMarketsChanged;
+        Events.Changed += HandleEventsChanged;
+        Registry.Changed += HandleEventsChanged;
 
-        // Свечи грузятся и когда тика нет: заход на страницу после остановки —
-        // это разбор закончившейся сессии, и график в нём главная панель.
-        LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
-
-        // Заход на страницу торги НЕ запускает. Раньше отсюда вызывался
-        // EnsureSimulationAsync, и переход по ссылке сам стартовал сессию: из-за
-        // этого «торги не запущены» и «торги остановлены» на этой странице были
-        // ненаблюдаемы, кнопка «Запустить торги» — недостижима, а кнопка
-        // остановки бессмысленна, потому что любой возврат запускал прогон
-        // заново. Запуск — явное действие человека, и живёт оно в одном месте:
-        // в кнопке ниже.
-        UpdateRunSummary();
+        // Заход на страницу торги не запускает: запуск — явное действие
+        // человека, и живёт оно в кнопке.
     }
 
-    private async Task EnsureSimulationAsync()
+    /// <summary>
+    /// Свитчер меняет только адрес, и Blazor переиспользует тот же компонент:
+    /// смену актива надо поймать здесь, иначе на экране GLEN остались бы
+    /// свечи и лента KVAN.
+    /// </summary>
+    protected override void OnParametersSet()
     {
-        // Load the summary for the currently running singleton simulation first, so the
-        // match check below sees the real asset name/type instead of falling back to
-        // CurrentAsset.IsFallback on a freshly-created component (which would needlessly
-        // restart an already-matching run on re-navigation).
-        UpdateRunSummary();
+        var assetId = Asset?.Id ?? Guid.Empty;
 
-        if (SimulationRunner.IsRunning && SimulationMatchesCurrentAsset())
+        if (assetId == shownAssetId)
         {
-            UpdateRunSummary();
             return;
         }
 
-        if (SimulationRunner.IsRunning)
+        shownAssetId = assetId;
+        ResetViewState();
+        appliedTick = -1;
+        shownRunId = RunId;
+        selectedNewsAt = null;
+
+        if (Market?.Last is { } tick)
         {
-            await SimulationRunner.StopAsync();
+            latestTick = tick;
+            appliedTick = tick.Tick;
+            PrimeFromSnapshot(tick, DateTimeOffset.Now);
         }
 
-        // Новый запуск — новый период. Счётчики страницы обнуляются вместе с биржей.
-        // Раньше сброс происходил только при замене ИДУЩЕЙ симуляции, поэтому после
-        // «остановить → запустить» рядом оказывались метрики разных запусков: биржа
-        // считала объём с нуля, а сделки, свечи и лента оставались от прошлого прогона.
-        ResetViewState();
-
-        await SimulationRunner.StartAsync(CreateSessionConfig(CurrentAsset));
+        // Свечи грузятся и без тика: заход после остановки — разбор сессии.
+        LoadPersistedCandles(selectedTimeframe, forceScrollToRealtime: true);
+        pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime: true);
         UpdateRunSummary();
     }
 
-    private void HandleTick(SimulationTickResult tickResult)
+    private async Task StartAsync()
+    {
+        if (isBusy || !Composition.IsValid || Registry.Assets.Count == 0)
+        {
+            return;
+        }
+
+        isBusy = true;
+
+        try
+        {
+            await Markets.StartAsync(Composition.ToSpecs());
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        if (isBusy)
+        {
+            return;
+        }
+
+        isBusy = true;
+
+        try
+        {
+            await Markets.StopAsync();
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Шаг сессии отработан по всем рынкам. Странице нужен тик своего актива;
+    /// новый прогон этого рынка (новая сессия) начинает экран с нуля.
+    /// </summary>
+    private void HandleMarketsChanged()
     {
         _ = InvokeAsync(() =>
         {
-            ApplyTick(tickResult);
+            if (RunId != shownRunId)
+            {
+                ResetViewState();
+                appliedTick = -1;
+                shownRunId = RunId;
+                pendingChartSync = BuildFullChartSyncPayload(forceScrollToRealtime: true);
+            }
+
+            if (Market?.Last is { } tick && tick.Tick != appliedTick)
+            {
+                ApplyTick(tick);
+            }
+
             StateHasChanged();
         });
     }
@@ -984,9 +797,9 @@
     {
         var receivedAt = DateTimeOffset.Now;
         latestTick = tickResult;
+        appliedTick = tickResult.Tick;
         lastChartUpdate = receivedAt;
         UpdateRunSummary();
-        SyncCompositionFromRun(tickResult);
         UpdateTradeHistory(tickResult);
         UpdateChartSeries(tickResult, receivedAt);
         LoadPersistedCandles(selectedTimeframe);
@@ -1038,6 +851,7 @@
         if (firstRender)
         {
             await ApplyPreferredTimeframeAsync();
+            await ResolveSymbolAsync();
         }
 
         if (pendingChartSync is not null)
@@ -1047,6 +861,31 @@
         else
         {
             await SyncChartSessionStateAsync();
+        }
+    }
+
+    /// <summary>
+    /// Адрес без тикера открывает последний выбранный актив; адрес с тикером
+    /// делает его последним выбранным (DESIGN.md 13). Выбор живёт в браузере,
+    /// поэтому читается только после первой отрисовки.
+    /// </summary>
+    private async Task ResolveSymbolAsync()
+    {
+        if (Asset is { } asset)
+        {
+            await Selected.RememberAsync(asset.Symbol);
+            return;
+        }
+
+        var trading = Markets.Markets
+            .Select(market => Registry.Find(market.AssetId)?.Symbol)
+            .OfType<string>()
+            .ToArray();
+        var symbol = await Selected.ResolveAsync(Registry.Assets, trading);
+
+        if (symbol is not null)
+        {
+            Navigation.NavigateTo($"/trading/{symbol}", replace: true);
         }
     }
 
@@ -1061,7 +900,7 @@
     /// </summary>
     private async Task SyncChartSessionStateAsync()
     {
-        var active = SimulationRunner.IsRunning;
+        var active = Markets.IsRunning;
 
         if (!isChartRegistered || tradingChartModule is null || chartSessionActive == active)
         {
@@ -1251,15 +1090,9 @@
 
     private void UpdateRunSummary()
     {
-        // Прогон закончился — раннер обнулил CurrentRunId, и спрашивать сводку
-        // стало не у кого. Идентификатор берётся из истории прогона: она знает,
-        // какому прогону принадлежит её состав, и переживает остановку. Тем же
-        // приёмом это решено на «Агентах» (коммит 3fe4516).
-        var runId = SimulationRunner.CurrentRunId;
-        if (runId == Guid.Empty)
-        {
-            runId = EquityHistory.RunId;
-        }
+        // Прогон рынка этого актива: рынки сессии помнят его и после
+        // остановки, когда раннер уже всё очистил.
+        var runId = RunId;
 
         if (runId == Guid.Empty)
         {
@@ -1284,132 +1117,6 @@
         observedRunId = runId;
         lastSummaryRead = now;
 
-    }
-
-    private bool SimulationMatchesCurrentAsset()
-    {
-        if (currentRunSummary is null)
-        {
-            return CurrentAsset.IsFallback;
-        }
-
-        return string.Equals(currentRunSummary.AssetName, CurrentAsset.Draft.Name, StringComparison.Ordinal) &&
-               currentRunSummary.AssetType == CurrentAsset.Draft.AssetType;
-    }
-
-    private const int MaxAgentsPerType = 8;
-    private const int MinTotalAgents = 1;
-    private const int MaxTotalAgents = 32;
-
-    // Значения по умолчанию — ровно те, что были зашиты в конфиг до появления
-    // формы, чтобы поведение без вмешательства пользователя не изменилось.
-    // Стартовая позиция задаётся типом и в UI не выводится: её изменение
-    // поехало бы в базу расчёта P/L.
-    private readonly AgentCompositionRow[] agentComposition =
-    [
-        new(AgentType.TrendFollowing, 110_000m, 60m, "идёт за импульсом по двум средним"),
-        new(AgentType.CounterTrend, 110_000m, 60m, "торгует откаты к средней"),
-        new(AgentType.MarketMaker, 140_000m, 160m, "держит заявки по обе стороны"),
-        new(AgentType.NewsDriven, 105_000m, 55m, "ждёт первую новость, до неё неактивен")
-    ];
-
-    private Guid syncedCompositionRunId = Guid.Empty;
-
-    private int TotalAgentCount => agentComposition.Sum(row => row.Count);
-
-    private decimal TotalCompositionCapital => agentComposition.Sum(row => row.TotalCapital);
-
-    // Ноль агентов типа — допустимо, поэтому капитал проверяется только у тех
-    // строк, которые реально попадут в сессию.
-    private static bool HasCapitalError(AgentCompositionRow row) => row.Count > 0 && row.Capital <= 0m;
-
-    private bool IsCompositionValid =>
-        TotalAgentCount >= MinTotalAgents &&
-        TotalAgentCount <= MaxTotalAgents &&
-        agentComposition.All(row => row.Count >= 0 && row.Count <= MaxAgentsPerType && !HasCapitalError(row));
-
-    private void ChangeAgentCount(AgentCompositionRow row, int delta) =>
-        row.Count = Math.Clamp(row.Count + delta, 0, MaxAgentsPerType);
-
-    /// <summary>
-    /// Приводит форму к составу, которым реально идёт сессия: после перезагрузки
-    /// страницы посреди прогона форма иначе показывала бы значения по умолчанию,
-    /// а не то, чем торгуют на экране.
-    /// </summary>
-    private void SyncCompositionFromRun(SimulationTickResult tickResult)
-    {
-        var runId = SimulationRunner.CurrentRunId;
-        if (runId == Guid.Empty || syncedCompositionRunId == runId)
-        {
-            return;
-        }
-
-        syncedCompositionRunId = runId;
-
-        foreach (var row in agentComposition)
-        {
-            var live = tickResult.Agents.Where(agent => agent.Type == row.Type).ToArray();
-            row.Count = live.Length;
-
-            if (live.Length > 0)
-            {
-                row.Capital = Math.Round(live[0].InitialCash, 0, MidpointRounding.AwayFromZero);
-            }
-        }
-    }
-
-    private SimulationConfig CreateSessionConfig(ActiveAssetView asset) =>
-        new(
-            asset.Draft.Name,
-            asset.Profile.Description,
-            asset.Draft.AssetType,
-            CalculateStartPrice(asset),
-            TimeSpan.FromSeconds(1),
-            agentComposition
-                .Where(row => row.Count > 0)
-                .SelectMany(row => Enumerable.Repeat(
-                    new AgentSpec(row.Type, row.Capital, row.DefaultPosition),
-                    row.Count))
-                .ToArray());
-
-    private sealed class AgentCompositionRow(
-        AgentType type,
-        decimal capital,
-        decimal defaultPosition,
-        string behaviour)
-    {
-        public AgentType Type { get; } = type;
-        public decimal DefaultPosition { get; } = defaultPosition;
-        public string Behaviour { get; } = behaviour;
-
-        public int Count { get; set; } = 1;
-        public decimal Capital { get; set; } = capital;
-
-        public decimal TotalCapital => Count * Capital;
-    }
-
-    private static decimal CalculateStartPrice(ActiveAssetView asset)
-    {
-        if (asset.IsFallback)
-        {
-            return DemoStartPrice;
-        }
-
-        var basePrice = asset.Draft.AssetType switch
-        {
-            AssetType.Stock => 96m,
-            AssetType.Bond => 101m,
-            AssetType.Commodity => 88m,
-            AssetType.Crypto => 72m,
-            _ => DemoStartPrice
-        };
-
-        var adjusted = basePrice
-            + asset.Draft.GrowthPotential * 0.42m
-            + (asset.Draft.IncludeGovernmentSupport ? 4m : 0m)
-            + asset.Profile.NewsSensitivity * 10m;
-
-        return Math.Round(adjusted / 0.05m, MidpointRounding.AwayFromZero) * 0.05m;
     }
 
     private void UpdateTradeHistory(SimulationTickResult tickResult)
@@ -1623,7 +1330,7 @@
 
         var markers = new List<ChartMarker>();
 
-        foreach (var entry in NewsFeed.Entries)
+        foreach (var entry in Events.News)
         {
             var slot = AlignToTimeframe(entry.At, interval);
             if (slot < first || slot > last)
@@ -1636,7 +1343,7 @@
                 "aboveBar",
                 "arrowDown",
                 "--chart-news-marker",
-                Fixed2(entry.ImpactScore)));
+                entry.Fan?.For(Asset?.Symbol)?.Strength is { } impact ? Fixed2(impact) : "не задет"));
         }
 
         var seenSlots = new HashSet<long>();
@@ -1679,12 +1386,12 @@
     /// открывший «Торги» после новости, приходит смотреть именно её.
     /// </summary>
     private DateTimeOffset? SelectedNewsAt =>
-        selectedNewsAt is { } chosen && NewsFeed.Entries.Any(entry => entry.At == chosen)
+        selectedNewsAt is { } chosen && Events.News.Any(entry => entry.At == chosen)
             ? chosen
-            : NewsFeed.Entries.FirstOrDefault()?.At;
+            : Events.News.FirstOrDefault()?.At;
 
-    private SessionNewsEntry? SelectedNews =>
-        SelectedNewsAt is { } at ? NewsFeed.Entries.FirstOrDefault(entry => entry.At == at) : null;
+    private SessionEvent? SelectedNews =>
+        SelectedNewsAt is { } at ? Events.News.FirstOrDefault(entry => entry.At == at) : null;
 
     private void SelectNews(DateTimeOffset at) => selectedNewsAt = at;
 
@@ -1694,105 +1401,6 @@
         {
             SelectNews(at);
         }
-    }
-
-    private static string PolarityTone(SignalPolarity polarity) => polarity switch
-    {
-        SignalPolarity.Positive => "up",
-        SignalPolarity.Negative => "down",
-        _ => "warn"
-    };
-
-    private static string PolarityName(SignalPolarity polarity) => polarity switch
-    {
-        SignalPolarity.Positive => "Позитивная",
-        SignalPolarity.Negative => "Негативная",
-        _ => "Нейтральная"
-    };
-
-    /// <summary>Первая сделка новостного агента после новости — если она была.</summary>
-    private Trade? NewsAgentTrade(SessionNewsEntry news) =>
-        tradeHistory
-            .Where(trade => trade.ExecutedAt >= news.At
-                            && (IsNewsAgent(trade.BuyerAgentName) || IsNewsAgent(trade.SellerAgentName)))
-            .OrderBy(trade => trade.ExecutedAt)
-            .FirstOrDefault();
-
-    private string NewsAgentAction(SessionNewsEntry news)
-    {
-        var trade = NewsAgentTrade(news);
-        if (trade is null)
-        {
-            return "—";
-        }
-
-        var buys = IsNewsAgent(trade.BuyerAgentName);
-        return $"{(buys ? "покупает" : "продаёт")} {FormatQuantity(trade.Quantity)} по {FormatPrice(trade.Price)}";
-    }
-
-    private string NewsAgentTradeNote(SessionNewsEntry news)
-    {
-        var trade = NewsAgentTrade(news);
-        if (trade is null)
-        {
-            return "сделок после новости пока не было";
-        }
-
-        var counterparty = IsNewsAgent(trade.BuyerAgentName) ? trade.SellerAgentName : trade.BuyerAgentName;
-        return $"сделка {trade.ExecutedAt.ToLocalTime():HH:mm:ss} с {AgentTypeNames.InstrumentalForAgentName(counterparty)}";
-    }
-
-    /// <summary>Цена на момент новости — закрытие последней свечи до неё.</summary>
-    private decimal? PriceAtNews(SessionNewsEntry news)
-    {
-        var candles = GetSelectedTimeframeState().Candles;
-        var before = candles.LastOrDefault(candle => candle.Timestamp <= news.At);
-        return before?.Close;
-    }
-
-    private string PriceShift(SessionNewsEntry news)
-    {
-        var before = PriceAtNews(news);
-        var after = GetSelectedTimeframeState().Candles.LastOrDefault()?.Close;
-
-        if (before is not { } from || after is not { } to)
-        {
-            return "—";
-        }
-
-        // Раздел 10: «Текст никогда не показывает A → A». После округления до
-        // двух знаков начальное и конечное могут совпасть — тогда изменение
-        // называется словом, а не стрелкой из числа в то же число.
-        return FormatPrice(from) == FormatPrice(to)
-            ? "без изменения"
-            : $"{FormatPrice(from)} → {FormatPrice(to)}";
-    }
-
-    private string PriceShiftNote(SessionNewsEntry news)
-    {
-        var before = PriceAtNews(news);
-        var after = GetSelectedTimeframeState().Candles.LastOrDefault()?.Close;
-
-        if (before is not { } from || after is not { } to || from == 0m)
-        {
-            return "";
-        }
-
-        var elapsed = DateTimeOffset.Now - news.At;
-        var minutes = Math.Max(1, (int)Math.Round(elapsed.TotalMinutes, MidpointRounding.AwayFromZero));
-
-        // Цена не сдвинулась — значение выше уже сказало «без изменения», и
-        // приписывать к нему «↗ +0,00 %» значит спорить с самим собой в
-        // соседней строке (разделы 10 и 17).
-        if (FormatPrice(from) == FormatPrice(to))
-        {
-            return $"за {minutes} мин";
-        }
-
-        var percent = (to - from) / from * 100m;
-        var arrow = percent > 0m ? "↗" : "↘";
-
-        return $"за {minutes} мин {arrow} {Sign(percent)}{Math.Abs(percent):0.00} %";
     }
 
     private ChartSyncPayload BuildIncrementalChartSyncPayload(AggregatedCandle candle, bool forceScrollToRealtime)
@@ -1862,14 +1470,9 @@
             return;
         }
 
-        // После остановки CurrentRunId обнулён, но свечи закончившегося прогона
-        // никуда не делись — график обязан показывать разбор сессии, а не
-        // «Нет данных» (пункт 13 docs/ui-backlog.md).
-        var runId = SimulationRunner.CurrentRunId;
-        if (runId == Guid.Empty)
-        {
-            runId = EquityHistory.RunId;
-        }
+        // После остановки свечи закончившегося прогона никуда не делись —
+        // график обязан показывать разбор сессии, а не «Нет данных».
+        var runId = RunId;
 
         if (runId == Guid.Empty)
         {
@@ -2129,18 +1732,20 @@
         return builder.ToString();
     }
 
-    private void HandleNewsFeedChanged() => _ = InvokeAsync(StateHasChanged);
+    private void HandleEventsChanged() => _ = InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {
-        SimulationRunner.OnTick -= HandleTick;
-        NewsFeed.Changed -= HandleNewsFeedChanged;
+        Markets.Changed -= HandleMarketsChanged;
+        Events.Changed -= HandleEventsChanged;
+        Registry.Changed -= HandleEventsChanged;
     }
 
     public async ValueTask DisposeAsync()
     {
-        SimulationRunner.OnTick -= HandleTick;
-        NewsFeed.Changed -= HandleNewsFeedChanged;
+        Markets.Changed -= HandleMarketsChanged;
+        Events.Changed -= HandleEventsChanged;
+        Registry.Changed -= HandleEventsChanged;
 
         if (tradingChartModule is null)
         {
