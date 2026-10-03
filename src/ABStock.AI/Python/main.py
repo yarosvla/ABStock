@@ -8,7 +8,7 @@ from openai import OpenAI
 
 import json
 
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 
 from dotenv import load_dotenv
 
@@ -22,14 +22,43 @@ classifier = pipeline(
     model="ProsusAI/finbert"
 )
 
+translation_model_name = "Helsinki-NLP/opus-mt-ru-en"
+
+translation_tokenizer = AutoTokenizer.from_pretrained(
+    translation_model_name
+)
+
+translation_model = AutoModelForSeq2SeqLM.from_pretrained(
+    translation_model_name
+)
+
 class Request(BaseModel):
     text: str
 
 @app.post("/analyze")
 def analyze(req: Request):
 
-    results = classifier(
+    inputs = translation_tokenizer(
         req.text,
+        return_tensors="pt",
+        truncation=True,
+        max_length=512
+    )
+
+    translated_tokens = translation_model.generate(
+        **inputs,
+        max_length=512
+    )
+
+    translated = translation_tokenizer.decode(
+        translated_tokens[0],
+        skip_special_tokens=True
+    )
+
+    print(f"FinBERT input: {translated}")
+
+    results = classifier(
+        translated,
         top_k=None
     )
 
@@ -76,7 +105,7 @@ def generate_profile(req: dict):
     prompt = req["prompt"]
 
     response = get_client().chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5-mini",
         messages=[
             {
                 "role": "system",
@@ -91,7 +120,7 @@ def generate_profile(req: dict):
             "type": "json_object"
         }
     )
-    """
+    
     usage = response.usage
 
     print(
@@ -100,7 +129,7 @@ def generate_profile(req: dict):
         f"output={usage.completion_tokens}, "
         f"total={usage.total_tokens}"
     )
-
+    """
     result = json.loads(response.choices[0].message.content)
 
     print(json.dumps(result, ensure_ascii=False, indent=2))

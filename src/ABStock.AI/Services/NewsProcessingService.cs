@@ -8,11 +8,11 @@ internal sealed class NewsProcessingService : INewsProcessingService
 {
     /// <summary>
     /// С какой близости фактор считается задетым новостью. У
-    /// text-embedding-3-small косинус несвязанных текстов около 0,1–0,3,
+    /// text-embedding-3-large косинус несвязанных текстов около 0,1–0,3,
     /// новости и фактора на одну тему — около 0,4–0,6. Прежний порог 0,75
     /// почти не достигался, и любая новость выходила «ни о чём».
     /// </summary>
-    internal const decimal RelevanceThreshold = 0.40m;
+    internal const decimal RelevanceThreshold = 0.60m;
 
     private readonly IFinBertAnalyzer _finBert;
     private readonly IFactorMatcher _matcher;

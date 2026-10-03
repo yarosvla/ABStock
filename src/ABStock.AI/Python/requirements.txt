@@ -4,3 +4,4 @@ openai
 transformers
 torch
 python-dotenv==1.2.4
+sentencepiece==0.2.2

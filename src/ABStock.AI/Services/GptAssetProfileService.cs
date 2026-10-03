@@ -82,13 +82,18 @@ internal sealed class GptAssetProfileService : IAssetProfileService
 
             var negativeCount =
                 result.Factors.Count(f => !f.IsPositive);
-
+/*
             var valid =
                 result.Factors.Count >= 40 &&
                 result.Factors.Count <= 50 &&
                 positiveCount >= 15 &&
                 negativeCount >= 15;
-
+*/
+            var valid =
+                result.Factors.Count == 40 &&
+                positiveCount == 20 &&
+                negativeCount == 20;
+                
             if (valid)
             {
                 break;
