@@ -10,7 +10,7 @@ internal sealed class OpenAIEmbeddingService
     public OpenAIEmbeddingService(string apiKey)
     {
         _client = new EmbeddingClient(
-            "text-embedding-3-small",
+            "text-embedding-3-large",
             apiKey);
     }
 

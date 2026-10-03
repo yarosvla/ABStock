@@ -29,7 +29,7 @@ public class GptAssetProfileServiceTests
     [Fact]
     public async Task Valid_answer_gives_balanced_ai_profile()
     {
-        var generated = Enumerable.Range(0, 44)
+        var generated = Enumerable.Range(0, 40)
             .Select(i => new { name = $"Фактор {i}", isPositive = i % 2 == 0, importance = 0.5m + i / 100m })
             .ToArray();
 

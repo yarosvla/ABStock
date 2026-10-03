@@ -4,6 +4,8 @@ using ABStock.AI.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
+using DotNetEnv;
+
 namespace ABStock.AI.Extensions;
 
 public static class ServiceCollectionExtensions
@@ -12,6 +14,21 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddABStockAI(this IServiceCollection services, IConfiguration configuration)
     {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+
+        while (directory is not null)
+        {
+            var envPath = Path.Combine(directory.FullName, ".env");
+
+            if (File.Exists(envPath))
+            {
+                Env.Load(envPath);
+                break;
+            }
+
+            directory = directory.Parent;
+        }
+
         var apiKey =
             Environment.GetEnvironmentVariable("OPENAI_API_KEY")
             ?? configuration["OpenAI:ApiKey"];
