@@ -6,8 +6,9 @@ using ABStock.Shared;
 namespace ABStock.AI.Tests;
 
 /// <summary>
-/// Сила влияния — сумма вкладов задетых факторов: тональность × близость ×
-/// вес, со знаком фактора, умноженная на чувствительность актива.
+/// Сила влияния — сумма вкладов задетых факторов:
+/// тональность × близость × вес, умноженная на чувствительность актива.
+/// Знак влияния определяется тональностью новости.
 /// </summary>
 public class NewsProcessingServiceTests
 {
@@ -53,13 +54,31 @@ public class NewsProcessingServiceTests
     }
 
     [Fact]
-    public async Task Positive_news_on_negative_factor_pushes_impact_down()
+    public async Task Positive_news_produces_positive_impact()
     {
         var profile = Profiles.With(
             new AssetFactor("Рост тарифов на тепло", false, 0.5m, [1f, 0f]));
 
-        var signal = await AnalyzeAsync(profile, new FixedFinBert(0.70m, 0.20m, 0.10m));
+        var signal = await AnalyzeAsync(
+            profile,
+            new FixedFinBert(0.70m, 0.20m, 0.10m));
 
+        Assert.Equal(SignalPolarity.Positive, signal.Polarity);
+        Assert.Equal(1, signal.NegativeMatches);
+        Assert.True(signal.ImpactScore > 0m);
+    }
+
+    [Fact]
+    public async Task Negative_news_produces_negative_impact()
+    {
+        var profile = Profiles.With(
+            new AssetFactor("Рост тарифов на тепло", false, 0.5m, [1f, 0f]));
+
+        var signal = await AnalyzeAsync(
+            profile,
+            new FixedFinBert(0.10m, 0.20m, 0.70m));
+
+        Assert.Equal(SignalPolarity.Negative, signal.Polarity);
         Assert.Equal(1, signal.NegativeMatches);
         Assert.True(signal.ImpactScore < 0m);
     }

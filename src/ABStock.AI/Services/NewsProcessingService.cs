@@ -58,11 +58,6 @@ internal sealed class NewsProcessingService : INewsProcessingService
                 finBertResult.PositiveProbability
                 - finBertResult.NegativeProbability;
 
-            if (!match.Factor.IsPositive)
-            {
-                sentimentStrength *= -1;
-            }
-
             var contribution =
                 sentimentStrength
                 * match.Similarity
