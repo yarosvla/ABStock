@@ -7,4 +7,7 @@ public record MarketSnapshot(
     decimal Volume,
     IReadOnlyList<decimal> RecentPrices,
     IReadOnlyList<Trade> RecentTrades
-);
+)
+{
+    public long TotalTradeCount { get; init; }
+}

@@ -1,3 +1,6 @@
+using ABStock.Application.Accounts;
+using ABStock.Application.Assets;
+using ABStock.Application.Markets;
 using ABStock.Application.Simulation;
 using ABStock.Application.MarketHistory;
 using ABStock.Agents;
@@ -12,13 +15,19 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddABStockApplication(this IServiceCollection services)
     {
         services.AddABStockExchange();
+        services.TryAddSingleton<IAssetStartPricePolicy, AssetStartPricePolicy>();
+        services.TryAddSingleton<IAssetCatalog, InMemoryAssetCatalog>();
+        services.TryAddSingleton<IMarketSessionFactory, MarketSessionFactory>();
+        services.TryAddSingleton<ITradingSessionFactory, TradingSessionFactory>();
         services.TryAddSingleton<IAgentFactory, AgentFactory>();
         services.TryAddSingleton<IMarketHistoryStore, NullMarketHistoryStore>();
         services.TryAddSingleton<IMarketCandleReader, NullMarketCandleReader>();
         services.TryAddSingleton<ISimulationHistoryReader, NullSimulationHistoryReader>();
+        services.TryAddSingleton<ITradingSessionHistoryReader, NullTradingSessionHistoryReader>();
         services.TryAddSingleton<IAgentStatisticsReader, NullAgentStatisticsReader>();
         services.TryAddSingleton<SimulationRunner>();
         services.TryAddSingleton<ISimulationRunner>(provider => provider.GetRequiredService<SimulationRunner>());
+        services.TryAddSingleton<IMultiAssetSimulationRunner>(provider => provider.GetRequiredService<SimulationRunner>());
         return services;
     }
 }

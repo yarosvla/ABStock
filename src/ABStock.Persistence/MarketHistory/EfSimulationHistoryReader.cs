@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ABStock.Persistence.MarketHistory;
 
-internal sealed class EfSimulationHistoryReader(IDbContextFactory<AbStockDbContext> contextFactory) : ISimulationHistoryReader
+internal sealed class EfSimulationHistoryReader(
+    IDbContextFactory<AbStockDbContext> contextFactory,
+    StorageInitializer initializer) : ISimulationHistoryReader
 {
     public SimulationRunSummary? GetRun(Guid runId)
     {
@@ -12,53 +14,23 @@ internal sealed class EfSimulationHistoryReader(IDbContextFactory<AbStockDbConte
             return null;
         }
 
+        initializer.EnsureInitialized();
         using var db = contextFactory.CreateDbContext();
-
-        var run = db.SimulationRuns
-            .AsNoTracking()
-            .Where(item => item.Id == runId)
-            .Select(item => new
-            {
-                item.Id,
-                item.AssetName,
-                item.AssetType,
-                item.StartedAt,
-                TickCount = item.MarketTicks.Count,
-                TradeCount = item.Trades.Count
-            })
-            .FirstOrDefault();
-
-        if (run is null)
-        {
-            return null;
-        }
-
-        var lastPrice = db.MarketTicks
-            .AsNoTracking()
-            .Where(tick => tick.SimulationRunId == runId)
-            .OrderByDescending(tick => tick.Tick)
-            .Select(tick => (decimal?)tick.LastPrice)
-            .FirstOrDefault() ?? 0m;
-
-        return new SimulationRunSummary(
-            run.Id,
-            run.AssetName,
-            run.AssetType,
-            run.StartedAt,
-            run.TickCount,
-            run.TradeCount,
-            lastPrice);
+        return RunHistoryProjection.SelectSummaries(db.SimulationRuns.AsNoTracking()
+            .Where(item => item.Id == runId)).FirstOrDefault();
     }
 
     public SimulationHistoryOverview GetOverview(int recentRuns = 10)
     {
         var normalizedRecentRuns = Math.Clamp(recentRuns, 1, 50);
 
+        initializer.EnsureInitialized();
         using var db = contextFactory.CreateDbContext();
 
         var runs = db.SimulationRuns.AsNoTracking();
-        var runCount = runs.Count();
-        var distinctAssetCount = runs
+        var legacyRuns = runs.Where(run => run.Market == null);
+        var runCount = db.TradingSessions.Count() + legacyRuns.Count();
+        var distinctAssetCount = db.Assets.Count() + legacyRuns
             .Select(run => run.AssetName)
             .Distinct()
             .Count();

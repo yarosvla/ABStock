@@ -432,6 +432,7 @@ public sealed class ExchangeEngineTests
         Assert.Equal(3m, snapshot.Volume);
         Assert.Equal([103m, 102m, 101m], snapshot.RecentPrices);
         Assert.Equal(2, snapshot.RecentTrades.Count);
+        Assert.Equal(3L, snapshot.TotalTradeCount);
         Assert.All(snapshot.RecentTrades, trade => Assert.Equal(1m, trade.Quantity));
     }
 
@@ -668,6 +669,38 @@ public sealed class ExchangeEngineTests
             Quantity: quantity,
             CreatedAt: DateTimeOffset.UtcNow
         );
+    }
+
+    [Fact]
+    public void TradeCounterCountsExecutionsNotUnitsAndIsIndependentOfHistoryWindow()
+    {
+        var exchange = new ExchangeEngine(maxRecentTrades: 1);
+        var result = exchange.SubmitManyWithResult(
+        [
+            CreateOrder(CreateId(1), OrderSide.Sell, 100m, 2m),
+            CreateOrder(CreateId(2), OrderSide.Sell, 101m, 3m),
+            CreateOrder(CreateId(3), OrderSide.Sell, 102m, 5m),
+            CreateMarketOrder(CreateId(4), OrderSide.Buy, 10m)
+        ]);
+
+        Assert.Equal(3L, result.Snapshot.TotalTradeCount);
+        Assert.Equal(10m, result.Snapshot.Volume);
+        Assert.Single(result.Snapshot.RecentTrades);
+        Assert.Equal(3, result.Trades.Count);
+    }
+
+    [Fact]
+    public void RejectedCancelledAndUnfilledOrdersDoNotIncreaseTradeCounter()
+    {
+        var exchange = new ExchangeEngine();
+        exchange.Submit(CreateOrder(CreateId(1), OrderSide.Buy, 99m, 1m));
+        exchange.CancelOrder(CreateId(1));
+        exchange.Submit(CreateMarketOrder(CreateId(2), OrderSide.Buy, 1m));
+        var invalid = exchange.SubmitManyWithResult([CreateOrder(CreateId(3), OrderSide.Sell, -1m, 1m)]);
+
+        Assert.Single(invalid.RejectedOrders);
+        Assert.Equal(0L, exchange.GetSnapshot().TotalTradeCount);
+        Assert.Equal(0m, exchange.GetSnapshot().Volume);
     }
 
     private static Order CreateMarketOrder(
