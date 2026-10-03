@@ -138,4 +138,66 @@ public sealed class NewsDrivenAgentTests
         Assert.Equal(TradeAction.Hold, decision.Action);
         Assert.Empty(decision.Orders);
     }
+
+    [Fact]
+    public void Decide_ContextHoldsWhenNewsDoesNotMatchAssetProfile()
+    {
+        var agent = new NewsDrivenAgent(10_000m);
+        var context = CreateContext(CreateSnapshot(99m, 101m), "GLEN");
+        var news = News(SignalPolarity.Positive) with { MatchScore = 0.40m };
+
+        var decision = agent.Decide(context, news);
+
+        Assert.Equal(TradeAction.Hold, decision.Action);
+        Assert.Empty(decision.Orders);
+        Assert.Contains("GLEN", decision.Explanation);
+        Assert.Contains("совпадение", decision.Explanation);
+    }
+
+    [Fact]
+    public void Decide_ContextUsesImpactDirectionInsteadOfGenericPolarity()
+    {
+        var agent = new NewsDrivenAgent(10_000m, initialPosition: 5m);
+        var context = CreateContext(CreateSnapshot(99m, 101m), "GLEN");
+        var news = News(SignalPolarity.Positive) with { ImpactScore = -1m, MatchScore = 1m };
+
+        var decision = agent.Decide(context, news);
+
+        Assert.Equal(TradeAction.Sell, decision.Action);
+        var order = Assert.Single(decision.Orders);
+        Assert.Equal(OrderSide.Sell, order.Side);
+        Assert.Equal(1.5m, order.Quantity);
+        Assert.Contains("GLEN", decision.Explanation);
+    }
+
+    [Fact]
+    public void Decide_ContextScalesQuantityWithProfileConviction()
+    {
+        var context = CreateContext(CreateSnapshot(99m, 101m), "GLEN");
+        var moderate = News(SignalPolarity.Positive) with { ImpactScore = 0.5m, MatchScore = 0.8m };
+        var strong = News(SignalPolarity.Positive) with { ImpactScore = 2m, MatchScore = 1m };
+
+        var moderateOrder = Assert.Single(new NewsDrivenAgent(10_000m).Decide(context, moderate).Orders);
+        var strongOrder = Assert.Single(new NewsDrivenAgent(10_000m).Decide(context, strong).Orders);
+
+        Assert.Equal(1m, moderateOrder.Quantity);
+        Assert.Equal(2m, strongOrder.Quantity);
+    }
+
+    private static AgentMarketContext CreateContext(MarketSnapshot snapshot, string ticker)
+    {
+        var asset = new Asset(Guid.NewGuid(),
+            new AssetProfile(ticker, AssetType.Stock, $"Profile for {ticker}.", [], 0.8m),
+            snapshot.LastPrice, DateTimeOffset.UtcNow)
+        {
+            Ticker = ticker
+        };
+
+        return new AgentMarketContext(Guid.NewGuid(), asset.AssetId, snapshot,
+            new AgentAccountSnapshot("NewsDriven", AgentType.NewsDriven, 10_000m, 0m, 10_000m,
+                10_000m, 10_000m, new Dictionary<Guid, AgentPositionSnapshot>()))
+        {
+            Asset = asset
+        };
+    }
 }

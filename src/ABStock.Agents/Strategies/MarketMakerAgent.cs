@@ -16,11 +16,21 @@ public class MarketMakerAgent : AgentBase
     }
 
     public override AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal)
+        => DecideCore(snapshot, asset: null);
+
+    public override AgentDecision Decide(AgentMarketContext context, NewsSignal? newsSignal)
+        => DecideCore(context.Snapshot, context.Asset);
+
+    private AgentDecision DecideCore(MarketSnapshot snapshot, Asset? asset)
     {
         var orders = new List<Order>();
-        var remainingCash = State.Cash;
-        var remainingPosition = State.Position;
-        var priceStep = Math.Max(_spreadPercent / LadderLevels, 0.0025m);
+        var remainingCash = State.AvailableCash;
+        var remainingPosition = State.AvailablePosition;
+        var spreadPercent = asset is null
+            ? _spreadPercent
+            : AssetStrategyPolicy.MarketMakerSpread(_spreadPercent, asset);
+        var priceStep = Math.Max(spreadPercent / LadderLevels, 0.0025m);
+        var prefix = asset is null ? string.Empty : $"{AssetStrategyPolicy.Symbol(asset)}: ";
 
         for (var level = 1; level <= LadderLevels; level++)
         {
@@ -43,12 +53,13 @@ public class MarketMakerAgent : AgentBase
         }
 
         if (orders.Count == 0)
-            return HoldDecision($"нечем выставлять заявки: деньги {State.Cash:F2}, позиция {State.Position:F2}");
+            return HoldDecision(
+                $"{prefix}нечем выставлять заявки: доступно денег {State.AvailableCash:F2}, позиции {State.AvailablePosition:F2}");
 
         return new AgentDecision(
             State.AgentName,
             TradeAction.Hold,
-            $"держу спред вокруг {snapshot.LastPrice:F2}, лестница на {LadderLevels} уровня",
+            $"{prefix}держу спред {(priceStep * LadderLevels * 100m):F2} % вокруг {snapshot.LastPrice:F2}, лестница на {LadderLevels} уровня",
             orders
         );
     }
