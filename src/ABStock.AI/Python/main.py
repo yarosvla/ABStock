@@ -91,5 +91,21 @@ def generate_profile(req: dict):
             "type": "json_object"
         }
     )
+    """
+    usage = response.usage
+
+    print(
+        f"GPT usage: "
+        f"input={usage.prompt_tokens}, "
+        f"output={usage.completion_tokens}, "
+        f"total={usage.total_tokens}"
+    )
+
+    result = json.loads(response.choices[0].message.content)
+
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+
+    return result
+    """
 
     return json.loads(response.choices[0].message.content)
