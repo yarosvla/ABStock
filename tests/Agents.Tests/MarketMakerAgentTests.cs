@@ -101,4 +101,55 @@ public sealed class MarketMakerAgentTests
         Assert.Equal(GetBidPrice(200m, 0.05m, 1), bid.Price);
         Assert.Equal(GetAskPrice(200m, 0.05m, 1), ask.Price);
     }
+
+    [Fact]
+    public void Decide_UsesAvailableBalancesAfterReservations()
+    {
+        var agent = new MarketMakerAgent(10_000m, initialPosition: 5m);
+        agent.State.ReservedCash = 10_000m;
+        agent.State.ReservedPosition = 5m;
+
+        var decision = agent.Decide(CreateSnapshot(100m), null);
+
+        Assert.Equal(TradeAction.Hold, decision.Action);
+        Assert.Empty(decision.Orders);
+        Assert.Contains("доступно", decision.Explanation);
+    }
+
+    [Fact]
+    public void Decide_WidensSpreadForRiskierAsset()
+    {
+        var snapshot = CreateSnapshot(100m);
+        var bond = CreateAsset("BOND", AssetType.Bond, newsSensitivity: 0m);
+        var crypto = CreateAsset("CRYP", AssetType.Crypto, newsSensitivity: 1m);
+        var bondAgent = new MarketMakerAgent(10_000m, initialPosition: 5m);
+        var cryptoAgent = new MarketMakerAgent(10_000m, initialPosition: 5m);
+
+        var bondDecision = bondAgent.Decide(CreateContext(snapshot, bond), null);
+        var cryptoDecision = cryptoAgent.Decide(CreateContext(snapshot, crypto), null);
+        var bondBid = bondDecision.Orders.First(order => order.Side == OrderSide.Buy);
+        var cryptoBid = cryptoDecision.Orders.First(order => order.Side == OrderSide.Buy);
+        var bondAsk = bondDecision.Orders.First(order => order.Side == OrderSide.Sell);
+        var cryptoAsk = cryptoDecision.Orders.First(order => order.Side == OrderSide.Sell);
+
+        Assert.True(cryptoBid.Price < bondBid.Price);
+        Assert.True(cryptoAsk.Price > bondAsk.Price);
+        Assert.Contains("BOND", bondDecision.Explanation);
+        Assert.Contains("CRYP", cryptoDecision.Explanation);
+    }
+
+    private static Asset CreateAsset(string ticker, AssetType type, decimal newsSensitivity) =>
+        new(Guid.NewGuid(), new AssetProfile(ticker, type, $"Profile for {ticker}.", [], newsSensitivity),
+            100m, DateTimeOffset.UtcNow)
+        {
+            Ticker = ticker
+        };
+
+    private static AgentMarketContext CreateContext(MarketSnapshot snapshot, Asset asset) =>
+        new(Guid.NewGuid(), asset.AssetId, snapshot,
+            new AgentAccountSnapshot("MarketMaker", AgentType.MarketMaker, 10_000m, 0m, 10_000m,
+                10_500m, 10_500m, new Dictionary<Guid, AgentPositionSnapshot>()))
+        {
+            Asset = asset
+        };
 }

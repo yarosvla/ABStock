@@ -197,7 +197,8 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
             runner.AddMarket(second.AssetId);
             await quotes.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            runner.SubmitNews(second.AssetId, new NewsSignal(SignalPolarity.Positive, 1m, 1m, "Second asset news."));
+            runner.SubmitNews(second.AssetId,
+                new NewsSignal(SignalPolarity.Positive, 1m, 0.5m, "Second asset news.") { MatchScore = 1m });
             var tick = await trade.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
             var executed = Assert.Single(tick.Submission!.Trades);
@@ -210,6 +211,43 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
             Assert.Equal(10m, seller.Positions[first.AssetId].Quantity);
             Assert.Equal(9m, seller.Positions[second.AssetId].Quantity);
             Assert.Equal(13_000m, seller.InitialPortfolioValue);
+        }
+        finally
+        {
+            await runner.StopAsync();
+        }
+    }
+
+    [Fact]
+    public async Task RealMarketMaker_DoesNotOfferReservedCashAgainOnNextMarket()
+    {
+        await using var services = new ServiceCollection().AddABStockApplication().BuildServiceProvider();
+        var runner = services.GetRequiredService<IMultiAssetSimulationRunner>();
+        var catalog = services.GetRequiredService<IAssetCatalog>();
+        var first = catalog.Create(new(new AssetProfile("First", AssetType.Stock, "First asset.", [], 0.5m), 100m));
+        var second = catalog.Create(new(new AssetProfile("Second", AssetType.Stock, "Second asset.", [], 0.5m), 100m));
+        var completion = new TaskCompletionSource<IReadOnlyList<SimulationTickResult>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        runner.OnMarketTick += tick =>
+        {
+            if (tick.AssetId == second.AssetId && tick.Tick == 1)
+            {
+                completion.TrySetResult(runner.GetCurrentMarkets());
+            }
+        };
+
+        try
+        {
+            await runner.StartSessionAsync(new([first.AssetId, second.AssetId], TimeSpan.FromHours(1),
+                [new(AgentType.MarketMaker, 500m, 5m)]));
+            var ticks = await completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.Equal(2, ticks.Count);
+            Assert.All(ticks, tick => Assert.Empty(tick.Submission!.RejectedOrders));
+            Assert.Contains(runner.GetOpenOrders(first.AssetId), order => order.Side == OrderSide.Buy);
+            Assert.DoesNotContain(runner.GetOpenOrders(second.AssetId), order => order.Side == OrderSide.Buy);
+            Assert.True(Assert.Single(runner.GetAgentAccounts()).ReservedCash > 0m);
         }
         finally
         {
