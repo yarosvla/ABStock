@@ -1,5 +1,5 @@
 /* ============================================================================
-   Профиль — раскладка. Только раскладка: цвета, шрифты и тени берутся
+   Настройки — раскладка. Только раскладка: цвета, шрифты и тени берутся
    токенами из design-system.css (раздел 18.3).
 
    Экран нарративный, 8 + 4 (раздел 8). Слева настройки, справа состояние на
@@ -25,7 +25,6 @@
 /* Опорные ширины страницы — именованными переменными, а не литералами по
    месту (пункт 66 docs/ui-backlog.md). */
 .profile-page {
-    --w-name-field: 260px;  /* поле имени оператора, артборд «Состояния» */
 }
 
 .profile-grid {
@@ -38,7 +37,7 @@
 
 /* Колонки страницы. Имя «rail» здесь намеренно НЕ используется: раздел 13
    закрепил за рельсами постоянные роли — левый несёт хронологию событий,
-   правый состояние на сейчас, — а у «Профиля» это просто две колонки сетки.
+   правый состояние на сейчас, — а у «Настроек» это просто две колонки сетки.
    Раньше класс назывался .col и тянулся из сетки bootstrap вместе с
    недействующим flex: 1 0 0% (пункт 6 docs/ui-backlog.md). */
 .profile-col {
@@ -71,58 +70,6 @@
     font: var(--t-body-sm);
     color: var(--warn-500);
 }
-
-/* ============================================================================
-   Оператор
-   ============================================================================ */
-.operator {
-    display: flex;
-    align-items: center;
-    gap: var(--s-4);
-    flex-wrap: wrap;
-}
-
-.operator__avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex: none;
-    width: var(--s-8);
-    height: var(--s-8);
-    border-radius: var(--r-pill);
-    background: var(--gph-700);
-    font: var(--t-micro);
-    color: var(--text-2);
-}
-
-.operator__id { flex: 1; min-width: 0; }
-.operator__id h3 { font: var(--t-h3); color: var(--text-1); }
-.operator__id p { margin: 0; font: var(--t-caption); color: var(--text-3); }
-
-.operator__edit {
-    display: flex;
-    align-items: center;
-    gap: var(--s-3);
-    flex: 1;
-    min-width: 0;
-}
-
-.operator__edit ::deep .ui-field { width: var(--w-name-field); }
-.operator__hint { font: var(--t-caption); color: var(--text-quiet); }
-
-/* Валидация — охра. Красный означает падение цены и ничего больше (раздел 3).
-   На артборде 06 это нарисовано красным; здесь прав раздел 3. */
-.operator__error {
-    display: flex;
-    align-items: center;
-    gap: var(--s-2);
-    width: 100%;
-    margin: 0;
-    font: var(--t-caption);
-    color: var(--down-text);
-}
-
-.operator__error ::deep .ui-icon { flex: none; }
 
 /* ============================================================================
    Акцент: палитра и живой предпросмотр.

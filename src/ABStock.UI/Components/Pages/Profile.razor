@@ -1,3 +1,5 @@
+@page "/settings"
+@* Старый адрес — чтобы не ломать закладки. *@
 @page "/profile"
 @rendermode InteractiveServer
 @using ABStock.Application.MarketHistory
@@ -11,7 +13,7 @@
 @inject ISessionMarkets Markets
 @inject IUserPreferences Preferences
 
-<PageTitle>Профиль</PageTitle>
+<PageTitle>Настройки</PageTitle>
 
 <div class="app-bg" aria-hidden="true"><div class="app-bg__noise"></div></div>
 
@@ -20,11 +22,11 @@
 
     <main class="profile-page">
 
-        @* Крошки — раздел 13. Чипа сессии на этой странице нет: «Профиль»
+        @* Крошки — раздел 13. Чипа сессии на этой странице нет: «Настройки»
            не про прогон, а про настройки. *@
-        <Breadcrumbs Items="@(new Crumb[] { new("Активы", Href: "/assets"), new("Профиль") })" />
+        <Breadcrumbs Items="@(new Crumb[] { new("Активы", Href: "/assets"), new("Настройки") })" />
 
-        <PageHead Title="Профиль">
+        <PageHead Title="Настройки">
             <Context>Настройки интерфейса и итоги работы</Context>
         </PageHead>
 
@@ -47,56 +49,7 @@
                  предпросмотр, порождённый настройкой, а не данными (7.2). ── *@
             <div class="profile-col profile-col--main">
 
-                <Panel Title="Оператор" Class="rise rise-1">
-                    <ChildContent>
-                        <div class="operator">
-                            <span class="operator__avatar" aria-hidden="true">@Initials</span>
-
-                            @if (isEditingName)
-                            {
-                                <div class="operator__edit">
-                                    <TextField @ref="nameField"
-                                               Value="@nameDraft"
-                                               ValueChanged="SetNameDraft"
-                                               MaxLength="60"
-                                               Label="Имя оператора"
-                                               Invalid="nameError"
-                                               InvalidTone="down"
-                                               OnKeyDown="HandleNameKey" />
-                                    <span class="operator__hint">Enter — сохранить, Esc — отменить</span>
-                                </div>
-
-                                @if (nameError)
-                                {
-                                    @* Красная, а не охра. Раздел 3 запрещал --down-* в
-                                       валидации, раздел 9.3 требовал его там же — спор
-                                       разрешён в пользу 9.3 (DESIGN.md v2.21): красная
-                                       кромка поля читается как ошибка ввода, а не как
-                                       падение цены. Охра осталась за предупреждением,
-                                       которое не про конкретное поле. *@
-                                    <p class="operator__error">
-                                        <Icon Name="alert" Size="14" />
-                                        Имя не может быть пустым
-                                    </p>
-                                }
-                            }
-                            else
-                            {
-                                <div class="operator__id">
-                                    <h3>@Preferences.OperatorName</h3>
-                                    <p>Оператор симуляции</p>
-                                </div>
-                                @* Знак вместо подписи (артборд 01): подпись «Изменить» рядом с именем
-                                   читалась как второе имя. IconButton — раздел 9.2. *@
-                                <AppButton Variant="ghost" Size="26" Icon="pencil"
-                                           OnClick="StartEditingName"
-                                           aria-label="Изменить имя оператора" />
-                            }
-                        </div>
-                    </ChildContent>
-                </Panel>
-
-                <Panel Title="Акцент интерфейса" Class="rise rise-2">
+                <Panel Title="Акцент интерфейса" Class="rise rise-1">
                     <MetaContent>@AccentMeta</MetaContent>
                     <ChildContent>
                         @* Пресеты рассчитаны на тёмный фон: светлая заливка, тёмный
@@ -198,7 +151,7 @@
 
                                        Раньше здесь стояли рыночные данные и подпись «Не меняется
                                        никогда». Доказывать неизменность рынка эта панель не обязана:
-                                       раздел 3.1 говорит, что «пресет проверяется не на „Профиле“,
+                                       раздел 3.1 говорит, что «пресет проверяется не на „Настройках“,
                                        а на „Торгах“», и для этого есть артборды 03 и 04 с тремя
                                        полноразмерными экранами рядом. Пункт 55 docs/ui-backlog.md. *@
                                     <div class="preview__col preview__col--fixed" data-accent="graphite">
@@ -246,7 +199,7 @@
                     </ChildContent>
                 </Panel>
 
-                <Panel Title="Настройки интерфейса" Class="rise rise-3">
+                <Panel Title="Настройки интерфейса" Class="rise rise-2">
                     <MetaContent>Применяются сразу</MetaContent>
                     <ChildContent>
                         <div class="settings">
@@ -456,7 +409,7 @@
     /// <summary>
     /// Как часто перечитывается сводка истории. GetOverview — несколько
     /// агрегатных запросов, и делать их на каждый тик значило бы долбить базу
-    /// с каждого открытого «Профиля».
+    /// с каждого открытого «Настроек».
     /// </summary>
     private const int HistoryRefreshTickInterval = 5;
 
@@ -468,11 +421,6 @@
     /// <summary>Состояние компонентов предпросмотра. Ничего не настраивает.</summary>
     private string previewTimeframe = Timeframes.DefaultKey;
     private bool previewToggle = true;
-
-    private bool isEditingName;
-    private bool nameError;
-    private string nameDraft = string.Empty;
-    private TextField? nameField;
 
     /// <summary>
     /// Ссылки на образцы. Нужны затем, что палитра — радиогруппа с бегущим
@@ -486,7 +434,6 @@
 
     /// <summary>Пример текста в предпросмотре поля — название первого актива, если он есть.</summary>
     private string SampleName => Registry.Assets.FirstOrDefault()?.Name ?? "Гелиос Энерго";
-    private string Initials => UserPreferences.GetInitials(Preferences.OperatorName);
     private bool HasRuns => historyOverview.RunCount > 0;
 
     /// <summary>
@@ -646,54 +593,6 @@
     private Task SetNotifyNews(bool value) => Preferences.SetNotifyNewsAsync(value);
 
     private Task SetNotifySystem(bool value) => Preferences.SetNotifySystemAsync(value);
-
-    // ───────────────────────────── имя оператора ─────────────────────────────
-
-    private void StartEditingName()
-    {
-        nameDraft = Preferences.OperatorName;
-        nameError = false;
-        isEditingName = true;
-    }
-
-    private void SetNameDraft(string value)
-    {
-        nameDraft = value;
-
-        // Ошибка гаснет по мере ввода: держать её, пока человек уже исправился,
-        // значит ругаться на то, чего больше нет.
-        if (nameError && !string.IsNullOrWhiteSpace(value))
-        {
-            nameError = false;
-        }
-    }
-
-    private async Task HandleNameKey(KeyboardEventArgs args)
-    {
-        if (args.Key == "Escape")
-        {
-            isEditingName = false;
-            nameError = false;
-            return;
-        }
-
-        if (args.Key != "Enter")
-        {
-            return;
-        }
-
-        // Пустое имя не сохраняется: решать за человека, что он имел в виду
-        // пустой строкой, страница не должна.
-        if (await Preferences.TrySetOperatorNameAsync(nameDraft))
-        {
-            isEditingName = false;
-            nameError = false;
-        }
-        else
-        {
-            nameError = true;
-        }
-    }
 
     private sealed record TotalRow(string Label, string Value);
 

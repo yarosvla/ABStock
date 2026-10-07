@@ -45,7 +45,7 @@
         @* Тема и уведомления — одна группа значков: между ними зазор
            кнопки, а не шаг шапки. *@
         <div class="topnav__tools">
-            @* Тема — раздел 19. Здесь, а не только на «Профиле»: на защите тему
+            @* Тема — раздел 19. Здесь, а не только на «Настройках»: на защите тему
                переключают на ходу, перед проектором, и уходить ради этого со
                «Торгов» нельзя. Значок показывает, КУДА переключит нажатие. *@
             <button class="topnav__icon-button" type="button"
@@ -68,10 +68,6 @@
                 </button>
             </div>
         </div>
-
-        <a class="topnav__avatar" href="/profile" aria-label="Профиль пользователя">
-            <span>@AvatarInitials</span>
-        </a>
     </div>
 </nav>
 
@@ -114,12 +110,12 @@
                 else if (HasHiddenByFilter)
                 {
                     @* Честная причина пустоты: события есть, но их вид выключен
-                       на «Профиле». Пустое состояние «уведомлений нет» здесь
+                       на «Настройках». Пустое состояние «уведомлений нет» здесь
                        было бы неправдой. *@
                     <EmptyState IconName="bell" Title="Все виды событий выключены"
                                 Description="Включить их можно в настройках интерфейса.">
                         <Action>
-                            <AppButton Variant="secondary" Size="26" Href="/profile">Открыть «Профиль»</AppButton>
+                            <AppButton Variant="secondary" Size="26" Href="/settings">Открыть «Настройки»</AppButton>
                         </Action>
                     </EmptyState>
                 }
@@ -137,13 +133,6 @@
     [Parameter] public string ActivePage { get; set; } = "Assets";
     [Parameter] public bool ShowClock { get; set; } = false;
 
-    /// <summary>
-    /// Инициалы считаются из имени оператора, а не задаются параметром.
-    /// Пока здесь стояла константа «АК», шапка и «Профиль» показывали разных
-    /// людей на одном экране.
-    /// </summary>
-    private string AvatarInitials => UserPreferences.GetInitials(Preferences.OperatorName);
-
     // Ровно пять разделов — раздел 16.
     private static readonly NavSection[] Sections =
     [
@@ -153,7 +142,7 @@
         new("Trading", "/trading", "Торги"),
         new("News", "/news", "Новости"),
         new("Agents", "/agents", "Агенты"),
-        new("Profile", "/profile", "Профиль")
+        new("Profile", "/settings", "Настройки")
     ];
 
     private bool IsNotificationsOpen { get; set; }
@@ -178,7 +167,7 @@
 
     /// <summary>
     /// Фильтрация происходит ЗДЕСЬ, при отображении, а не при записи в ленту:
-    /// выключенный на «Профиле» вид перестаёт показываться, но события не
+    /// выключенный на «Настройках» вид перестаёт показываться, но события не
     /// теряются, и включение обратно возвращает их.
     /// </summary>
     private IReadOnlyList<NotificationEntry> Visible =>
@@ -214,9 +203,9 @@
 
     protected override void OnInitialized()
     {
-        // Имя оператора и переключатели уведомлений живут в настройках, а
-        // шапка показывает и то, и другое: без подписки инициалы и счётчик
-        // застыли бы на значениях, прочитанных при создании контура.
+        // Тема и переключатели уведомлений живут в настройках, а шапка
+        // показывает и то, и другое: без подписки значок и счётчик застыли
+        // бы на значениях, прочитанных при создании контура.
         Preferences.Changed += HandlePreferencesChanged;
         NotificationFeed.Changed += HandleNotificationsChanged;
 
@@ -229,7 +218,7 @@
     /// Шапка читает настройки сама. Макет статический — интерактивность
     /// задана страницами, — и его OnAfterRenderAsync не вызывается вовсе:
     /// без этого на «Агентах», «Новостях» и «Создании актива» значок темы и
-    /// инициалы оставались значениями по умолчанию. EnsureLoadedAsync
+    /// счётчик уведомлений оставались значениями по умолчанию. EnsureLoadedAsync
     /// идемпотентен, повторное чтение хранилища не случится.
     /// </summary>
     protected override async Task OnAfterRenderAsync(bool firstRender)

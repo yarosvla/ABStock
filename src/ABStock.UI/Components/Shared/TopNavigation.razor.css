@@ -115,21 +115,6 @@
     background: var(--acc-500);
 }
 
-.topnav__avatar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--r-pill);
-    background: var(--gph-700);
-    font: var(--t-micro);
-    color: var(--text-2);
-    text-decoration: none;
-}
-
-.topnav__avatar:hover { color: var(--text-1); }
-
 /* ============================================================================
    Панель уведомлений — раздел 9.14. Плавающий слой, поэтому стекло.
    Цветных полос по краю строки нет.

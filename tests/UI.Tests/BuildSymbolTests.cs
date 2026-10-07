@@ -3,7 +3,7 @@ using ABStock.UI.Services;
 namespace ABStock.UI.Tests;
 
 /// <summary>
-/// Тикер показывают «Торги», «Новости», «Профиль» и «Создание актива» —
+/// Тикер показывают «Торги», «Новости», «Настройки» и «Создание актива» —
 /// правило его сборки одно на всю систему (DESIGN.md 10).
 /// </summary>
 public class BuildSymbolTests

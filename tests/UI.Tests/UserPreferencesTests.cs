@@ -79,23 +79,6 @@ public class UserPreferencesTests
         Assert.Equal(6, Timeframes.All.Count);
     }
 
-    [Theory]
-    [InlineData("Иван Петров", "ИП")]
-    [InlineData("Оператор", "ОП")]
-    [InlineData("Алексей Ковалёв", "АК")]
-    [InlineData("иван петров", "ИП")]
-    [InlineData("Иван Сергеевич Петров", "ИП")]   // первое и последнее слово
-    [InlineData("  Иван   Петров  ", "ИП")]
-    [InlineData("Я", "Я")]
-    public void Инициалы_считаются_из_имени(string name, string expected) =>
-        Assert.Equal(expected, UserPreferences.GetInitials(name));
-
-    [Fact]
-    public void Пустое_имя_не_роняет_инициалы() =>
-        // Инициалы пустого имени — инициалы имени по умолчанию: пустой кружок
-        // в шапке хуже, чем «ОП».
-        Assert.Equal("ОП", UserPreferences.GetInitials("   "));
-
     [Fact]
     public void Название_неизвестного_пресета_не_бросает() =>
         Assert.Equal("Графит", UserPreferences.GetAccentLabel("нет такого"));

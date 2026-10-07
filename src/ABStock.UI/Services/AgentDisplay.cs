@@ -13,7 +13,7 @@ public static class AgentDisplay
     /// <summary>
     /// Названия живут в ABStock.Shared: их показывает не только интерфейс, но
     /// и читатель истории, который собирает из них строку события сессии.
-    /// Пока таблиц было две, «Профиль» показывал «TrendFollowing» там, где
+    /// Пока таблиц было две, «Настройки» показывали «TrendFollowing» там, где
     /// «Агенты» показывали «Трендовый».
     /// </summary>
     public static string GetTypeLabel(AgentType type) => AgentTypeNames.Label(type);

@@ -4,7 +4,7 @@ namespace ABStock.UI.Services;
 
 /// <summary>
 /// Пользовательские настройки: тема, акцент интерфейса, таймфрейм по умолчанию,
-/// три переключателя уведомлений и имя оператора.
+/// три переключателя уведомлений.
 ///
 /// Хранилище — localStorage браузера. Ни базы, ни серверного состояния:
 /// авторизации в системе нет (раздел 16), пользователь один, и настройки
@@ -31,8 +31,6 @@ public interface IUserPreferences
 
     bool NotifySystem { get; }
 
-    string OperatorName { get; }
-
     /// <summary>Настройка изменилась — подписчикам пора перерисоваться.</summary>
     event Action? Changed;
 
@@ -53,13 +51,6 @@ public interface IUserPreferences
     Task SetNotifyNewsAsync(bool enabled);
 
     Task SetNotifySystemAsync(bool enabled);
-
-    /// <summary>
-    /// Сохранить имя оператора. Пустое имя не сохраняется — вернёт false,
-    /// и страница показывает ошибку. Решать за человека, что он имел в виду
-    /// пустой строкой, сервис не должен.
-    /// </summary>
-    Task<bool> TrySetOperatorNameAsync(string name);
 }
 
 /// <summary>
@@ -84,14 +75,12 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
     private const string NotifyTradesKey = "abstock.notify.trades";
     private const string NotifyNewsKey = "abstock.notify.news";
     private const string NotifySystemKey = "abstock.notify.system";
-    private const string OperatorNameKey = "abstock.operator.name";
 
     public const string DarkTheme = "dark";
     public const string LightTheme = "light";
     public const string DefaultTheme = DarkTheme;
 
     public const string DefaultAccent = "graphite";
-    public const string DefaultOperatorName = "Оператор";
 
     /// <summary>
     /// Те же десять ключей, что в загрузочном скрипте App.razor и в
@@ -140,8 +129,6 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
 
     public bool NotifySystem { get; private set; } = true;
 
-    public string OperatorName { get; private set; } = DefaultOperatorName;
-
     public event Action? Changed;
 
     public static string NormalizeTheme(string? theme) =>
@@ -159,27 +146,6 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
         Accents.FirstOrDefault(preset => preset.Key == accent)?.Label
         ?? Accents[0].Label;
 
-    /// <summary>
-    /// Инициалы из имени: «Иван Петров» → «ИП», «Оператор» → «ОП».
-    /// Живут здесь, а не в шапке: имя одно, и считать инициалы двумя
-    /// способами — верный путь к тому, что «Профиль» и шапка покажут разное.
-    /// </summary>
-    public static string GetInitials(string name)
-    {
-        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-        if (parts.Length == 0)
-        {
-            return GetInitials(DefaultOperatorName);
-        }
-
-        var initials = parts.Length == 1
-            ? parts[0][..Math.Min(2, parts[0].Length)]
-            : $"{parts[0][0]}{parts[^1][0]}";
-
-        return initials.ToUpperInvariant();
-    }
-
     public Task EnsureLoadedAsync() => loading ??= LoadAsync();
 
     private async Task LoadAsync()
@@ -196,7 +162,6 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
             NotifyTrades = ReadFlag(await ReadAsync(NotifyTradesKey));
             NotifyNews = ReadFlag(await ReadAsync(NotifyNewsKey));
             NotifySystem = ReadFlag(await ReadAsync(NotifySystemKey));
-            OperatorName = ReadName(await ReadAsync(OperatorNameKey));
         }
         catch (Exception)
         {
@@ -257,19 +222,6 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
     public Task SetNotifySystemAsync(bool enabled) =>
         WriteFlagAsync(NotifySystemKey, enabled, value => NotifySystem = value);
 
-    public async Task<bool> TrySetOperatorNameAsync(string name)
-    {
-        var trimmed = name?.Trim() ?? string.Empty;
-
-        if (trimmed.Length == 0)
-        {
-            return false;
-        }
-
-        await WriteAsync(OperatorNameKey, trimmed, value => OperatorName = value);
-        return true;
-    }
-
     private Task WriteFlagAsync(string key, bool enabled, Action<bool> assign) =>
         WriteAsync(key, enabled ? "true" : "false", _ => assign(enabled));
 
@@ -305,11 +257,6 @@ public sealed class UserPreferences(IJSRuntime js) : IUserPreferences
     private static bool ReadFlag(string? stored) =>
         stored is null || !string.Equals(stored, "false", StringComparison.Ordinal);
 
-    private static string ReadName(string? stored)
-    {
-        var trimmed = stored?.Trim();
-        return string.IsNullOrEmpty(trimmed) ? DefaultOperatorName : trimmed;
-    }
 }
 
 /// <param name="Key">Значение в хранилище; <c>light</c> — атрибут data-theme.</param>

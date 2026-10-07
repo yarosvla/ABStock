@@ -499,7 +499,7 @@
 
 @code {
     // Список таймфреймов переехал в Services/Timeframes: тот же список
-    // рисуется на «Профиле» в настройке «таймфрейм по умолчанию», и два
+    // рисуется на «Настройках» в настройке «таймфрейм по умолчанию», и два
     // списка подписей разошлись бы при первой же правке.
     private static readonly IReadOnlyDictionary<string, TimeframeOption> TimeframesByKey =
         Timeframes.All.ToDictionary(item => item.Key, StringComparer.Ordinal);
@@ -918,7 +918,7 @@
     }
 
     /// <summary>
-    /// Таймфрейм по умолчанию с «Профиля». Применяется после первой
+    /// Таймфрейм по умолчанию с «Настроек». Применяется после первой
     /// отрисовки, а не в OnInitialized: настройка лежит в localStorage, а до
     /// первой отрисовки JS-интеропа в Blazor Server не существует.
     ///
