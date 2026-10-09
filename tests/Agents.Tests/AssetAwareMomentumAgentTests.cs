@@ -53,6 +53,34 @@ public sealed class AssetAwareMomentumAgentTests
         Assert.True(growthOrder.Quantity > defensiveOrder.Quantity);
     }
 
+    [Fact]
+    public void TrendFollowing_MeasuresMoveFromLastDifferentPrice()
+    {
+        // Регрессия: две сделки шага по одной цене давали «движение 0 %»,
+        // и агенты, которые ждут движения, ждали вечно.
+        var bond = Asset("BOND", AssetType.Bond, newsSensitivity: 0m);
+        var snapshot = new MarketSnapshot(101m, 100.9m, 101.1m, 0m, [100m, 101m, 101m], []);
+
+        var decision = new TrendFollowingAgent(10_000m).Decide(Context(snapshot, bond), null);
+
+        Assert.Equal(TradeAction.Buy, decision.Action);
+        Assert.Contains("рост", decision.Explanation);
+    }
+
+    [Fact]
+    public void TrendFollowing_ProbesMarketAfterSeveralQuietSteps()
+    {
+        var crypto = Asset("CRYP", AssetType.Crypto, newsSensitivity: 1m);
+        var quiet = new MarketSnapshot(100m, 99.9m, 100.1m, 0m, [100m, 100m], []) { TotalTradeCount = 7 };
+        var agent = new TrendFollowingAgent(10_000m);
+
+        var decisions = Enumerable.Range(0, 5).Select(_ => agent.Decide(Context(quiet, crypto), null)).ToArray();
+
+        Assert.All(decisions.Take(4), decision => Assert.Equal(TradeAction.Hold, decision.Action));
+        Assert.NotEqual(TradeAction.Hold, decisions[^1].Action);
+        Assert.Contains("пробую рынок", decisions[^1].Explanation);
+    }
+
     private static MarketSnapshot Snapshot(decimal previousPrice, decimal lastPrice) =>
         new(lastPrice, lastPrice - 0.1m, lastPrice + 0.1m, 0m, [previousPrice, lastPrice], []);
 

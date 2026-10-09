@@ -201,21 +201,55 @@ public sealed class MultiAssetSimulationRunnerIntegrationTests
                 new NewsSignal(SignalPolarity.Positive, 1m, 0.5m, "Second asset news.") { MatchScore = 1m });
             var tick = await trade.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-            var executed = Assert.Single(tick.Submission!.Trades);
-            Assert.Equal("MarketMaker", executed.SellerAgentName);
-            Assert.Equal("NewsDriven", executed.BuyerAgentName);
-            Assert.Equal(1m, tick.Snapshot.Volume);
+            // Новостной агент бьёт по рынку объёмом 3 — это проходит два уровня лестницы.
+            var executed = tick.Submission!.Trades;
+            Assert.All(executed, trade =>
+            {
+                Assert.Equal("MarketMaker", trade.SellerAgentName);
+                Assert.Equal("NewsDriven", trade.BuyerAgentName);
+            });
+            Assert.Equal(3m, executed.Sum(trade => trade.Quantity));
+            Assert.Equal(3m, tick.Snapshot.Volume);
             Assert.Equal(0m, runner.GetCurrent(first.AssetId)!.Snapshot.Volume);
             Assert.Equal(2, tick.Accounts.Count);
             var seller = tick.Accounts.Single(account => account.AgentType == AgentType.MarketMaker);
             Assert.Equal(10m, seller.Positions[first.AssetId].Quantity);
-            Assert.Equal(9m, seller.Positions[second.AssetId].Quantity);
+            Assert.Equal(7m, seller.Positions[second.AssetId].Quantity);
             Assert.Equal(13_000m, seller.InitialPortfolioValue);
         }
         finally
         {
             await runner.StopAsync();
         }
+    }
+
+    [Fact]
+    public async Task UnfilledOrdersLiveOneStepAndReleaseReservations()
+    {
+        // Регрессия: заявки не снимались, маркет-мейкер за пару шагов запирал весь
+        // капитал в старых лестницах, и рынок вставал через полминуты.
+        await using var fixture = new Fixture((agent, context, _) => new AgentDecision(
+            agent.State.AgentName, TradeAction.Buy, "Resting bid.",
+            [new Order(Guid.NewGuid(), agent.State.AgentName, OrderSide.Buy, OrderType.Limit, 50m, 1m,
+                DateTimeOffset.UtcNow)]));
+        var asset = fixture.CreateAsset("Only", 100m);
+        var fifth = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        fixture.Runner.OnMarketTick += tick =>
+        {
+            if (tick.Tick >= 5)
+            {
+                fifth.TrySetResult();
+            }
+        };
+
+        await fixture.StartAsync([asset], [new(AgentType.MarketMaker, 1_000m)], TimeSpan.FromMilliseconds(10));
+        await fifth.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await fixture.Runner.StopAsync();
+
+        var calls = fixture.Factory.CreatedAgents.Single().Calls.ToArray();
+        Assert.True(calls.Length >= 5);
+        // К каждому решению свободна вся сумма, кроме заявки самого последнего шага — её сняли перед ним.
+        Assert.All(calls.Skip(1), call => Assert.Equal(1_000m, call.AvailableCash));
     }
 
     [Fact]

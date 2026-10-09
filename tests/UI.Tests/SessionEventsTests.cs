@@ -96,6 +96,32 @@ public sealed class SessionEventsTests : IAsyncDisposable
         await _markets.StopAsync();
     }
 
+    [Fact]
+    public async Task Реакция_новостных_агентов_пишется_по_каждому_задетому_активу()
+    {
+        // Регрессия: реакция запоминалась одна на новость — по первому рынку в
+        // списке, и полоса связи на «Торгах» второго актива писала «торговали
+        // другим активом», хотя новостные агенты купили и его.
+        Add("Гелиос Энерго");
+        Add("КвантЭнерго");
+        await _markets.StartAsync(
+        [
+            new(AgentType.MarketMaker, 100_000m, 50m),
+            new(AgentType.NewsDriven, 100_000m, 50m)
+        ]);
+        await WaitAsync(() => _markets.Accounts.Count > 0 && _events.Entries.Count > 0);
+        var signal = new NewsSignal(SignalPolarity.Positive, 0.9m, 1m, "") { MatchScore = 0.9m };
+        var fan = NewsFan.FromSignals(_registry.Assets, _registry.Assets.ToDictionary(asset => asset.Symbol, _ => signal));
+
+        var news = _events.AddNews("Энергетика растёт", fan);
+        _markets.SubmitNews(fan);
+        await WaitAsync(() => _events.ReactionTo(news, "GLEN") is not null && _events.ReactionTo(news, "KVAN") is not null);
+
+        Assert.Equal(TradeAction.Buy, _events.ReactionTo(news, "GLEN")!.Action);
+        Assert.Equal(TradeAction.Buy, _events.ReactionTo(news, "KVAN")!.Action);
+        await _markets.StopAsync();
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _runner.StopAsync();

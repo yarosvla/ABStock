@@ -6,7 +6,20 @@ public class NewsDrivenAgent : AgentBase
 {
     private const decimal MinimumMatchScore = 0.60m;
     private const decimal MinimumConviction = 0.10m;
+
+    /// <summary>
+    /// Сколько шагов новость остаётся в игре. Реакция в один шаг объёмом в одну
+    /// бумагу тонула в лестнице маркет-мейкера: цена после сильной новости не
+    /// сдвигалась вовсе. Теперь агент отыгрывает новость несколько шагов,
+    /// и с каждым шагом всё меньшим объёмом.
+    /// </summary>
+    private const int NewsHorizon = 10;
+
+    /// <summary>Объём первого шага на единицу множителя уверенности.</summary>
+    private const decimal NewsQuantityFactor = 3m;
+
     private readonly decimal _orderQuantity;
+    private readonly Dictionary<Guid, (NewsSignal Signal, int Age)> _active = [];
 
     public NewsDrivenAgent(decimal initialCash, decimal initialPosition = 0, decimal orderQuantity = 1m)
         : base("NewsDriven", AgentType.NewsDriven, initialCash, initialPosition)
@@ -56,9 +69,22 @@ public class NewsDrivenAgent : AgentBase
         }
 
         var symbol = AssetStrategyPolicy.Symbol(asset);
-        if (newsSignal is null)
+        var age = 0;
+        if (newsSignal is not null)
         {
-            return HoldDecision($"{symbol}: новостей для актива не было — сигналов нет");
+            _active[asset.AssetId] = (newsSignal, 0);
+        }
+        else if (_active.TryGetValue(asset.AssetId, out var active) && active.Age + 1 < NewsHorizon)
+        {
+            age = active.Age + 1;
+            newsSignal = active.Signal;
+            _active[asset.AssetId] = (newsSignal, age);
+        }
+        else
+        {
+            return HoldDecision(active.Signal is null
+                ? $"{symbol}: новостей для актива не было — сигналов нет"
+                : $"{symbol}: новость отыграна — жду следующей");
         }
 
         if (newsSignal.MatchScore < MinimumMatchScore)
@@ -74,8 +100,12 @@ public class NewsDrivenAgent : AgentBase
                 $"{symbol}: влияние {newsSignal.ImpactScore:+0.00;-0.00;0.00} при совпадении {newsSignal.MatchScore:P0} слишком слабое — жду");
         }
 
-        var quantity = Math.Round(_orderQuantity * ConvictionMultiplier(conviction), 2,
-            MidpointRounding.AwayFromZero);
+        // Первый шаг — полный объём, дальше затухание до пятой части.
+        var decay = Math.Max(0.2m, 1m - (decimal)age / NewsHorizon);
+        var quantity = Math.Max(0.01m, Math.Round(
+            _orderQuantity * NewsQuantityFactor * ConvictionMultiplier(conviction) * decay, 2,
+            MidpointRounding.AwayFromZero));
+        var when = age == 0 ? string.Empty : $"новость {age} {StepsWord(age)} назад, ";
 
         if (newsSignal.ImpactScore > 0m)
         {
@@ -91,7 +121,7 @@ public class NewsDrivenAgent : AgentBase
 
             var order = CreateMarketOrder(OrderSide.Buy, quantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
-                $"{symbol}: влияние {newsSignal.ImpactScore:+0.00;-0.00;0.00}, совпадение {newsSignal.MatchScore:P0} — покупаю {quantity:F2} по рынку",
+                $"{symbol}: {when}влияние {newsSignal.ImpactScore:+0.00;-0.00;0.00}, совпадение {newsSignal.MatchScore:P0} — покупаю {quantity:F2} по рынку",
                 [order]);
         }
 
@@ -107,15 +137,22 @@ public class NewsDrivenAgent : AgentBase
 
         var sellOrder = CreateMarketOrder(OrderSide.Sell, quantity);
         return new AgentDecision(State.AgentName, TradeAction.Sell,
-            $"{symbol}: влияние {newsSignal.ImpactScore:+0.00;-0.00;0.00}, совпадение {newsSignal.MatchScore:P0} — продаю {quantity:F2} по рынку",
+            $"{symbol}: {when}влияние {newsSignal.ImpactScore:+0.00;-0.00;0.00}, совпадение {newsSignal.MatchScore:P0} — продаю {quantity:F2} по рынку",
             [sellOrder]);
     }
 
-    private static decimal ConvictionMultiplier(decimal conviction) => conviction switch
+    private static string StepsWord(int n) => (n % 10, n % 100) switch
     {
-        >= 1.60m => 2m,
-        >= 0.90m => 1.5m,
-        >= 0.30m => 1m,
-        _ => 0.5m
+        (1, not 11) => "шаг",
+        (2 or 3 or 4, not (12 or 13 or 14)) => "шага",
+        _ => "шагов"
     };
+
+    /// <summary>
+    /// Плавно, а не ступенями: при ступенях актив, задетый вдвое слабее,
+    /// попадал в ту же ступень, получал тот же объём и на экране мог вырасти
+    /// сильнее «главного» — веер новости и график противоречили друг другу.
+    /// </summary>
+    private static decimal ConvictionMultiplier(decimal conviction) =>
+        Math.Clamp(conviction * 2m, 0.3m, 2.5m);
 }

@@ -250,7 +250,7 @@
                 {
                     var here = fan.For(asset.Symbol);
                     var lead = fan.Lead;
-                    var reaction = Events.ReactionTo(news);
+                    var reaction = Events.ReactionTo(news, asset.Symbol) ?? Events.ReactionTo(news);
                     var reactedHere = reaction?.Symbol == asset.Symbol;
 
                     <CausalityStrip Class="causal-strip rise rise-3" Label="Как новость сдвинула цену">

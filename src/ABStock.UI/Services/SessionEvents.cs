@@ -51,8 +51,15 @@ public interface ISessionEvents
 
     SessionEvent AddNews(string text, NewsFan fan);
 
-    /// <summary>Реакция новостных агентов на новость или null, если её не было.</summary>
+    /// <summary>Первая реакция новостных агентов на новость или null, если её не было.</summary>
     NewsReaction? ReactionTo(SessionEvent news);
+
+    /// <summary>
+    /// Реакция новостных агентов на новость именно по этому активу. Новость
+    /// задевает несколько активов, и агенты торгуют каждым из них.
+    /// </summary>
+    NewsReaction? ReactionTo(SessionEvent news, string symbol) =>
+        ReactionTo(news) is { } reaction && reaction.Symbol == symbol ? reaction : null;
 }
 
 /// <summary>
@@ -88,7 +95,7 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
     private readonly Lock _sync = new();
     private readonly List<SessionEvent> _entries = [];
     private readonly Dictionary<(AgentType, Guid), (decimal Position, DateTimeOffset At)> _mentioned = [];
-    private readonly Dictionary<DateTimeOffset, NewsReaction> _reactions = [];
+    private readonly Dictionary<DateTimeOffset, List<NewsReaction>> _reactions = [];
     private (SessionEvent News, int Tick)? _awaitingReaction;
     private Guid _sessionId;
     private bool _wasRunning;
@@ -148,7 +155,15 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
     {
         lock (_sync)
         {
-            return _reactions.GetValueOrDefault(news.At);
+            return _reactions.GetValueOrDefault(news.At)?.FirstOrDefault();
+        }
+    }
+
+    public NewsReaction? ReactionTo(SessionEvent news, string symbol)
+    {
+        lock (_sync)
+        {
+            return _reactions.GetValueOrDefault(news.At)?.FirstOrDefault(reaction => reaction.Symbol == symbol);
         }
     }
 
@@ -294,9 +309,10 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
     }
 
     /// <summary>
-    /// Первая сделка-решение новостного агента после последней новости.
-    /// Смотрит решения последнего шага по каждому рынку: агентов, которые
-    /// после новости купили или продали, интерфейс не выдумывает, а видит.
+    /// Первая сделка-решение новостных агентов после последней новости — по
+    /// каждому рынку, который она задела. Смотрит решения последнего шага:
+    /// агентов, которые после новости купили или продали, интерфейс не
+    /// выдумывает, а видит.
     /// </summary>
     private bool NoteReactionLocked()
     {
@@ -316,23 +332,29 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
             .Select(account => account.AgentName)
             .ToHashSet(StringComparer.Ordinal);
 
+        if (!_reactions.TryGetValue(awaiting.News.At, out var reactions))
+        {
+            reactions = [];
+            _reactions[awaiting.News.At] = reactions;
+        }
+
+        var noted = false;
         foreach (var market in _markets.Markets)
         {
             var decision = market.Last.Decisions.FirstOrDefault(decision =>
                 newsAgents.Contains(decision.AgentName) && decision.Action is TradeAction.Buy or TradeAction.Sell);
             var asset = _assets.Find(market.AssetId);
 
-            if (decision is null || asset is null)
+            if (decision is null || asset is null || reactions.Any(reaction => reaction.Symbol == asset.Symbol))
             {
                 continue;
             }
 
-            _reactions[awaiting.News.At] = new NewsReaction(asset.Symbol, decision.Action);
-            _awaitingReaction = null;
-            return true;
+            reactions.Add(new NewsReaction(asset.Symbol, decision.Action));
+            noted = true;
         }
 
-        return false;
+        return noted;
     }
 
     private static string Counted(int count, string one, string few, string many) =>
