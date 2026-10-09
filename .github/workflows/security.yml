@@ -1,0 +1,80 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "true"
+
+jobs:
+  dependency-review:
+    name: Review dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime
+
+  codeql:
+    name: CodeQL and NuGet audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: csharp
+          build-mode: manual
+
+      - name: Restore and reject severe NuGet advisories
+        run: dotnet restore ABStock.slnx '-warnaserror:NU1903;NU1904'
+
+      - name: Report vulnerable packages
+        run: dotnet list ABStock.slnx package --vulnerable --include-transitive
+
+      - name: Build for CodeQL
+        run: dotnet build ABStock.slnx --configuration Release --no-restore --verbosity minimal
+
+      - name: Analyze with CodeQL
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:csharp
