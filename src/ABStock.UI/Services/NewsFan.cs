@@ -17,12 +17,15 @@ public sealed record NewsFan(
     decimal Confidence,
     IReadOnlyList<AssetSignal> Assets)
 {
+    /// <summary>Идентификатор одной разобранной новости и всех её рыночных сигналов.</summary>
+    public Guid NewsId { get; init; } = Guid.NewGuid();
+
     /// <summary>Задетые активы в порядке каталога.</summary>
     public IEnumerable<AssetSignal> Hit => Assets.Where(asset => asset.IsHit);
 
     /// <summary>
-    /// Самый задетый актив: на него, по предложению контракта, бьёт новостной
-    /// агент. Null — новость не задела ни один актив.
+    /// Самый задетый актив для отображения силы влияния. Сигналы получают
+    /// все задетые рынки. Null — новость не задела ни один актив.
     /// </summary>
     public AssetSignal? Lead => Hit.MaxBy(asset => asset.Strength);
 

@@ -42,7 +42,10 @@ public class NewsDrivenAgent : AgentBase
 
             var order = CreateMarketOrder(OrderSide.Buy, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
-                $"позитивная новость, уверенность {newsSignal.Confidence:F2} — покупаю по рынку", [order]);
+                $"позитивная новость, уверенность {newsSignal.Confidence:F2} — покупаю по рынку", [order])
+            {
+                NewsId = newsSignal.NewsId
+            };
         }
 
         if (newsSignal.Polarity == SignalPolarity.Negative)
@@ -55,7 +58,10 @@ public class NewsDrivenAgent : AgentBase
 
             var order = CreateMarketOrder(OrderSide.Sell, _orderQuantity);
             return new AgentDecision(State.AgentName, TradeAction.Sell,
-                $"негативная новость, уверенность {newsSignal.Confidence:F2} — продаю по рынку", [order]);
+                $"негативная новость, уверенность {newsSignal.Confidence:F2} — продаю по рынку", [order])
+            {
+                NewsId = newsSignal.NewsId
+            };
         }
 
         return HoldDecision($"новость нейтральная — держу позицию");
@@ -122,7 +128,10 @@ public class NewsDrivenAgent : AgentBase
             var order = CreateMarketOrder(OrderSide.Buy, quantity);
             return new AgentDecision(State.AgentName, TradeAction.Buy,
                 $"{symbol}: {when}влияние {newsSignal.ImpactScore:+0.00;-0.00;0.00}, совпадение {newsSignal.MatchScore:P0} — покупаю {quantity:F2} по рынку",
-                [order]);
+                [order])
+            {
+                NewsId = newsSignal.NewsId
+            };
         }
 
         if (context.Snapshot.BestBid is null)
@@ -138,7 +147,10 @@ public class NewsDrivenAgent : AgentBase
         var sellOrder = CreateMarketOrder(OrderSide.Sell, quantity);
         return new AgentDecision(State.AgentName, TradeAction.Sell,
             $"{symbol}: {when}влияние {newsSignal.ImpactScore:+0.00;-0.00;0.00}, совпадение {newsSignal.MatchScore:P0} — продаю {quantity:F2} по рынку",
-            [sellOrder]);
+            [sellOrder])
+        {
+            NewsId = newsSignal.NewsId
+        };
     }
 
     private static string StepsWord(int n) => (n % 10, n % 100) switch

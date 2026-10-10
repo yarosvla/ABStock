@@ -7,6 +7,9 @@ public record NewsSignal(
     string Explanation
 )
 {
+    /// <summary>Идентификатор исходной новости, общий для её сигналов по разным активам.</summary>
+    public Guid? NewsId { get; init; }
+
     /// <summary>
     /// Сколько позитивных факторов профиля затронула новость.
     /// </summary>

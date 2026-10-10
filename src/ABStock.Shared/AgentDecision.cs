@@ -5,4 +5,7 @@ public record AgentDecision(
     TradeAction Action,
     string Explanation,
     IReadOnlyList<Order> Orders
-);
+)
+{
+    public Guid? NewsId { get; init; }
+}

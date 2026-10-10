@@ -122,6 +122,91 @@ public sealed class SessionEventsTests : IAsyncDisposable
         await _markets.StopAsync();
     }
 
+    [Fact]
+    public async Task Новая_новость_не_наследует_реакцию_другого_актива_на_предыдущую()
+    {
+        Add("Гелиос Энерго");
+        Add("КвантЭнерго");
+        await _markets.StartAsync(
+        [
+            new(AgentType.MarketMaker, 100_000m, 50m),
+            new(AgentType.NewsDriven, 100_000m, 50m)
+        ]);
+        await WaitAsync(() => _markets.Accounts.Count > 0 && _events.Entries.Count > 0);
+        var signal = new NewsSignal(SignalPolarity.Positive, 0.9m, 1m, "") { MatchScore = 0.9m };
+        var firstFan = NewsFan.FromSignals(_registry.Assets,
+            new Dictionary<string, NewsSignal> { ["GLEN"] = signal });
+        var first = _events.AddNews("Новость только для GLEN", firstFan);
+        _markets.SubmitNews(firstFan);
+        await WaitAsync(() => _events.ReactionTo(first, "GLEN") is not null);
+
+        var secondFan = NewsFan.FromSignals(_registry.Assets,
+            new Dictionary<string, NewsSignal> { ["KVAN"] = signal });
+        var second = _events.AddNews("Новость только для KVAN", secondFan);
+        _markets.SubmitNews(secondFan);
+        await WaitAsync(() => _events.ReactionTo(second, "KVAN") is not null);
+        await _markets.StopAsync();
+
+        Assert.Equal(TradeAction.Buy, _events.ReactionTo(first, "GLEN")!.Action);
+        Assert.Equal(TradeAction.Buy, _events.ReactionTo(second, "KVAN")!.Action);
+        Assert.Null(_events.ReactionTo(first, "KVAN"));
+        Assert.Null(_events.ReactionTo(second, "GLEN"));
+    }
+
+    [Fact]
+    public async Task Новости_одного_актива_с_одинаковым_временем_имеют_свои_реакции()
+    {
+        Add("Гелиос Энерго");
+        using var events = new SessionEvents(_markets, _registry, new FixedTimeProvider());
+        var published = new TaskCompletionSource<(SessionEvent First, SessionEvent Second)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void PublishNews(SimulationTickResult tick)
+        {
+            if (tick.Tick != 2)
+            {
+                return;
+            }
+
+            // Both signals enter the queue before the next simulation step.
+            var positive = new NewsSignal(SignalPolarity.Positive, 0.9m, 1m, "") { MatchScore = 0.9m };
+            var firstFan = NewsFan.FromSignals(_registry.Assets,
+                new Dictionary<string, NewsSignal> { ["GLEN"] = positive });
+            var first = events.AddNews("Позитивная новость GLEN", firstFan);
+            _markets.SubmitNews(firstFan);
+
+            var negative = positive with { Polarity = SignalPolarity.Negative, ImpactScore = -1m };
+            var secondFan = NewsFan.FromSignals(_registry.Assets,
+                new Dictionary<string, NewsSignal> { ["GLEN"] = negative });
+            var second = events.AddNews("Негативная новость GLEN", secondFan);
+            _markets.SubmitNews(secondFan);
+            published.TrySetResult((first, second));
+        }
+
+        _runner.OnMarketTick += PublishNews;
+        try
+        {
+            await _markets.StartAsync(
+            [
+                new(AgentType.MarketMaker, 100_000m, 50m),
+                new(AgentType.NewsDriven, 100_000m, 50m)
+            ]);
+            var (first, second) = await published.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await WaitAsync(() => events.ReactionTo(first, "GLEN") is not null
+                && events.ReactionTo(second, "GLEN") is not null);
+            await _markets.StopAsync();
+
+            Assert.Equal(first.At, second.At);
+            Assert.NotEqual(first.Fan!.NewsId, second.Fan!.NewsId);
+            Assert.Equal(TradeAction.Buy, events.ReactionTo(first, "GLEN")!.Action);
+            Assert.Equal(TradeAction.Sell, events.ReactionTo(second, "GLEN")!.Action);
+        }
+        finally
+        {
+            _runner.OnMarketTick -= PublishNews;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         await _runner.StopAsync();
@@ -141,6 +226,11 @@ public sealed class SessionEventsTests : IAsyncDisposable
             new(AgentType.CounterTrend, 100_000m, 50m)
         ]);
         await WaitAsync(() => _markets.Accounts.Count > 0 && _events.Entries.Count > 0);
+    }
+
+    private sealed class FixedTimeProvider : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
     }
 
     private static async Task WaitAsync(Func<bool> condition)
