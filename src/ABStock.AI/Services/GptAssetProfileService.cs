@@ -20,20 +20,17 @@ internal sealed class GptAssetProfileService : IAssetProfileService
     private readonly IEmbeddingService _embeddingService;
     private readonly IProfilePromptBuilder _promptBuilder;
     private readonly ILogger<GptAssetProfileService> _logger;
-    private readonly ITextTranslator _translator;
 
     public GptAssetProfileService(
         HttpClient httpClient,
         IEmbeddingService embeddingService,
         IProfilePromptBuilder promptBuilder,
-        ILogger<GptAssetProfileService> logger,
-        ITextTranslator translator)
+        ILogger<GptAssetProfileService> logger)
     {
         _httpClient = httpClient;
         _embeddingService = embeddingService;
         _promptBuilder = promptBuilder;
         _logger = logger;
-        _translator = translator;
     }
 
     public async Task<AssetProfile> CreateProfileAsync(
@@ -115,13 +112,11 @@ internal sealed class GptAssetProfileService : IAssetProfileService
                 "GPT failed to generate a valid asset profile after 3 attempts.");
         }
 
-        // Описание и все факторы — одним запросом: первым идёт описание.
-        var texts = new[]
+        // GPT сразу возвращает описание и факторы на английском.
+        var englishTexts = new[]
         {
-            request.Description
-        }.Concat(result.Factors.Select(f => f.Name)).ToArray();
-
-        var englishTexts = await _translator.TranslateBatchToEnglishAsync(texts, ct);
+            result.DescriptionEn
+        }.Concat(result.Factors.Select(f => f.NameEn)).ToArray();
 
         var embeddings = await _embeddingService.CreateEmbeddingsAsync(
             englishTexts,
@@ -171,7 +166,10 @@ internal sealed class GptAssetProfileService : IAssetProfileService
                 f.IsPositive,
                 Math.Clamp(f.Importance, 0m, 1m),
                 item.Embedding
-            ));
+            )
+            {
+                NameEn = f.NameEn
+            });
         }
 
         return new AssetProfile(

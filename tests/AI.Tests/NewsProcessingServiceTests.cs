@@ -33,7 +33,8 @@ public class NewsProcessingServiceTests
             finBert,
             matcher,
             embeddings,
-            translator);
+            translator,
+            new FakeNliAnalyzer());
 
         return service.AnalyzeAsync(new NewsAnalysisRequest
         {
@@ -127,4 +128,19 @@ public class NewsProcessingServiceTests
         Assert.Equal(1m, matches[0].Similarity);
         Assert.Equal(0m, matches[1].Similarity);
     }
+
+    private sealed class FakeNliAnalyzer : INliAnalyzer
+{
+    public Task<IReadOnlyList<bool>> CheckEntailmentAsync(
+        string premise,
+        IReadOnlyList<string> hypotheses,
+        CancellationToken ct = default)
+    {
+        IReadOnlyList<bool> results = hypotheses
+            .Select(_ => true)
+            .ToArray();
+
+        return Task.FromResult(results);
+    }
+}
 }

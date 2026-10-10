@@ -21,12 +21,20 @@ internal sealed class NewsProcessingService : INewsProcessingService
 
     private readonly ITextTranslator _translator;
 
-    public NewsProcessingService(IFinBertAnalyzer finBert, IFactorMatcher matcher, IEmbeddingService embeddingService, ITextTranslator translator)
+    private readonly INliAnalyzer _nliAnalyzer;
+
+    public NewsProcessingService(
+        IFinBertAnalyzer finBert,
+        IFactorMatcher matcher,
+        IEmbeddingService embeddingService,
+        ITextTranslator translator,
+        INliAnalyzer nliAnalyzer)
     {
         _finBert = finBert;
         _matcher = matcher;
         _embeddingService = embeddingService;
         _translator = translator;
+        _nliAnalyzer = nliAnalyzer;
     }
 
     public async Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default)
@@ -68,6 +76,22 @@ internal sealed class NewsProcessingService : INewsProcessingService
                 .Where(x => x.Similarity > RelevanceThreshold)
                 .OrderByDescending(x => x.Similarity)
                 .ToList();
+
+        if (relevantMatches.Count > 0)
+        {
+            var hypotheses = relevantMatches
+                .Select(x => x.Factor.NameEn ?? x.Factor.Name)
+                .ToArray();
+
+            var entailments = await _nliAnalyzer.CheckEntailmentAsync(
+                englishNewsText,
+                hypotheses,
+                ct);
+
+            relevantMatches = relevantMatches
+                .Where((match, index) => entailments[index])
+                .ToList();
+        }
 
         decimal totalImpact = 0;
 

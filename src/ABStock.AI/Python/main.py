@@ -24,6 +24,11 @@ classifier = pipeline(
     model="ProsusAI/finbert"
 )
 
+nli_classifier = pipeline(
+    "text-classification",
+    model="typeform/distilbert-base-uncased-mnli"
+)
+
 translation_model_name = "Helsinki-NLP/opus-mt-ru-en"
 
 translation_tokenizer = AutoTokenizer.from_pretrained(
@@ -39,6 +44,10 @@ class Request(BaseModel):
 
 class BatchTranslationRequest(BaseModel):
     texts: List[str]
+
+class NliRequest(BaseModel):
+    premise: str
+    hypotheses: List[str]
 
 def translate_to_english(text: str) -> str:
     is_russian = any("\u0400" <= char <= "\u04FF" for char in text)
@@ -134,6 +143,32 @@ def translate_batch(req: BatchTranslationRequest):
 
     return {"texts": results}
 
+@app.post("/nli")
+def analyze_nli(req: NliRequest):
+    if not req.hypotheses:
+        return {"results": []}
+
+    pairs = [
+        {"text": req.premise, "text_pair": hypothesis}
+        for hypothesis in req.hypotheses
+    ]
+
+    results = nli_classifier(
+        pairs,
+        top_k=None,
+        truncation=True
+    )
+
+    return {
+        "results": [
+            {
+                item["label"].lower(): item["score"]
+                for item in scores
+            }
+            for scores in results
+        ]
+    }
+
 # Клиент создаётся при первом запросе: OpenAI() без ключа бросает исключение,
 # и на уровне модуля это роняло весь сервис — вместе с FinBERT, которому ключ
 # не нужен.
@@ -153,7 +188,7 @@ def generate_profile(req: dict):
     prompt = req["prompt"]
 
     response = get_client().chat.completions.create(
-        model="gpt-5-nano",
+        model="gpt-5.4-mini",
         messages=[
             {
                 "role": "system",

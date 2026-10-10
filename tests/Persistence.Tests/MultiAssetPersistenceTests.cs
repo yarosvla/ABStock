@@ -21,7 +21,16 @@ public sealed class MultiAssetPersistenceTests
         await using var fixture = new Fixture();
         var catalog = fixture.Services.GetRequiredService<IAssetCatalog>();
         var profile = new AssetProfile("  First  ", AssetType.Crypto, "  AI profile  ",
-            [new("Demand", true, 0.75m, [0.1f, 0.2f]), new("Risk", false, 0.5m, [-0.3f])], 1.25m)
+            [
+                new("Спрос", true, 0.75m, [0.1f, 0.2f])
+                {
+                    NameEn = "Demand"
+                },
+                new("Риск", false, 0.5m, [-0.3f])
+                {
+                    NameEn = "Risk"
+                }
+            ], 1.25m)
         {
             Source = source
         };
@@ -41,7 +50,10 @@ public sealed class MultiAssetPersistenceTests
         Assert.Equal(2, restored.Profile.Factors.Count);
         Assert.Equal(0.75m, restored.Profile.Factors[0].Importance);
         Assert.Equal(new[] { 0.1f, 0.2f }, restored.Profile.Factors[0].Embedding);
-        Assert.Equal("Risk", Assert.Single(restored.Profile.NegativeFactors).Name);
+        Assert.Equal("Риск", Assert.Single(restored.Profile.NegativeFactors).Name);
+        Assert.Equal("Risk", Assert.Single(restored.Profile.NegativeFactors).NameEn);
+        Assert.Equal("Спрос", restored.Profile.Factors[0].Name);
+        Assert.Equal("Demand", restored.Profile.Factors[0].NameEn);
     }
 
     [Fact]
