@@ -226,7 +226,7 @@ public sealed class SessionMarkets : ISessionMarkets, IDisposable
 
             try
             {
-                _runner.SubmitNews(asset.Id, row.Signal!);
+                _runner.SubmitNews(asset.Id, row.Signal! with { NewsId = fan.NewsId });
             }
             catch (Exception exception) when (exception is InvalidOperationException or KeyNotFoundException)
             {

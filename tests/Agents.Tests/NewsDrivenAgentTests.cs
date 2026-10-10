@@ -29,9 +29,11 @@ public sealed class NewsDrivenAgentTests
         var agent = new NewsDrivenAgent(10000m);
         var snapshot = CreateSnapshot(bestBid: 99m, bestAsk: 101m);
 
-        var decision = agent.Decide(snapshot, News(SignalPolarity.Positive));
+        var news = News(SignalPolarity.Positive) with { NewsId = Guid.NewGuid() };
+        var decision = agent.Decide(snapshot, news);
 
         Assert.Equal(TradeAction.Buy, decision.Action);
+        Assert.Equal(news.NewsId, decision.NewsId);
         var order = Assert.Single(decision.Orders);
         Assert.Equal(OrderSide.Buy, order.Side);
         Assert.Equal(OrderType.Market, order.Type);
@@ -44,9 +46,11 @@ public sealed class NewsDrivenAgentTests
         var agent = new NewsDrivenAgent(10000m, initialPosition: 5m);
         var snapshot = CreateSnapshot(bestBid: 99m, bestAsk: 101m);
 
-        var decision = agent.Decide(snapshot, News(SignalPolarity.Negative));
+        var news = News(SignalPolarity.Negative) with { NewsId = Guid.NewGuid() };
+        var decision = agent.Decide(snapshot, news);
 
         Assert.Equal(TradeAction.Sell, decision.Action);
+        Assert.Equal(news.NewsId, decision.NewsId);
         var order = Assert.Single(decision.Orders);
         Assert.Equal(OrderSide.Sell, order.Side);
         Assert.Equal(OrderType.Market, order.Type);
@@ -157,7 +161,7 @@ public sealed class NewsDrivenAgentTests
     [Fact]
     public void Decide_ContextUsesImpactDirectionInsteadOfGenericPolarity()
     {
-        var agent = new NewsDrivenAgent(10_000m, initialPosition: 5m);
+        var agent = new NewsDrivenAgent(10_000m, initialPosition: 10m);
         var context = CreateContext(CreateSnapshot(99m, 101m), "GLEN");
         var news = News(SignalPolarity.Positive) with { ImpactScore = -1m, MatchScore = 1m };
 
@@ -166,7 +170,7 @@ public sealed class NewsDrivenAgentTests
         Assert.Equal(TradeAction.Sell, decision.Action);
         var order = Assert.Single(decision.Orders);
         Assert.Equal(OrderSide.Sell, order.Side);
-        Assert.Equal(1.5m, order.Quantity);
+        Assert.Equal(6m, order.Quantity);
         Assert.Contains("GLEN", decision.Explanation);
     }
 
@@ -180,8 +184,64 @@ public sealed class NewsDrivenAgentTests
         var moderateOrder = Assert.Single(new NewsDrivenAgent(10_000m).Decide(context, moderate).Orders);
         var strongOrder = Assert.Single(new NewsDrivenAgent(10_000m).Decide(context, strong).Orders);
 
-        Assert.Equal(1m, moderateOrder.Quantity);
-        Assert.Equal(2m, strongOrder.Quantity);
+        Assert.Equal(2.4m, moderateOrder.Quantity);
+        Assert.Equal(7.5m, strongOrder.Quantity);
+    }
+
+    [Fact]
+    public void Decide_ContextKeepsPlayingNewsWithDecayThenStops()
+    {
+        var agent = new NewsDrivenAgent(100_000m);
+        var context = CreateContext(CreateSnapshot(99m, 101m), "GLEN");
+        var news = News(SignalPolarity.Positive) with { ImpactScore = 0.5m, MatchScore = 0.8m };
+
+        var first = Assert.Single(agent.Decide(context, news).Orders);
+        var second = agent.Decide(context, null);
+        var quantities = new List<decimal> { first.Quantity, Assert.Single(second.Orders).Quantity };
+        for (var step = 2; step < 10; step++)
+        {
+            quantities.Add(Assert.Single(agent.Decide(context, null).Orders).Quantity);
+        }
+
+        var after = agent.Decide(context, null);
+
+        Assert.Contains("1 шаг назад", second.Explanation);
+        Assert.Equal(quantities.OrderByDescending(quantity => quantity), quantities);
+        Assert.True(quantities[^1] < quantities[0]);
+        Assert.Equal(TradeAction.Hold, after.Action);
+        Assert.Contains("отыграна", after.Explanation);
+    }
+
+    [Fact]
+    public void Decide_ContextPreservesNewsIdDuringDecayAndReplacesItWithNewSignal()
+    {
+        var agent = new NewsDrivenAgent(100_000m, initialPosition: 50m);
+        var context = CreateContext(CreateSnapshot(99m, 101m), "GLEN");
+        var news = News(SignalPolarity.Positive) with
+        {
+            MatchScore = 0.8m,
+            NewsId = Guid.NewGuid()
+        };
+
+        var first = agent.Decide(context, news);
+        var continued = agent.Decide(context, null);
+        var elsewhere = agent.Decide(CreateContext(context.Snapshot, "KVAN"), null);
+        var replacement = news with
+        {
+            Polarity = SignalPolarity.Negative,
+            ImpactScore = -1m,
+            NewsId = Guid.NewGuid()
+        };
+        var replaced = agent.Decide(context, replacement);
+
+        Assert.Equal(TradeAction.Buy, first.Action);
+        Assert.Equal(news.NewsId, first.NewsId);
+        Assert.Equal(TradeAction.Buy, continued.Action);
+        Assert.Equal(news.NewsId, continued.NewsId);
+        Assert.Equal(TradeAction.Hold, elsewhere.Action);
+        Assert.Null(elsewhere.NewsId);
+        Assert.Equal(TradeAction.Sell, replaced.Action);
+        Assert.Equal(replacement.NewsId, replaced.NewsId);
     }
 
     private static AgentMarketContext CreateContext(MarketSnapshot snapshot, string ticker)

@@ -5,11 +5,14 @@ namespace ABStock.Agents.Strategies;
 public class TrendFollowingAgent : AgentBase
 {
     private readonly decimal _orderQuantity;
+    private readonly MomentumPulse _pulse;
 
-    public TrendFollowingAgent(decimal initialCash, decimal initialPosition = 0, decimal orderQuantity = 1m)
+    public TrendFollowingAgent(decimal initialCash, decimal initialPosition = 0, decimal orderQuantity = 1m,
+        Random? random = null)
         : base("TrendFollowing", AgentType.TrendFollowing, initialCash, initialPosition)
     {
         _orderQuantity = orderQuantity;
+        _pulse = new MomentumPulse(random);
     }
 
     public override AgentDecision Decide(MarketSnapshot snapshot, NewsSignal? newsSignal)
@@ -43,14 +46,29 @@ public class TrendFollowingAgent : AgentBase
 
         if (asset is not null)
         {
-            var movePercent = prevPrice == 0m ? 0m : (lastPrice - prevPrice) / prevPrice * 100m;
+            var idle = _pulse.Observe(asset.AssetId, snapshot);
+            var movePercent = MomentumPulse.LastMove(snapshot) is { } move ? MomentumPulse.Percent(move) : 0m;
             var threshold = AssetStrategyPolicy.MomentumThresholdPercent(asset);
+
+            if (Math.Abs(movePercent) < threshold && _pulse.IsRestless(idle))
+            {
+                return Probe(prefix, idle, buy: movePercent == 0m ? _pulse.CoinFlip() : movePercent > 0m,
+                    buyPrice, sellPrice, quantity);
+            }
 
             if (Math.Abs(movePercent) < threshold)
             {
                 return HoldDecision(
                     $"{prefix}движение {movePercent:+0.00;-0.00;0.00} % ниже порога {threshold:F2} % — жду");
             }
+
+            if (!_pulse.Acts())
+            {
+                return HoldDecision(
+                    $"{prefix}движение {movePercent:+0.00;-0.00;0.00} % — жду подтверждения на следующем шаге");
+            }
+
+            quantity = _pulse.Jitter(quantity);
 
             if (movePercent > 0m && CanBuy(buyPrice, quantity))
             {
@@ -86,5 +104,29 @@ public class TrendFollowingAgent : AgentBase
         }
 
         return HoldDecision("не хватает денег или позиции для сделки");
+    }
+
+    /// <summary>
+    /// Рынок по активу стоит дольше терпения агента — он пробует его малым
+    /// объёмом по лучшей встречной цене. Без этого рынок без новостей замирает.
+    /// </summary>
+    private AgentDecision Probe(string prefix, int idle, bool buy, decimal buyPrice, decimal sellPrice, decimal quantity)
+    {
+        var probe = Math.Max(0.01m, Math.Round(quantity / 2m, 2, MidpointRounding.AwayFromZero));
+        if (buy && CanBuy(buyPrice, probe))
+        {
+            return new AgentDecision(State.AgentName, TradeAction.Buy,
+                $"{prefix}сделок нет {idle} шагов — пробую рынок: покупаю {probe:F2}",
+                [CreateLimitOrder(OrderSide.Buy, buyPrice, probe)]);
+        }
+
+        if (!buy && CanSell(probe))
+        {
+            return new AgentDecision(State.AgentName, TradeAction.Sell,
+                $"{prefix}сделок нет {idle} шагов — пробую рынок: продаю {probe:F2}",
+                [CreateLimitOrder(OrderSide.Sell, sellPrice, probe)]);
+        }
+
+        return HoldDecision($"{prefix}сделок нет {idle} шагов, но на пробу не хватает денег или позиции");
     }
 }

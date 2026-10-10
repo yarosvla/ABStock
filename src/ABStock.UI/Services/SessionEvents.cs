@@ -51,8 +51,15 @@ public interface ISessionEvents
 
     SessionEvent AddNews(string text, NewsFan fan);
 
-    /// <summary>Реакция новостных агентов на новость или null, если её не было.</summary>
+    /// <summary>Первая реакция новостных агентов на новость или null, если её не было.</summary>
     NewsReaction? ReactionTo(SessionEvent news);
+
+    /// <summary>
+    /// Реакция новостных агентов на новость именно по этому активу. Новость
+    /// задевает несколько активов, и агенты торгуют каждым из них.
+    /// </summary>
+    NewsReaction? ReactionTo(SessionEvent news, string symbol) =>
+        ReactionTo(news) is { } reaction && reaction.Symbol == symbol ? reaction : null;
 }
 
 /// <summary>
@@ -77,8 +84,8 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
     private static readonly TimeSpan AgentEventCooldown = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Сколько шагов после новости ждать решения новостных агентов. Сигнал
-    /// доставляется на следующем шаге; дальше реакция — уже не на эту новость.
+    /// Сколько шагов после новости ждать первую реакцию новостных агентов.
+    /// Причина решения определяется по идентификатору новости, а не по времени.
     /// </summary>
     private const int ReactionWindow = 5;
 
@@ -88,8 +95,8 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
     private readonly Lock _sync = new();
     private readonly List<SessionEvent> _entries = [];
     private readonly Dictionary<(AgentType, Guid), (decimal Position, DateTimeOffset At)> _mentioned = [];
-    private readonly Dictionary<DateTimeOffset, NewsReaction> _reactions = [];
-    private (SessionEvent News, int Tick)? _awaitingReaction;
+    private readonly Dictionary<Guid, List<NewsReaction>> _reactions = [];
+    private readonly Dictionary<Guid, (SessionEvent News, int Tick)> _awaitingReactions = [];
     private Guid _sessionId;
     private bool _wasRunning;
 
@@ -136,7 +143,7 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
         lock (_sync)
         {
             _entries.Insert(0, entry);
-            _awaitingReaction = (entry, _markets.Tick);
+            _awaitingReactions[fan.NewsId] = (entry, _markets.Tick);
             Revision++;
         }
 
@@ -148,7 +155,19 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
     {
         lock (_sync)
         {
-            return _reactions.GetValueOrDefault(news.At);
+            return news.Fan is { } fan
+                ? _reactions.GetValueOrDefault(fan.NewsId)?.FirstOrDefault()
+                : null;
+        }
+    }
+
+    public NewsReaction? ReactionTo(SessionEvent news, string symbol)
+    {
+        lock (_sync)
+        {
+            return news.Fan is { } fan
+                ? _reactions.GetValueOrDefault(fan.NewsId)?.FirstOrDefault(reaction => reaction.Symbol == symbol)
+                : null;
         }
     }
 
@@ -188,7 +207,7 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
                 _entries.Clear();
                 _mentioned.Clear();
                 _reactions.Clear();
-                _awaitingReaction = null;
+                _awaitingReactions.Clear();
                 changed = true;
             }
 
@@ -294,20 +313,14 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
     }
 
     /// <summary>
-    /// Первая сделка-решение новостного агента после последней новости.
-    /// Смотрит решения последнего шага по каждому рынку: агентов, которые
-    /// после новости купили или продали, интерфейс не выдумывает, а видит.
+    /// Первая покупка или продажа по каждой ожидающей новости и задетому
+    /// рынку. Продолжающаяся реакция на старый сигнал не относится к новой
+    /// новости, даже если обе пришли для одного актива в одном шаге.
     /// </summary>
     private bool NoteReactionLocked()
     {
-        if (_awaitingReaction is not { } awaiting)
+        if (_awaitingReactions.Count == 0)
         {
-            return false;
-        }
-
-        if (_markets.Tick - awaiting.Tick > ReactionWindow)
-        {
-            _awaitingReaction = null;
             return false;
         }
 
@@ -316,23 +329,45 @@ public sealed class SessionEvents : ISessionEvents, IDisposable
             .Select(account => account.AgentName)
             .ToHashSet(StringComparer.Ordinal);
 
-        foreach (var market in _markets.Markets)
+        var noted = false;
+        foreach (var (newsId, awaiting) in _awaitingReactions.ToArray())
         {
-            var decision = market.Last.Decisions.FirstOrDefault(decision =>
-                newsAgents.Contains(decision.AgentName) && decision.Action is TradeAction.Buy or TradeAction.Sell);
-            var asset = _assets.Find(market.AssetId);
-
-            if (decision is null || asset is null)
+            if (_markets.Tick - awaiting.Tick > ReactionWindow)
             {
+                _awaitingReactions.Remove(newsId);
                 continue;
             }
 
-            _reactions[awaiting.News.At] = new NewsReaction(asset.Symbol, decision.Action);
-            _awaitingReaction = null;
-            return true;
+            if (!_reactions.TryGetValue(newsId, out var reactions))
+            {
+                reactions = [];
+                _reactions[newsId] = reactions;
+            }
+
+            foreach (var market in _markets.Markets)
+            {
+                var asset = _assets.Find(market.AssetId);
+                if (asset is null || awaiting.News.Fan?.For(asset.Symbol)?.IsHit != true
+                    || reactions.Any(reaction => reaction.Symbol == asset.Symbol))
+                {
+                    continue;
+                }
+
+                var decision = market.Last.Decisions.FirstOrDefault(decision =>
+                    newsAgents.Contains(decision.AgentName) && decision.NewsId == newsId
+                    && decision.Action is TradeAction.Buy or TradeAction.Sell);
+
+                if (decision is null)
+                {
+                    continue;
+                }
+
+                reactions.Add(new NewsReaction(asset.Symbol, decision.Action));
+                noted = true;
+            }
         }
 
-        return false;
+        return noted;
     }
 
     private static string Counted(int count, string one, string few, string many) =>

@@ -440,6 +440,17 @@ public sealed class SimulationRunner : IMultiAssetSimulationRunner, ISimulationD
                     foreach (var assetId in _marketOrder)
                     {
                         var snapshot = _session.GetMarket(assetId).Snapshot;
+
+                        // Заявка живёт один шаг. Снимок взят до снятия — агенты видят
+                        // котировки прошлого шага и могут по ним ударить, а деньги и
+                        // бумаги, замороженные в неисполненных заявках, к решению уже
+                        // свободны. Иначе маркет-мейкер за пару шагов запирает весь
+                        // капитал в старых лестницах и рынок встаёт.
+                        foreach (var registered in _agents)
+                        {
+                            _session.CancelOrdersByAgent(assetId, registered.Name);
+                        }
+
                         var news = _pendingNews.TryGetValue(assetId, out var queue) && queue.Count > 0
                             ? queue.Dequeue()
                             : null;
