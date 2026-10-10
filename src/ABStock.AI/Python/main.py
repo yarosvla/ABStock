@@ -12,6 +12,8 @@ from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
 
 from dotenv import load_dotenv
 
+from typing import List
+
 ROOT_DIR = Path(__file__).resolve().parents[3]
 load_dotenv(ROOT_DIR / ".env")
 
@@ -35,11 +37,17 @@ translation_model = AutoModelForSeq2SeqLM.from_pretrained(
 class Request(BaseModel):
     text: str
 
-@app.post("/analyze")
-def analyze(req: Request):
+class BatchTranslationRequest(BaseModel):
+    texts: List[str]
+
+def translate_to_english(text: str) -> str:
+    is_russian = any("\u0400" <= char <= "\u04FF" for char in text)
+
+    if not is_russian:
+        return text
 
     inputs = translation_tokenizer(
-        req.text,
+        text,
         return_tensors="pt",
         truncation=True,
         max_length=512
@@ -50,15 +58,19 @@ def analyze(req: Request):
         max_length=512
     )
 
-    translated = translation_tokenizer.decode(
+    return translation_tokenizer.decode(
         translated_tokens[0],
         skip_special_tokens=True
     )
 
-    print(f"FinBERT input: {translated}")
+@app.post("/analyze")
+def analyze(req: Request):
+    finbert_text = translate_to_english(req.text)
+
+    print(f"FinBERT input: {finbert_text}")
 
     results = classifier(
-        translated,
+        finbert_text,
         top_k=None
     )
 
@@ -67,16 +79,13 @@ def analyze(req: Request):
     negative = 0.0
 
     for item in results:
-
         label = item["label"].lower()
         score = item["score"]
 
         if label == "positive":
             positive = score
-
         elif label == "neutral":
             neutral = score
-
         elif label == "negative":
             negative = score
 
@@ -85,6 +94,45 @@ def analyze(req: Request):
         "neutral": neutral,
         "negative": negative
     }
+
+@app.post("/translate")
+def translate(req: Request):
+    return {"text": translate_to_english(req.text)}
+
+@app.post("/translate-batch")
+def translate_batch(req: BatchTranslationRequest):
+    results = list(req.texts)
+
+    russian_indices = [
+        i for i, text in enumerate(results)
+        if any("\u0400" <= char <= "\u04FF" for char in text)
+    ]
+
+    if russian_indices:
+        russian_texts = [results[i] for i in russian_indices]
+
+        inputs = translation_tokenizer(
+            russian_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=512
+        )
+
+        translated_tokens = translation_model.generate(
+            **inputs,
+            max_length=512
+        )
+
+        translations = translation_tokenizer.batch_decode(
+            translated_tokens,
+            skip_special_tokens=True
+        )
+
+        for i, translated in zip(russian_indices, translations):
+            results[i] = translated
+
+    return {"texts": results}
 
 # Клиент создаётся при первом запросе: OpenAI() без ключа бросает исключение,
 # и на уровне модуля это роняло весь сервис — вместе с FinBERT, которому ключ
@@ -105,7 +153,7 @@ def generate_profile(req: dict):
     prompt = req["prompt"]
 
     response = get_client().chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-5-nano",
         messages=[
             {
                 "role": "system",

@@ -20,17 +20,20 @@ internal sealed class GptAssetProfileService : IAssetProfileService
     private readonly IEmbeddingService _embeddingService;
     private readonly IProfilePromptBuilder _promptBuilder;
     private readonly ILogger<GptAssetProfileService> _logger;
+    private readonly ITextTranslator _translator;
 
     public GptAssetProfileService(
         HttpClient httpClient,
         IEmbeddingService embeddingService,
         IProfilePromptBuilder promptBuilder,
-        ILogger<GptAssetProfileService> logger)
+        ILogger<GptAssetProfileService> logger,
+        ITextTranslator translator)
     {
         _httpClient = httpClient;
         _embeddingService = embeddingService;
         _promptBuilder = promptBuilder;
         _logger = logger;
+        _translator = translator;
     }
 
     public async Task<AssetProfile> CreateProfileAsync(
@@ -113,10 +116,16 @@ internal sealed class GptAssetProfileService : IAssetProfileService
         }
 
         // Описание и все факторы — одним запросом: первым идёт описание.
-        var embeddings =
-            await _embeddingService.CreateEmbeddingsAsync(
-                [request.Description, .. result.Factors.Select(f => f.Name)],
-                ct);
+        var texts = new[]
+        {
+            request.Description
+        }.Concat(result.Factors.Select(f => f.Name)).ToArray();
+
+        var englishTexts = await _translator.TranslateBatchToEnglishAsync(texts, ct);
+
+        var embeddings = await _embeddingService.CreateEmbeddingsAsync(
+            englishTexts,
+            ct);
 
         var assetEmbedding = embeddings[0];
 

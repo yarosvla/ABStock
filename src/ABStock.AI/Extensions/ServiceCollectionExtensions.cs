@@ -47,6 +47,12 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<IFinBertAnalyzer, RealFinBertAnalyzer>(client =>
             client.BaseAddress = settings.ServiceUrl);
 
+        services.AddHttpClient<ITextTranslator, RealTextTranslator>(client =>
+        {
+            client.BaseAddress = settings.ServiceUrl;
+            client.Timeout = TimeSpan.FromMinutes(3);
+        });
+
         // 40–50 факторов от gpt-4o-mini — это десятки секунд, до трёх попыток.
         services.AddHttpClient<IAssetProfileService, GptAssetProfileService>(client =>
         {

@@ -20,12 +20,13 @@ public class GptAssetProfileServiceTests
     };
 
     private static GptAssetProfileService CreateService(HttpMessageHandler handler, IEmbeddingService embeddings) =>
-        new(
-            new HttpClient(handler) { BaseAddress = new Uri("http://ai.test/") },
-            embeddings,
-            new ProfilePromptBuilder(),
-            NullLogger<GptAssetProfileService>.Instance);
-
+    new(
+        new HttpClient(handler) { BaseAddress = new Uri("http://ai.test/") },
+        embeddings,
+        new ProfilePromptBuilder(),
+        NullLogger<GptAssetProfileService>.Instance,
+        new FakeTextTranslator());
+    
     [Fact]
     public async Task Valid_answer_gives_balanced_ai_profile()
     {
@@ -70,5 +71,23 @@ public class GptAssetProfileServiceTests
 
         Assert.Equal(3, handler.Calls);
         Assert.Equal(ProfileSource.Fallback, profile.Source);
+    }
+}
+
+
+internal sealed class FakeTextTranslator : ITextTranslator
+{
+    public Task<string> TranslateToEnglishAsync(
+        string text,
+        CancellationToken ct = default)
+    {
+        return Task.FromResult(text);
+    }
+
+    public Task<IReadOnlyList<string>> TranslateBatchToEnglishAsync(
+        IReadOnlyList<string> texts,
+        CancellationToken ct = default)
+    {
+        return Task.FromResult(texts);
     }
 }

@@ -19,19 +19,23 @@ internal sealed class NewsProcessingService : INewsProcessingService
 
     private readonly IEmbeddingService _embeddingService;
 
-    public NewsProcessingService(IFinBertAnalyzer finBert, IFactorMatcher matcher, IEmbeddingService embeddingService)
+    private readonly ITextTranslator _translator;
+
+    public NewsProcessingService(IFinBertAnalyzer finBert, IFactorMatcher matcher, IEmbeddingService embeddingService, ITextTranslator translator)
     {
         _finBert = finBert;
         _matcher = matcher;
         _embeddingService = embeddingService;
+        _translator = translator;
     }
 
     public async Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default)
     {
-        var newsEmbedding =
-            await _embeddingService.CreateEmbeddingAsync(
-                request.NewsText,
-                ct);
+        var englishNewsText = await _translator.TranslateToEnglishAsync(
+            request.NewsText, ct);
+
+        var newsEmbedding = await _embeddingService.CreateEmbeddingAsync(
+            englishNewsText, ct);
 
         var finBertResult =
             await _finBert.AnalyzeAsync(
@@ -43,6 +47,21 @@ internal sealed class NewsProcessingService : INewsProcessingService
                 newsEmbedding,
                 request.Profile,
                 ct);
+
+        Console.WriteLine("\n========== FACTOR SIMILARITY ==========");
+        Console.WriteLine($"News: {request.NewsText}");
+        Console.WriteLine($"Threshold: {RelevanceThreshold:F2}");
+
+        foreach (var match in matches.OrderByDescending(x => x.Similarity))
+        {
+            Console.WriteLine(
+                $"[{(match.Factor.IsPositive ? "POS" : "NEG")}] " +
+                $"Similarity: {match.Similarity:F4} | " +
+                $"Weight: {match.Factor.Importance:F2} | " +
+                $"{match.Factor.Name}");
+        }
+
+        Console.WriteLine("=======================================\n");
 
         var relevantMatches =
             matches
