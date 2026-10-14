@@ -11,7 +11,7 @@ internal sealed class RealNliAnalyzer : INliAnalyzer
         _httpClient = httpClient;
     }
 
-    public async Task<IReadOnlyList<bool>> CheckEntailmentAsync(
+    public async Task<IReadOnlyList<NliResult>> AnalyzeAsync(
         string premise,
         IReadOnlyList<string> hypotheses,
         CancellationToken ct = default)
@@ -32,21 +32,12 @@ internal sealed class RealNliAnalyzer : INliAnalyzer
         if (result is null || result.Results.Count != hypotheses.Count)
             throw new InvalidOperationException("Invalid NLI response.");
 
-        for (int i = 0; i < hypotheses.Count; i++)
-{
-            Console.WriteLine($"NLI hypothesis: {hypotheses[i]}");
-
-            foreach (var (label, score) in result.Results[i])
-            {
-                Console.WriteLine($"  {label}: {score:F4}");
-            }
-        }
-
         return result.Results
-            .Select(scores =>
-                scores.TryGetValue("entailment", out var entailment) &&
-                entailment > scores.GetValueOrDefault("neutral") &&
-                entailment > scores.GetValueOrDefault("contradiction"))
+            .Select(scores => new NliResult(
+                Entailment: (decimal)scores.GetValueOrDefault("entailment"),
+                Neutral: (decimal)scores.GetValueOrDefault("neutral"),
+                Contradiction: (decimal)scores.GetValueOrDefault("contradiction")
+            ))
             .ToArray();
     }
 
