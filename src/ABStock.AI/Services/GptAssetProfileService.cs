@@ -112,11 +112,15 @@ internal sealed class GptAssetProfileService : IAssetProfileService
                 "GPT failed to generate a valid asset profile after 3 attempts.");
         }
 
-        // Описание и все факторы — одним запросом: первым идёт описание.
-        var embeddings =
-            await _embeddingService.CreateEmbeddingsAsync(
-                [request.Description, .. result.Factors.Select(f => f.Name)],
-                ct);
+        // GPT сразу возвращает описание и факторы на английском.
+        var englishTexts = new[]
+        {
+            result.DescriptionEn
+        }.Concat(result.Factors.Select(f => f.NameEn)).ToArray();
+
+        var embeddings = await _embeddingService.CreateEmbeddingsAsync(
+            englishTexts,
+            ct);
 
         var assetEmbedding = embeddings[0];
 
@@ -162,7 +166,10 @@ internal sealed class GptAssetProfileService : IAssetProfileService
                 f.IsPositive,
                 Math.Clamp(f.Importance, 0m, 1m),
                 item.Embedding
-            ));
+            )
+            {
+                NameEn = f.NameEn
+            });
         }
 
         return new AssetProfile(

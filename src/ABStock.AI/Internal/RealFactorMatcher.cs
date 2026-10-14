@@ -6,10 +6,12 @@ internal sealed class RealFactorMatcher
     : IFactorMatcher
 {
     private readonly IEmbeddingService _embeddingService;
+    private readonly ITextTranslator _translator;
 
-    public RealFactorMatcher(IEmbeddingService embeddingService)
+    public RealFactorMatcher(IEmbeddingService embeddingService, ITextTranslator translator)
     {
         _embeddingService = embeddingService;
+        _translator = translator;
     }
 
     public async Task<IReadOnlyList<FactorMatchResult>> MatchAsync(
@@ -26,11 +28,21 @@ internal sealed class RealFactorMatcher
             .Where(factor => factor.Embedding.Length == 0)
             .ToArray();
 
-        IReadOnlyList<float[]> computed = missing.Length == 0
-            ? []
-            : await _embeddingService.CreateEmbeddingsAsync(
-                missing.Select(factor => factor.Name).ToArray(),
-                ct);
+        IReadOnlyList<float[]> computed = [];
+
+        if (missing.Length > 0)
+        {
+            var englishNames = new List<string>();
+
+            foreach (var factor in missing)
+            {
+                englishNames.Add(
+                    await _translator.TranslateToEnglishAsync(factor.Name, ct));
+            }
+
+            computed = await _embeddingService.CreateEmbeddingsAsync(
+                englishNames, ct);
+        }
 
         var results =
             new List<FactorMatchResult>();

@@ -19,19 +19,31 @@ internal sealed class NewsProcessingService : INewsProcessingService
 
     private readonly IEmbeddingService _embeddingService;
 
-    public NewsProcessingService(IFinBertAnalyzer finBert, IFactorMatcher matcher, IEmbeddingService embeddingService)
+    private readonly ITextTranslator _translator;
+
+    private readonly INliAnalyzer _nliAnalyzer;
+
+    public NewsProcessingService(
+        IFinBertAnalyzer finBert,
+        IFactorMatcher matcher,
+        IEmbeddingService embeddingService,
+        ITextTranslator translator,
+        INliAnalyzer nliAnalyzer)
     {
         _finBert = finBert;
         _matcher = matcher;
         _embeddingService = embeddingService;
+        _translator = translator;
+        _nliAnalyzer = nliAnalyzer;
     }
 
     public async Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default)
     {
-        var newsEmbedding =
-            await _embeddingService.CreateEmbeddingAsync(
-                request.NewsText,
-                ct);
+        var englishNewsText = await _translator.TranslateToEnglishAsync(
+            request.NewsText, ct);
+
+        var newsEmbedding = await _embeddingService.CreateEmbeddingAsync(
+            englishNewsText, ct);
 
         var finBertResult =
             await _finBert.AnalyzeAsync(
@@ -44,11 +56,42 @@ internal sealed class NewsProcessingService : INewsProcessingService
                 request.Profile,
                 ct);
 
+        Console.WriteLine("\n========== FACTOR SIMILARITY ==========");
+        Console.WriteLine($"News: {request.NewsText}");
+        Console.WriteLine($"Threshold: {RelevanceThreshold:F2}");
+
+        foreach (var match in matches.OrderByDescending(x => x.Similarity))
+        {
+            Console.WriteLine(
+                $"[{(match.Factor.IsPositive ? "POS" : "NEG")}] " +
+                $"Similarity: {match.Similarity:F4} | " +
+                $"Weight: {match.Factor.Importance:F2} | " +
+                $"{match.Factor.Name}");
+        }
+
+        Console.WriteLine("=======================================\n");
+
         var relevantMatches =
             matches
                 .Where(x => x.Similarity > RelevanceThreshold)
                 .OrderByDescending(x => x.Similarity)
                 .ToList();
+
+        if (relevantMatches.Count > 0)
+        {
+            var hypotheses = relevantMatches
+                .Select(x => x.Factor.NameEn ?? x.Factor.Name)
+                .ToArray();
+
+            var entailments = await _nliAnalyzer.CheckEntailmentAsync(
+                englishNewsText,
+                hypotheses,
+                ct);
+
+            relevantMatches = relevantMatches
+                .Where((match, index) => entailments[index])
+                .ToList();
+        }
 
         decimal totalImpact = 0;
 

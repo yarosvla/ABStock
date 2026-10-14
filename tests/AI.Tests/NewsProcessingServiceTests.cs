@@ -26,9 +26,21 @@ public class NewsProcessingServiceTests
     private static Task<NewsSignal> AnalyzeAsync(AssetProfile profile, FixedFinBert finBert)
     {
         var embeddings = new DictionaryEmbeddings(Vectors);
-        var service = new NewsProcessingService(finBert, new RealFactorMatcher(embeddings), embeddings);
+        var translator = new FakeTextTranslator();
 
-        return service.AnalyzeAsync(new NewsAnalysisRequest { NewsText = News, Profile = profile });
+        var matcher = new RealFactorMatcher(embeddings, translator);
+        var service = new NewsProcessingService(
+            finBert,
+            matcher,
+            embeddings,
+            translator,
+            new FakeNliAnalyzer());
+
+        return service.AnalyzeAsync(new NewsAnalysisRequest
+        {
+            NewsText = News,
+            Profile = profile
+        });
     }
 
     [Fact]
@@ -106,11 +118,29 @@ public class NewsProcessingServiceTests
             new AssetFactor("Аварии в сетевом хозяйстве", false, 0.7m, [0f, 1f]));
 
         var embeddings = new DictionaryEmbeddings(Vectors);
-        var matches = await new RealFactorMatcher(embeddings).MatchAsync([1f, 0f], profile);
+        var matches = await new RealFactorMatcher(
+            embeddings,
+            new FakeTextTranslator()
+        ).MatchAsync([1f, 0f], profile);
 
         var batch = Assert.Single(embeddings.BatchCalls);
         Assert.Equal(["Ввод новых генерирующих мощностей"], batch);
         Assert.Equal(1m, matches[0].Similarity);
         Assert.Equal(0m, matches[1].Similarity);
     }
+
+    private sealed class FakeNliAnalyzer : INliAnalyzer
+{
+    public Task<IReadOnlyList<bool>> CheckEntailmentAsync(
+        string premise,
+        IReadOnlyList<string> hypotheses,
+        CancellationToken ct = default)
+    {
+        IReadOnlyList<bool> results = hypotheses
+            .Select(_ => true)
+            .ToArray();
+
+        return Task.FromResult(results);
+    }
+}
 }

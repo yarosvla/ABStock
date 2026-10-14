@@ -106,8 +106,21 @@ internal sealed class ProfilePromptBuilder
                 - Do not generate duplicates or near duplicates.
                 - Two differently worded factors describing the same underlying driver count as duplicates.
 
-              9. Write every factor name in Russian.
-                The application UI and incoming news are in Russian.
+              9. Generate every factor name in two languages:
+                - "name": the factor name in Russian, for display in the application UI.
+                - "nameEn": an accurate English translation of "name", for embedding generation.
+
+                Both fields MUST describe exactly the same underlying driver.
+                Do not add, remove, or change any financial meaning when translating.
+                Preserve company names, product names, technologies, and other specific entities.
+                Do not generate separate factors for different languages.
+
+              10. Translate the provided asset description into English:
+                  - Return it in the top-level "descriptionEn" field.
+                  - Preserve all factual information from the original description.
+                  - Do not invent, remove, or reinterpret information.
+                  - Do not include the asset name or industry unless they are present
+                    in the original description.
 
               ---
 
@@ -116,9 +129,11 @@ internal sealed class ProfilePromptBuilder
               Return ONLY valid JSON. No explanations, no text, no markdown.
 
               {
+                "descriptionEn": "Accurate English translation of the provided asset description",
                 "factors": [
                   {
-                    "name": "string (asset-specific persistent driver)",
+                    "name": "Russian factor name",
+                    "nameEn": "Accurate English translation of the same factor",
                     "isPositive": true,
                     "importance": 0.0
                   }
@@ -173,6 +188,8 @@ internal sealed class ProfilePromptBuilder
                 - EXACTLY 20 factors have isPositive = false;
                 - every factor describes a persistent driver rather than a news event;
                 - no factors are duplicates or near duplicates.
+                - "descriptionEn" is an accurate English translation of the asset description;
+                - every factor has both "name" and "nameEn", with identical financial meaning.
 
               If any condition is not satisfied, correct the list before returning the JSON.
 
