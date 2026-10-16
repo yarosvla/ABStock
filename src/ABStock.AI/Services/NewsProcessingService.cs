@@ -39,6 +39,8 @@ internal sealed class NewsProcessingService : INewsProcessingService
 
     public async Task<NewsSignal> AnalyzeAsync(NewsAnalysisRequest request, CancellationToken ct = default)
     {
+        var showDebug = request.Profile.Name == "";
+
         var englishNewsText = await _translator.TranslateToEnglishAsync(
             request.NewsText, ct);
 
@@ -56,20 +58,23 @@ internal sealed class NewsProcessingService : INewsProcessingService
                 request.Profile,
                 ct);
 
-        Console.WriteLine("\n========== FACTOR SIMILARITY ==========");
-        Console.WriteLine($"News: {request.NewsText}");
-        Console.WriteLine($"Threshold: {RelevanceThreshold:F2}");
-
-        foreach (var match in matches.OrderByDescending(x => x.Similarity))
+        if (showDebug)
         {
-            Console.WriteLine(
-                $"[{(match.Factor.IsPositive ? "POS" : "NEG")}] " +
-                $"Similarity: {match.Similarity:F4} | " +
-                $"Weight: {match.Factor.Importance:F2} | " +
-                $"{match.Factor.Name}");
-        }
+            Console.WriteLine("\n========== FACTOR SIMILARITY ==========");
+            Console.WriteLine($"News: {request.NewsText}");
+            Console.WriteLine($"Threshold: {RelevanceThreshold:F2}");
 
-        Console.WriteLine("=======================================\n");
+            foreach (var match in matches.OrderByDescending(x => x.Similarity))
+            {
+                Console.WriteLine(
+                    $"[{(match.Factor.IsPositive ? "POS" : "NEG")}] " +
+                    $"Similarity: {match.Similarity:F4} | " +
+                    $"Weight: {match.Factor.Importance:F2} | " +
+                    $"{match.Factor.Name}");
+            }
+
+            Console.WriteLine("=======================================\n");
+        }
 
         var relevantMatches =
             matches
@@ -79,17 +84,52 @@ internal sealed class NewsProcessingService : INewsProcessingService
 
         if (relevantMatches.Count > 0)
         {
-            var hypotheses = relevantMatches
-                .Select(x => x.Factor.NameEn ?? x.Factor.Name)
-                .ToArray();
+            var hypotheses = await _translator.TranslateBatchToEnglishAsync(
+                relevantMatches.Select(x =>
+                    x.Factor.HypothesisEn
+                    ?? x.Factor.NameEn
+                    ?? x.Factor.Name
+                ).ToArray(),
+                ct);
 
-            var entailments = await _nliAnalyzer.CheckEntailmentAsync(
+            if (showDebug)
+            {
+                Console.WriteLine($"NLI premise: {englishNewsText}");
+
+                for (int i = 0; i < hypotheses.Count; i++)
+                {
+                    Console.WriteLine($"NLI hypothesis {i + 1}: {hypotheses[i]}");
+                }
+            }
+
+            var nliResults = await _nliAnalyzer.AnalyzeAsync(
                 englishNewsText,
                 hypotheses,
                 ct);
 
+            if (showDebug)
+            {
+                Console.WriteLine("\n========== NLI RESULTS ==========");
+
+                for (int i = 0; i < relevantMatches.Count; i++)
+                {
+                    var nli = nliResults[i];
+
+                    Console.WriteLine(
+                        $"Factor: {relevantMatches[i].Factor.Name} | " +
+                        $"Similarity: {relevantMatches[i].Similarity:F4} | " +
+                        $"Entailment: {nli.Entailment:F4} | " +
+                        $"Neutral: {nli.Neutral:F4} | " +
+                        $"Contradiction: {nli.Contradiction:F4}");
+                }
+
+                Console.WriteLine("=================================\n");
+            }
+
             relevantMatches = relevantMatches
-                .Where((match, index) => entailments[index])
+                .Where((match, index) =>
+                    nliResults[index].Entailment > nliResults[index].Neutral &&
+                    nliResults[index].Entailment > nliResults[index].Contradiction)
                 .ToList();
         }
 

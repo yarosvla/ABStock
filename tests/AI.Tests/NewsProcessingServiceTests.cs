@@ -131,13 +131,16 @@ public class NewsProcessingServiceTests
 
     private sealed class FakeNliAnalyzer : INliAnalyzer
 {
-    public Task<IReadOnlyList<bool>> CheckEntailmentAsync(
+    public Task<IReadOnlyList<NliResult>> AnalyzeAsync(
         string premise,
         IReadOnlyList<string> hypotheses,
         CancellationToken ct = default)
     {
-        IReadOnlyList<bool> results = hypotheses
-            .Select(_ => true)
+        IReadOnlyList<NliResult> results = hypotheses
+            .Select(_ => new NliResult(
+                Entailment: 1m,
+                Neutral: 0m,
+                Contradiction: 0m))
             .ToArray();
 
         return Task.FromResult(results);

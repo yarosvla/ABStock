@@ -13,6 +13,8 @@ public sealed record GeneratedFactor
 
     public required string NameEn { get; init; }
 
+    public string? HypothesisEn { get; set; }
+
     public required bool IsPositive { get; init; }
 
     public required decimal Importance { get; init; }

@@ -21,4 +21,5 @@ public record AssetFactor(
 )
 {
     public string? NameEn { get; init; }
+    public string? HypothesisEn { get; init; }
 }

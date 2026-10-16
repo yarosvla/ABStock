@@ -168,7 +168,8 @@ internal sealed class GptAssetProfileService : IAssetProfileService
                 item.Embedding
             )
             {
-                NameEn = f.NameEn
+                NameEn = f.NameEn,
+                HypothesisEn = f.HypothesisEn
             });
         }
 

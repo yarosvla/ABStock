@@ -188,7 +188,7 @@ def generate_profile(req: dict):
     prompt = req["prompt"]
 
     response = get_client().chat.completions.create(
-        model="gpt-5.4-mini",
+        model="gpt-5.6-terra",
         messages=[
             {
                 "role": "system",

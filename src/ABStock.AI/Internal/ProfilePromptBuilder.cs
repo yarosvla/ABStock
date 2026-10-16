@@ -13,10 +13,26 @@ internal sealed class ProfilePromptBuilder
 
               Your task is to generate a set of highly specific, asset-dependent market drivers for the given financial asset.
 
-              A factor is a persistent characteristic, dependency, source of risk, or source of growth
-              to which the asset's revenue, profitability, competitive position, or market value is sensitive.
+              A factor is a specific positive or negative change in an asset-related
+              business driver that could affect the asset's revenue, profitability,
+              competitive position, or market value.
 
-              A factor is NOT a news event and must NOT describe something that has already happened.
+              Each factor MUST describe a concrete, verifiable change that could
+              be confirmed or contradicted by a financial news article.
+
+              Examples:
+              - "Рост спроса на Tesla Model 3 и Model Y"
+              - "Снижение спроса на Tesla Model 3 и Model Y"
+              - "Увеличение производственных мощностей Tesla Gigafactory"
+              - "Рост себестоимости производства автомобилей Tesla"
+
+              Do NOT generate static topics or characteristics such as:
+              - "Спрос на электромобили Tesla"
+              - "Конкурентоспособность Tesla"
+              - "Зависимость Tesla от поставщиков"
+
+              A factor describes a possible development, not an event
+              that has necessarily already occurred.
 
               ---
 
@@ -39,42 +55,44 @@ internal sealed class ProfilePromptBuilder
                   - "economic conditions"
                   - "increasing demand" without specifying demand for what
 
-              2. A factor MUST describe a persistent driver, dependency, competitive condition, risk,
-                or source of growth for the asset.
+              2. Every factor MUST describe a specific positive or negative
+              change affecting the asset.
 
-                GOOD factors:
-                - "Спрос гиперскейлеров на серверные процессоры AMD EPYC"
-                - "Спрос операторов дата-центров на ускорители AMD Instinct"
-                - "Конкурентоспособность AMD EPYC относительно Intel Xeon"
-                - "Конкурентоспособность AMD Instinct относительно NVIDIA в AI-нагрузках"
-                - "Доступ AMD к передовым техпроцессам и производственным мощностям TSMC"
-                - "Доступность HBM-памяти для ускорителей AMD Instinct"
-                - "Распространённость ROCm среди разработчиков и операторов AI-инфраструктуры"
+              GOOD factors:
+              - "Рост спроса на серверные процессоры AMD EPYC"
+              - "Снижение спроса на ускорители AMD Instinct"
+              - "Повышение конкурентоспособности AMD EPYC относительно Intel Xeon"
+              - "Снижение конкурентоспособности AMD Instinct относительно NVIDIA"
+              - "Улучшение доступа AMD к производственным мощностям TSMC"
+              - "Ухудшение доступности HBM-памяти для AMD Instinct"
+              - "Расширение использования ROCm разработчиками AI-инфраструктуры"
 
-              3. Do NOT describe concrete events as factors.
+              BAD factors:
+              - "Спрос на серверные процессоры AMD EPYC"
+              - "Конкурентоспособность AMD относительно Intel"
+              - "Доступность HBM-памяти"
 
-                BAD factors:
-                - "AWS заключил крупный контракт на поставку AMD EPYC"
-                - "TSMC выделила AMD приоритетные 3-нм квоты"
-                - "Microsoft продлил контракт с AMD"
-                - "AMD получила субсидии по CHIPS Act"
-                - "Суд обязал AMD выплатить компенсацию"
-                - "Бенчмарки показали отставание MI300 от NVIDIA"
+              Every factor must have a clear direction of change.
+              Positive factors describe developments beneficial to the asset.
+              Negative factors describe developments harmful to the asset.
 
-                These are NEWS EVENTS, not persistent asset factors.
+              3. Factors MUST describe possible changes, not confirmed past events.
 
-                Instead describe the underlying driver:
-                - BAD: "AWS заключил крупный контракт на поставку AMD EPYC"
-                  GOOD: "Спрос крупных облачных провайдеров на серверные процессоры AMD EPYC"
+              GOOD:
+              - "Рост продаж автомобилей Tesla Model 3 и Model Y"
+              - "Снижение спроса на ускорители AMD Instinct"
+              - "Увеличение производственных мощностей TSMC"
 
-                - BAD: "TSMC выделила AMD приоритетные 3-нм квоты"
-                  GOOD: "Доступ AMD к передовым производственным мощностям TSMC"
+              BAD:
+              - "Tesla reported record sales in Q3 2026"
+              - "AMD announced a new contract yesterday"
+              - "TSMC opened a new factory last month"
 
-                - BAD: "AMD получила субсидии по CHIPS Act"
-                  GOOD: "Доступ AMD к государственным субсидиям и программам поддержки полупроводникового производства"
+              Do NOT include specific dates, completed transactions,
+              announcements, or historical events.
 
-                - BAD: "Бенчмарки показали отставание MI300 от NVIDIA"
-                  GOOD: "Производительность ускорителей AMD Instinct относительно конкурирующих ускорителей NVIDIA"
+              Each factor must be suitable for checking whether
+              a future news article confirms or contradicts it.
 
               4. Generate EXACTLY 20 positive and EXACTLY 20 negative factors.
                 - Positive factors: isPositive = true
@@ -91,6 +109,11 @@ internal sealed class ProfilePromptBuilder
                 - "Рост конкурентоспособности AMD Instinct относительно NVIDIA" → isPositive = true
                 - "Снижение конкурентоспособности AMD Instinct относительно NVIDIA" → isPositive = false
 
+                An increase is not always positive, and a decrease is not always negative.
+                For example:
+                - "Снижение себестоимости производства Tesla" → isPositive = true
+                - "Рост себестоимости производства Tesla" → isPositive = false
+
               6. Importance must reflect how strongly this factor can influence the asset price,
                 revenue, profitability, or competitive position:
                 - Range: 0.0 to 1.0
@@ -104,16 +127,26 @@ internal sealed class ProfilePromptBuilder
 
               8. Factors must be non-overlapping.
                 - Do not generate duplicates or near duplicates.
-                - Two differently worded factors describing the same underlying driver count as duplicates.
+                - Two differently worded factors describing the same change count as duplicates.
+                - Opposite changes in the same underlying driver are allowed
+                  and are NOT considered duplicates.
 
-              9. Generate every factor name in two languages:
-                - "name": the factor name in Russian, for display in the application UI.
-                - "nameEn": an accurate English translation of "name", for embedding generation.
+              9. Generate three representations of each factor:
+                - "name": a short Russian label for display in the UI.
+                - "nameEn": a short English label for embedding generation.
+                - "hypothesisEn": a complete, grammatically correct English
+                  statement for Natural Language Inference (NLI).
 
-                Both fields MUST describe exactly the same underlying driver.
-                Do not add, remove, or change any financial meaning when translating.
-                Preserve company names, product names, technologies, and other specific entities.
-                Do not generate separate factors for different languages.
+                All three fields MUST describe exactly the same event.
+                Do not add, remove, or change any financial meaning.
+                Preserve company names, product names, and technologies.
+
+                The hypothesisEn must be a factual statement, not a
+                prediction, possibility, or question.
+
+                Distinguish demand, orders, sales, deliveries, production,
+                revenue, and market share. An increase in one metric
+                does not prove an increase in another.
 
               10. Translate the provided asset description into English:
                   - Return it in the top-level "descriptionEn" field.
@@ -134,6 +167,7 @@ internal sealed class ProfilePromptBuilder
                   {
                     "name": "Russian factor name",
                     "nameEn": "Accurate English translation of the same factor",
+                    "hypothesisEn": "Actual sales of Tesla Model 3 and Model Y have increased.",
                     "isPositive": true,
                     "importance": 0.0
                   }
@@ -151,17 +185,28 @@ internal sealed class ProfilePromptBuilder
                 customers, suppliers, competitors, regulation, or business model?
                 If no → REJECT it.
 
-              2. DRIVER TEST:
-                Does the factor describe something to which the asset is persistently sensitive?
+              2. CHANGE TEST:
+                Does the factor describe a specific positive or negative
+                change in an asset-related business driver?
                 If no → REJECT it.
 
+                The factor must have a clear direction of change
+                and must be suitable for NLI verification.
+
               3. NEWS TEST:
-                Does the factor sound like a headline describing a specific event that already happened?
-                If yes → REJECT it and rewrite it as the underlying persistent driver.
+                Does the factor describe a specific event that has
+                already happened, including dates or announcements?
+                If yes → REJECT it.
+
+                The factor must describe a possible development
+                that future news could confirm or contradict.
 
               4. DUPLICATE TEST:
-                Does another factor already represent essentially the same underlying driver?
+                Does another factor describe essentially the same change?
                 If yes → REJECT it.
+
+                Opposite changes in the same underlying driver are allowed
+                and are NOT considered duplicates.
 
               Prefer factors related to:
                 - demand for specific products or product families;
@@ -186,10 +231,14 @@ internal sealed class ProfilePromptBuilder
                 - the "factors" array contains EXACTLY 40 factors;
                 - EXACTLY 20 factors have isPositive = true;
                 - EXACTLY 20 factors have isPositive = false;
-                - every factor describes a persistent driver rather than a news event;
+                - every factor describes a specific possible positive or negative change;
+                - every factor can be confirmed or contradicted by a news article;
+                - no factor is merely a static topic or characteristic;
                 - no factors are duplicates or near duplicates.
                 - "descriptionEn" is an accurate English translation of the asset description;
-                - every factor has both "name" and "nameEn", with identical financial meaning.
+                - every factor has "name", "nameEn", and "hypothesisEn";
+                - all three fields describe exactly the same event;
+                - every "hypothesisEn" is a complete English factual statement.
 
               If any condition is not satisfied, correct the list before returning the JSON.
 
